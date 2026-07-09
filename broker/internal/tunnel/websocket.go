@@ -3,7 +3,6 @@ package tunnel
 import (
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"io"
 	"log"
 	"net"
@@ -245,7 +244,6 @@ func (tm *TunnelManager) HandleWS(w http.ResponseWriter, r *http.Request) {
 						Payload: payload, // { ip: "...", network: "..." }
 						Time:    time.Now().Format("15:04:05"),
 					}
-				}
 				} else if msgType == "DATA" {
 					connId, _ := payload["connId"].(string)
 					dataStr, _ := payload["data"].(string)
