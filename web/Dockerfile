@@ -12,6 +12,9 @@
 FROM node:22-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json* ./
+# Força instalação de TODAS as dependências (inclusive devDependencies)
+# O Coolify injeta ARG NODE_ENV=production que faz npm pular devDependencies
+ENV NODE_ENV=development
 RUN npm install --ignore-scripts
 
 # --- Stage 2: Desenvolvimento (usado pelo docker-compose) ---
