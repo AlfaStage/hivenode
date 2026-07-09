@@ -119,7 +119,7 @@ export default function ProxiesPage() {
       if (!res.ok) throw new Error(data.error);
       
       // Compressão Extrema para o QR Code Nível L ficar minúsculo
-      const payload = `hivenode|${data.data.linkToken}|${data.data.ip}`;
+      const payload = `hivenode|${data.data.linkToken}`;
       
       setQrPayload(payload);
       setIsQrOpen(true);
