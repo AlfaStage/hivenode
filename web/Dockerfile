@@ -34,11 +34,16 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # Variáveis dummy para o build não crashar ao importar Redis/Prisma
-ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
 ENV REDIS_URL="redis://localhost:6379/0"
 ENV JWT_SECRET="build-time-dummy-secret"
 ENV ENCRYPTION_KEY="build-time-dummy-encryption-key-32ch"
-ENV NEXT_PUBLIC_APP_URL="http://localhost:3000"
+
+# Argumentos que o Coolify/Docker vai passar durante o build
+ARG NEXT_PUBLIC_APP_URL
+ENV NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
+
+# Mock de DATABASE_URL para o prisma generate não quebrar durante o build
+ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
 
 RUN npx prisma generate
 RUN npm run build
