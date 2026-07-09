@@ -54,7 +54,7 @@ export default function ProxiesPage() {
   
   // O Log Context define se estamos vendo logs globais (celular) ou locais (proxy)
   const [logContext, setLogContext] = useState<{type: "node" | "proxy", title: string, id: string} | null>(null);
-  const [liveLogs, setLiveLogs] = useState<{time: string, msg: string, nodeId: string}[]>([]);
+  const [liveLogs, setLiveLogs] = useState<{id?: string, time: string, msg: string, nodeId: string}[]>([]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -251,7 +251,7 @@ export default function ProxiesPage() {
           Para rotear seu tráfego, configure o seu navegador ou sistema operacional usando as credenciais abaixo e aponte para o nosso Broker na porta 10000.
         </p>
         <code className="bg-[#0a0a0c] text-emerald-300 p-3 rounded-lg block border border-emerald-500/30">
-          socks5://usuario:senha@ip-do-servidor:10000
+          socks5://usuario:senha@hivenode.alfastage.com.br:10000
         </code>
       </div>
 

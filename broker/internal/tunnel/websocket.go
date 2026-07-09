@@ -146,7 +146,6 @@ func NewTunnelManager() *TunnelManager {
 		dashboardClients: make(map[*websocket.Conn]bool),
 		virtualConns:     make(map[string]*VirtualConn),
 		BroadcastChan:    make(chan BroadcastEvent, 100),
-		activeSockets:    make(map[string]*VirtualConn),
 	}
 	go tm.runBroadcaster()
 	return tm
