@@ -49,16 +49,35 @@ services:
       retries: 5
 
   # ----------------------------------------------------------------------------
-  # Web: Next.js (Frontend + API + Workers BullMQ)
+  # Migrator: Serviço efêmero para empurrar o Prisma DB
+  # ----------------------------------------------------------------------------
+  migrator:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+      target: deps
+    container_name: hivenode-migrator
+    command: sh -c "npx prisma generate && npx prisma db push"
+    environment:
+      - DATABASE_URL=postgresql://hivenode_user:hivenode_dev_2026@postgres:5432/hivenode?schema=public
+    volumes:
+      - ./web/prisma:/app/prisma
+    networks:
+      - hivenode-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ----------------------------------------------------------------------------
+  # Web: Next.js (Frontend + API)
   # ----------------------------------------------------------------------------
   web:
     build:
       context: ./web
       dockerfile: Dockerfile
-      target: dev
+      target: runner
     expose:
       - "3000"
-    command: sh -c "npx prisma generate && npx prisma db push && npm run dev"
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.hivenode-web.rule=Host(`hivenode.alfastage.com.br`)"
@@ -74,16 +93,12 @@ services:
       - ABACATE_PAY_WEBHOOK_SECRET=${ABACATE_PAY_WEBHOOK_SECRET}
       - BROKER_API_URL=http://broker:${BROKER_SOCKS5_PORT:-10000}
       - BROKER_SOCKS_PORT=${BROKER_SOCKS5_PORT:-10000}
-    volumes:
-      - ./web/src:/app/src
-      - ./web/public:/app/public
-      - ./web/prisma:/app/prisma
-      - /app/node_modules
-      - /app/.next
     networks:
       - hivenode-net
     restart: unless-stopped
     depends_on:
+      migrator:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       redis:
@@ -98,7 +113,7 @@ services:
     build:
       context: ./broker
       dockerfile: Dockerfile
-      target: dev
+      target: runner
     ports:
       - "${BROKER_SOCKS5_PORT:-10000}:${BROKER_SOCKS5_PORT:-10000}"
     expose:
@@ -114,8 +129,6 @@ services:
       - BILLING_FLUSH_MB=${BROKER_BILLING_FLUSH_MB:-5}
       - BILLING_FLUSH_SEC=${BROKER_BILLING_FLUSH_SEC:-30}
       - JWT_SECRET=${JWT_SECRET}
-    volumes:
-      - ./broker:/app
     networks:
       - hivenode-net
     restart: unless-stopped
