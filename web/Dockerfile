@@ -68,7 +68,7 @@ COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 # Script de inicialização: migra o banco e depois inicia o servidor
 RUN echo '#!/bin/sh' > /app/start.sh && \
     echo 'echo "🔄 Executando Prisma DB Push..."' >> /app/start.sh && \
-    echo 'npx prisma db push --skip-generate 2>&1 || echo "⚠️ Prisma push falhou, continuando..."' >> /app/start.sh && \
+    echo 'node node_modules/prisma/build/index.js db push --skip-generate --accept-data-loss 2>&1 || echo "⚠️ Prisma push falhou, continuando..."' >> /app/start.sh && \
     echo 'echo "🚀 Iniciando Next.js..."' >> /app/start.sh && \
     echo 'exec node server.js' >> /app/start.sh && \
     chmod +x /app/start.sh
