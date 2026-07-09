@@ -59,6 +59,10 @@ services:
     container_name: hivenode-web
     ports:
       - "${WEB_PORT:-3000}:3000"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.hivenode-web.rule=Host(`hivenode.alfastage.com.br`)"
+      - "traefik.http.services.hivenode-web.loadbalancer.server.port=3000"
     environment:
       - NODE_ENV=${NODE_ENV:-development}
       - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
@@ -99,6 +103,10 @@ services:
     ports:
       - "${BROKER_SOCKS5_PORT:-10000}:${BROKER_SOCKS5_PORT:-10000}"
       - "${BROKER_TUNNEL_PORT:-10001}:${BROKER_TUNNEL_PORT:-10001}"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.hivenode-broker.rule=Host(`api.hivenode.alfastage.com.br`)"
+      - "traefik.http.services.hivenode-broker.loadbalancer.server.port=10001"
     environment:
       - REDIS_URL=redis://:hivenode_redis_2026@redis:6379/0
       - SOCKS5_PORT=${BROKER_SOCKS5_PORT:-10000}
