@@ -129,8 +129,8 @@ func (vc *VirtualConn) Close() error {
 }
 
 // Dummy impls para net.Conn
-func (vc *VirtualConn) LocalAddr() net.Addr                { return &net.TCPAddr{} }
-func (vc *VirtualConn) RemoteAddr() net.Addr               { return &net.TCPAddr{} }
+func (vc *VirtualConn) LocalAddr() net.Addr                { return &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 10000} }
+func (vc *VirtualConn) RemoteAddr() net.Addr               { return &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 10000} }
 func (vc *VirtualConn) SetDeadline(t time.Time) error      { return nil }
 func (vc *VirtualConn) SetReadDeadline(t time.Time) error  { return nil }
 func (vc *VirtualConn) SetWriteDeadline(t time.Time) error { return nil }
