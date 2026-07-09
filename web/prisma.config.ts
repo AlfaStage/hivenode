@@ -4,7 +4,6 @@
 // Define a URL de conexão ao banco de dados fora do schema.prisma.
 // ==============================================================================
 
-import "dotenv/config";
 import { defineConfig } from "prisma/config";
 
 export default defineConfig({
