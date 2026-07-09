@@ -5,7 +5,7 @@ import { apiError, apiSuccess, generateSecureString } from "@/lib/utils";
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const authHeader = request.headers.get("authorization");
@@ -13,9 +13,11 @@ export async function POST(
 
     const token = authHeader.split(" ")[1];
     const payload = await verifyToken(token);
+    
+    const { id } = await params;
 
     const node = await prisma.node.findUnique({
-      where: { id: params.id }
+      where: { id }
     });
 
     if (!node || node.userId !== payload.userId) {
@@ -25,7 +27,7 @@ export async function POST(
     const newPass = generateSecureString(16);
 
     const updatedNode = await prisma.node.update({
-      where: { id: params.id },
+      where: { id },
       data: { proxyPass: newPass }
     });
 
