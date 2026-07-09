@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"time"
 
 	"github.com/gorilla/websocket"
 
@@ -46,11 +47,12 @@ func StartSocks5Server(port string, redisClient *redis.Client, tm *TunnelManager
 		AuthMethods: []socks5.Authenticator{auth},
 		Logger:      log.New(log.Writer(), "[SOCKS5] ", log.LstdFlags),
 		Dial: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			// Simulação de interceptação real TCP -> WS
-			log.Printf("Interceptando TCP para %s. Procurando celular responsável...", addr)
+			log.Printf("Interceptando TCP para %s. Preparando túnel VirtualConn...", addr)
 			
-			// Para propósitos de MVP, pegamos o único celular que deve estar conectado
-			// No ambiente real, pegaríamos o context do auth.
+			// Gera um ID simples usando nanosegundos
+			connID := fmt.Sprintf("conn_%d", time.Now().UnixNano())
+			
+			// Para propósitos de MVP, pegamos o único celular conectado
 			tm.mu.RLock()
 			var conn *websocket.Conn
 			var nodeID string
@@ -65,15 +67,34 @@ func StartSocks5Server(port string, redisClient *redis.Client, tm *TunnelManager
 				return nil, fmt.Errorf("nenhum celular android conectado no momento")
 			}
 
-			log.Printf("Enviando requisição %s para o celular %s", addr, nodeID)
+			vc := &VirtualConn{
+				ConnID:  connID,
+				NodeID:  nodeID,
+				TM:      tm,
+				ReadCh:  make(chan []byte, 1024),
+				CloseCh: make(chan struct{}),
+				buffer:  make([]byte, 0),
+			}
+			tm.AddVirtualConn(vc)
+
+			// Envia o comando para o celular abrir a porta local com a internet
+			msg := map[string]interface{}{
+				"type":   "DIAL",
+				"connId": connID,
+				"host":   addr,
+			}
 			
-			// Aqui nós criaríamos um net.Conn virtual que escreve no WebSocket.
-			// Para evitar complexidade de mutex/io.Pipe gigante nesta demonstração inicial,
-			// enviamos apenas o comando inicial pro Android.
+			tm.mu.Lock()
+			err := conn.WriteJSON(msg)
+			tm.mu.Unlock()
 			
-			// Isso simula o início da conexão (O Android conectará no host real)
-			// (Implementação real completa exigiria o `net.Conn` proxy)
-			return nil, fmt.Errorf("Proxy em modo Dry-Run: Redirecionamento configurado para %s (TCP <-> WS). App Android já preparado.", addr)
+			if err != nil {
+				vc.Close()
+				return nil, err
+			}
+
+			log.Printf("Túnel TCP->WS criado para %s via celular %s (ConnID: %s)", addr, nodeID, connID)
+			return vc, nil
 		},
 	}
 
