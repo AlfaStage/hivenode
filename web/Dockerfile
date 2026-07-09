@@ -54,9 +54,6 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV HOSTNAME="0.0.0.0"
 
-# Instala ferramentas do prisma CLI para rodar as migrations na inicialização
-RUN npm init -y && npm install prisma@7.8.0 @prisma/config@7.8.0 effect tsx --no-save
-
 # Segurança: roda como user não-root
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
@@ -68,6 +65,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/prisma.config.ts ./
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
+COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=builder /app/node_modules/effect ./node_modules/effect
 
 # Script de inicialização: migra o banco e depois inicia o servidor
 RUN echo '#!/bin/sh' > /app/start.sh && \
