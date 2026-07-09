@@ -49,26 +49,6 @@ services:
       retries: 5
 
   # ----------------------------------------------------------------------------
-  # Migrator: Serviço efêmero para empurrar o Prisma DB
-  # ----------------------------------------------------------------------------
-  migrator:
-    build:
-      context: ./web
-      dockerfile: Dockerfile
-      target: deps
-    container_name: hivenode-migrator
-    command: sh -c "npx prisma generate && npx prisma db push"
-    environment:
-      - DATABASE_URL=postgresql://hivenode_user:hivenode_dev_2026@postgres:5432/hivenode?schema=public
-    volumes:
-      - ./web/prisma:/app/prisma
-    networks:
-      - hivenode-net
-    depends_on:
-      postgres:
-        condition: service_healthy
-
-  # ----------------------------------------------------------------------------
   # Web: Next.js (Frontend + API)
   # ----------------------------------------------------------------------------
   web:
@@ -97,8 +77,6 @@ services:
       - hivenode-net
     restart: unless-stopped
     depends_on:
-      migrator:
-        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       redis:
