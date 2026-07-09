@@ -29,6 +29,14 @@ FROM node:22-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+
+# Variáveis dummy para o build não crashar ao importar Redis/Prisma
+ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
+ENV REDIS_URL="redis://localhost:6379/0"
+ENV JWT_SECRET="build-time-dummy-secret"
+ENV ENCRYPTION_KEY="build-time-dummy-encryption-key-32ch"
+ENV NEXT_PUBLIC_APP_URL="http://localhost:3000"
+
 RUN npx prisma generate
 RUN npm run build
 
