@@ -4,18 +4,12 @@ import { apiSuccess, apiError } from "@/lib/utils";
 import os from "os";
 
 function getHostIp(request: NextRequest) {
-  // Se tiver um domínio de produção configurado, usa ele
-  if (process.env.NEXT_PUBLIC_DOMAIN) {
-    return process.env.NEXT_PUBLIC_DOMAIN;
+  // Em produção, o App móvel deve se conectar através do domínio ponte da API (onde a porta 10000 tá liberada)
+  if (process.env.NODE_ENV === "production") {
+    return "api.hivenode.alfastage.com.br";
   }
   
-  // Tenta pegar o Host do header da requisição
-  const host = request.headers.get("host")?.split(":")[0];
-  if (host && host !== "localhost" && host !== "127.0.0.1") {
-    return host;
-  }
-
-  // Descobre o IP da rede local automaticamente
+  // No ambiente de dev local, tenta adivinhar o IP da máquina
   const nets = os.networkInterfaces();
   for (const name of Object.keys(nets)) {
     if (nets[name]) {
