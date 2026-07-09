@@ -56,9 +56,8 @@ services:
       context: ./web
       dockerfile: Dockerfile
       target: dev
-    container_name: hivenode-web
-    ports:
-      - "${WEB_PORT:-3000}:3000"
+    expose:
+      - "3000"
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.hivenode-web.rule=Host(`hivenode.alfastage.com.br`)"
@@ -99,10 +98,10 @@ services:
       context: ./broker
       dockerfile: Dockerfile
       target: dev
-    container_name: hivenode-broker
     ports:
       - "${BROKER_SOCKS5_PORT:-10000}:${BROKER_SOCKS5_PORT:-10000}"
-      - "${BROKER_TUNNEL_PORT:-10001}:${BROKER_TUNNEL_PORT:-10001}"
+    expose:
+      - "10001"
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.hivenode-broker.rule=Host(`api.hivenode.alfastage.com.br`)"
