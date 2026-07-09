@@ -1,0 +1,7 @@
+vendor
+*.exe
+*.test
+.git
+.gitignore
+README.md
+*.md

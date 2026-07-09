@@ -1,0 +1,10 @@
+node_modules
+.next
+.env
+.env.local
+web/node_modules
+web/.next
+broker/vendor
+*.log
+.git
+.temp

@@ -1,0 +1,119 @@
+// ==============================================================================
+// HiveNode — Prisma Schema
+// ==============================================================================
+// Fonte da verdade: HiveNode.md (Seção 4)
+// ==============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ==============================================================================
+// Models
+// ==============================================================================
+
+model User {
+  id               String         @id @default(uuid())
+  email            String         @unique
+  passwordHash     String
+  role             Role           @default(CUSTOMER)
+  balanceGB        Float          @default(0.0)
+  abacatePayCustId String?
+  nodes            Node[]
+  proxies          ProxyCredential[]
+  subscriptions    Subscription[]
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  @@map("users")
+}
+
+model Node {
+  id           String     @id @default(uuid())
+  userId       String?
+  user         User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+  type         NodeType
+  status       NodeStatus @default(OFFLINE)
+  deviceModel  String?
+  ipAddress    String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  proxies      ProxyCredential[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([type])
+  @@map("nodes")
+}
+
+model ProxyCredential {
+  id           String     @id @default(uuid())
+  nodeId       String
+  node         Node       @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  proxyUser    String     @unique
+  proxyPass    String
+  totalBytesRx BigInt     @default(0)
+  totalBytesTx BigInt     @default(0)
+  status       NodeStatus @default(ONLINE)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@index([nodeId])
+  @@index([userId])
+  @@map("proxy_credentials")
+}
+
+model Subscription {
+  id               String    @id @default(uuid())
+  userId           String
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planType         PlanType
+  status           SubStatus @default(ACTIVE)
+  abacatePaySubId  String?
+  currentPeriodEnd DateTime
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@map("subscriptions")
+}
+
+// ==============================================================================
+// Enums
+// ==============================================================================
+
+enum Role {
+  CUSTOMER
+  ADMIN
+}
+
+enum NodeType {
+  BYOD
+  MASTER_MOBILE
+  DATACENTER
+}
+
+enum NodeStatus {
+  ONLINE
+  OFFLINE
+  BLOCKED
+}
+
+enum PlanType {
+  BYOD_MONTHLY
+  PREMIUM_METERED
+}
+
+enum SubStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+}
