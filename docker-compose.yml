@@ -58,6 +58,7 @@ services:
       target: dev
     expose:
       - "3000"
+    command: sh -c "npx prisma generate && npx prisma db push && npm run dev"
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.hivenode-web.rule=Host(`hivenode.alfastage.com.br`)"
