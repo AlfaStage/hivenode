@@ -6,6 +6,8 @@ import { Sidebar } from "@/components/Sidebar";
 import { Header } from "@/components/Header";
 import { getGravatarProfile } from "@/lib/gravatar";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Dashboard | HiveNode",
 };
