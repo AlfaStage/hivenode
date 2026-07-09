@@ -60,15 +60,16 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 
-# Copia Prisma CLI e config para auto-migração na inicialização
-COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
-COPY --from=builder /app/node_modules/@prisma/engines ./node_modules/@prisma/engines
-COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
+# Instala o Prisma CLI globalmente para podermos usar o comando prisma no start.sh
+RUN npm install -g prisma
+
+# Copia Prisma config
+COPY --from=builder /app/prisma.config.ts ./prisma.config.ts || true
 
 # Script de inicialização: migra o banco e depois inicia o servidor
 RUN echo '#!/bin/sh' > /app/start.sh && \
     echo 'echo "🔄 Executando Prisma DB Push..."' >> /app/start.sh && \
-    echo 'node node_modules/prisma/build/index.js db push --accept-data-loss 2>&1 || echo "⚠️ Prisma push falhou, continuando..."' >> /app/start.sh && \
+    echo 'prisma db push --accept-data-loss 2>&1 || echo "⚠️ Prisma push falhou, continuando..."' >> /app/start.sh && \
     echo 'echo "🚀 Iniciando Next.js..."' >> /app/start.sh && \
     echo 'exec node server.js' >> /app/start.sh && \
     chmod +x /app/start.sh
