@@ -76,7 +76,10 @@ export default function ProxiesPage() {
     fetchData();
 
     // Conecta no WebSocket do Go Broker usando o mesmo IP que o usuário digitou na URL
-    const ws = new WebSocket(`ws://${window.location.hostname}:10001/dashboard-stream`);
+    const isHttps = window.location.protocol === "https:";
+    const wsProtocol = isHttps ? "wss://" : "ws://";
+    const wsHost = isHttps ? "api.hivenode.alfastage.com.br" : `${window.location.hostname}:10001`;
+    const ws = new WebSocket(`${wsProtocol}${wsHost}/dashboard-stream`);
     
     ws.onmessage = (event) => {
       try {
