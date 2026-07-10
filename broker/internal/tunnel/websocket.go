@@ -1,7 +1,6 @@
 package tunnel
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"io"
 	"log"
@@ -40,12 +39,13 @@ type NodeStats struct {
 
 // VirtualConn implementa net.Conn enviando dados pelo WebSocket do Android
 type VirtualConn struct {
-	ConnID  string
-	NodeID  string
-	TM      *TunnelManager
-	ReadCh  chan []byte
-	CloseCh chan struct{}
-	closed  bool
+	ConnID     string
+	NodeID     string
+	TM         *TunnelManager
+	ReadCh     chan []byte
+	DialRespCh chan bool
+	CloseCh    chan struct{}
+	closed     bool
 	mu      sync.Mutex
 	buffer  []byte
 }
@@ -79,12 +79,12 @@ func (vc *VirtualConn) Write(b []byte) (n int, err error) {
 	}
 	vc.mu.Unlock()
 
-	encoded := base64.StdEncoding.EncodeToString(b)
-	msg := map[string]interface{}{
-		"type":   "DATA",
-		"connId": vc.ConnID,
-		"data":   encoded,
-	}
+	// Formato Binário: [connIdLen (1)] + [connId] + [payload]
+	idBytes := []byte(vc.ConnID)
+	outBuffer := make([]byte, 1+len(idBytes)+len(b))
+	outBuffer[0] = byte(len(idBytes))
+	copy(outBuffer[1:], idBytes)
+	copy(outBuffer[1+len(idBytes):], b)
 
 	vc.TM.mu.RLock()
 	ws, ok := vc.TM.devices[vc.NodeID]
@@ -100,7 +100,7 @@ func (vc *VirtualConn) Write(b []byte) (n int, err error) {
 	}
 
 	vc.TM.mu.Lock()
-	err = ws.WriteJSON(msg)
+	err = ws.WriteMessage(websocket.BinaryMessage, outBuffer)
 	vc.TM.mu.Unlock()
 
 	if err != nil {
@@ -222,7 +222,7 @@ func (tm *TunnelManager) HandleWS(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for {
-		_, msgBytes, err := conn.ReadMessage()
+		msgTypeRaw, msgBytes, err := conn.ReadMessage()
 		if err != nil {
 			log.Printf("❌ Device desconectado: %s", nodeID)
 			tm.mu.Lock()
@@ -239,7 +239,32 @@ func (tm *TunnelManager) HandleWS(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 
-		// Faz o parse do pacote recebido do Celular
+		// Verifica se a mensagem é um pacote TCP Binário
+		if msgTypeRaw == websocket.BinaryMessage {
+			if len(msgBytes) > 1 {
+				idLen := int(msgBytes[0])
+				if len(msgBytes) >= 1+idLen {
+					connId := string(msgBytes[1 : 1+idLen])
+					payload := msgBytes[1+idLen:]
+
+					tm.mu.RLock()
+					vc, exists := tm.virtualConns[connId]
+					stats, statsOk := tm.nodeStats[nodeID]
+					tm.mu.RUnlock()
+
+					if statsOk {
+						atomic.AddUint64(&stats.Tx, uint64(len(payload)))
+					}
+
+					if exists {
+						vc.ReadCh <- payload
+					}
+				}
+			}
+			continue
+		}
+
+		// Faz o parse do pacote recebido do Celular (Controle/JSON)
 		var payload map[string]interface{}
 		if err := json.Unmarshal(msgBytes, &payload); err == nil {
 			msgType, ok := payload["type"].(string)
@@ -269,27 +294,34 @@ func (tm *TunnelManager) HandleWS(w http.ResponseWriter, r *http.Request) {
 						Payload: payload, // { ip: "...", network: "...", rx: X, tx: Y }
 						Time:    time.Now().Format("15:04:05"),
 					}
-				} else if msgType == "DATA" {
+				} else if msgType == "DIAL_OK" {
 					connId, _ := payload["connId"].(string)
-					dataStr, _ := payload["data"].(string)
-					if connId != "" && dataStr != "" {
-						decoded, err := base64.StdEncoding.DecodeString(dataStr)
-						if err == nil {
-							tm.mu.RLock()
-							vc, exists := tm.virtualConns[connId]
-							stats, statsOk := tm.nodeStats[nodeID]
-							tm.mu.RUnlock()
-
-							if statsOk {
-								atomic.AddUint64(&stats.Tx, uint64(len(decoded)))
-							}
-
-							if exists {
-								vc.ReadCh <- decoded
+					if connId != "" {
+						tm.mu.RLock()
+						vc, exists := tm.virtualConns[connId]
+						tm.mu.RUnlock()
+						if exists {
+							select {
+							case vc.DialRespCh <- true:
+							default:
 							}
 						}
 					}
-				} else if msgType == "CLOSE" || msgType == "DIAL_ERR" {
+				} else if msgType == "DIAL_ERR" {
+					connId, _ := payload["connId"].(string)
+					if connId != "" {
+						tm.mu.RLock()
+						vc, exists := tm.virtualConns[connId]
+						tm.mu.RUnlock()
+						if exists {
+							select {
+							case vc.DialRespCh <- false:
+							default:
+							}
+							vc.Close()
+						}
+					}
+				} else if msgType == "CLOSE" {
 					connId, _ := payload["connId"].(string)
 					if connId != "" {
 						tm.mu.RLock()

@@ -6,21 +6,9 @@ import Redis from "ioredis";
 
 const redis = new Redis(process.env.REDIS_URL || "redis://redis:6379");
 
-async function resolvePayload(request: NextRequest) {
-  const authHeader = request.headers.get("authorization");
-  if (authHeader && authHeader.trim() !== "") {
-    try {
-      return await verifyToken(authHeader.split(" ")[1]);
-    } catch {
-      // Ignora erro do header e tenta o cookie
-    }
-  }
-  return await requireAuth();
-}
-
 export async function POST(request: NextRequest) {
   try {
-    const payload = await resolvePayload(request);
+    const payload = await requireAuth();
 
     const body = await request.json();
     const { proxyUser, proxyPass, nodeId } = body;

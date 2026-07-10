@@ -3,14 +3,6 @@ import { prisma } from "@/lib/prisma";
 import { verifyToken, requireAuth } from "@/lib/auth";
 import { apiError, apiSuccess, generateSecureString } from "@/lib/utils";
 
-async function resolvePayload(request: NextRequest) {
-  const authHeader = request.headers.get("authorization");
-  if (authHeader) {
-    return await verifyToken(authHeader.split(" ")[1]);
-  }
-  return await requireAuth();
-}
-
 // Buscar Nodes do usuário
 export async function GET(request: NextRequest) {
   try {
@@ -46,7 +38,7 @@ export async function GET(request: NextRequest) {
 // Criar novo Node
 export async function POST(request: NextRequest) {
   try {
-    const payload = await resolvePayload(request);
+    const payload = await requireAuth();
 
     const body = await request.json();
     const { deviceName } = body;

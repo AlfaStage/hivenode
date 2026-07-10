@@ -6,7 +6,7 @@
 
 import { SignJWT, jwtVerify, type JWTPayload } from "jose";
 import bcryptjs from "bcryptjs";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 
 // ==============================================================================
 // Tipos
@@ -107,6 +107,12 @@ export async function removeAuthCookie(): Promise<void> {
 
 export async function getAuthenticatedUser(): Promise<TokenPayload | null> {
   try {
+    const headersList = await headers();
+    const authHeader = headersList.get("authorization");
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      return await verifyToken(authHeader.split(" ")[1]);
+    }
+
     const token = await getAuthCookie();
     if (!token) return null;
     return await verifyToken(token);

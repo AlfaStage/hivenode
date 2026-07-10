@@ -68,12 +68,13 @@ func StartSocks5Server(port string, redisClient *redis.Client, tm *TunnelManager
 			}
 
 			vc := &VirtualConn{
-				ConnID:  connID,
-				NodeID:  nodeID,
-				TM:      tm,
-				ReadCh:  make(chan []byte, 1024),
-				CloseCh: make(chan struct{}),
-				buffer:  make([]byte, 0),
+				ConnID:     connID,
+				NodeID:     nodeID,
+				TM:         tm,
+				ReadCh:     make(chan []byte, 1024),
+				DialRespCh: make(chan bool, 1),
+				CloseCh:    make(chan struct{}),
+				buffer:     make([]byte, 0),
 			}
 			tm.AddVirtualConn(vc)
 
@@ -91,6 +92,18 @@ func StartSocks5Server(port string, redisClient *redis.Client, tm *TunnelManager
 			if err != nil {
 				vc.Close()
 				return nil, err
+			}
+
+			// Aguarda a confirmação do celular (DIAL_OK ou DIAL_ERR)
+			select {
+			case success := <-vc.DialRespCh:
+				if !success {
+					vc.Close()
+					return nil, fmt.Errorf("celular recusou a conexao TCP para %s", addr)
+				}
+			case <-time.After(10 * time.Second):
+				vc.Close()
+				return nil, fmt.Errorf("timeout esperando celular conectar ao %s", addr)
 			}
 
 			log.Printf("Túnel TCP->WS criado para %s via celular %s (ConnID: %s)", addr, nodeID, connID)
