@@ -65,14 +65,11 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/prisma.config.ts ./
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
-COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
-COPY --from=builder /app/node_modules/effect ./node_modules/effect
 
 # Script de inicialização: migra o banco e depois inicia o servidor
 RUN echo '#!/bin/sh' > /app/start.sh && \
-    echo 'echo "🔄 Executando Prisma DB Push..."' >> /app/start.sh && \
-    echo 'node ./node_modules/prisma/build/index.js db push --accept-data-loss 2>&1 || echo "⚠️ Prisma push falhou, continuando..."' >> /app/start.sh && \
+    echo 'echo "🔄 Executando Prisma DB Push via npx cloud..."' >> /app/start.sh && \
+    echo 'npx --yes prisma@latest db push --accept-data-loss 2>&1 || echo "⚠️ Prisma push falhou, continuando..."' >> /app/start.sh && \
     echo 'echo "🚀 Iniciando Next.js..."' >> /app/start.sh && \
     echo 'exec node server.js' >> /app/start.sh && \
     chmod +x /app/start.sh
