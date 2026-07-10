@@ -57,15 +57,15 @@ const worker = new Worker<BillingJobData>(
       console.log(`[BullMQ] ✅ Debitado ${gbUsed.toFixed(4)} GB do usuário ${user.email}. Saldo restante: ${user.balanceGB.toFixed(2)} GB.`);
     }
 
-    // Atualiza estatísticas do Node
-    await prisma.node.update({
-      where: { id: nodeId },
+    // Atualiza estatísticas do Proxy
+    await prisma.proxyCredential.updateMany({
+      where: { nodeId: nodeId },
       data: {
         totalBytesTx: { increment: BigInt(bytesUsed) },
       },
     });
   },
-  { connection: redis }
+  { connection: redis as any }
 );
 
 worker.on("failed", (job, err) => {
