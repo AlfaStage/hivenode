@@ -70,13 +70,8 @@ COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/tsconfig.json ./tsconfig.json
 
-# Dependências do Prisma CLI (prisma, tsx, typescript) para rodar db push em runtime
-COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
-COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
-COPY --from=builder /app/node_modules/tsx ./node_modules/tsx
-COPY --from=builder /app/node_modules/typescript ./node_modules/typescript
-COPY --from=builder /app/node_modules/.bin/prisma ./node_modules/.bin/prisma
-COPY --from=builder /app/node_modules/.bin/tsx ./node_modules/.bin/tsx
+# Instala Prisma CLI + tsx limpos (garante WASM, engines e symlinks corretos)
+RUN npm install --no-save prisma tsx typescript @prisma/adapter-pg 2>&1
 
 # Script de inicialização: sincroniza schema no banco e depois inicia o servidor
 RUN echo '#!/bin/sh' > /app/start.sh && \
@@ -89,3 +84,4 @@ RUN echo '#!/bin/sh' > /app/start.sh && \
 USER nextjs
 EXPOSE 3000
 CMD ["/app/start.sh"]
+
