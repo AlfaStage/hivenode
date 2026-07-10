@@ -71,8 +71,8 @@ COPY --from=builder /app/node_modules/effect ./node_modules/effect
 
 # Script de inicialização: migra o banco e depois inicia o servidor
 RUN echo '#!/bin/sh' > /app/start.sh && \
-    echo 'echo "🔄 Executando Prisma DB Push via npx..."' >> /app/start.sh && \
-    echo 'npx --yes prisma db push --accept-data-loss 2>&1 || echo "⚠️ Prisma push falhou, continuando..."' >> /app/start.sh && \
+    echo 'echo "🔄 Executando Prisma DB Push..."' >> /app/start.sh && \
+    echo 'node ./node_modules/prisma/build/index.js db push --accept-data-loss 2>&1 || echo "⚠️ Prisma push falhou, continuando..."' >> /app/start.sh && \
     echo 'echo "🚀 Iniciando Next.js..."' >> /app/start.sh && \
     echo 'exec node server.js' >> /app/start.sh && \
     chmod +x /app/start.sh
