@@ -4,7 +4,8 @@ import { useEffect, useState, useCallback } from "react";
 import QRCode from "react-qr-code";
 import { 
   Shield, Plus, Activity, HardDrive, 
-  Eye, TerminalSquare, QrCode, Trash2, Copy
+  Eye, EyeOff, TerminalSquare, QrCode, Trash2, Copy,
+  Wifi, Signal, Battery, Clock, Tag, Info, ArrowDown, ArrowUp
 } from "lucide-react";
 
 type Node = {
@@ -13,6 +14,7 @@ type Node = {
   deviceModel?: string;
   status: string;
   createdAt: string;
+  tags?: string[];
 };
 
 type Proxy = {
@@ -48,9 +50,23 @@ export default function ProxiesPage() {
   const [nodeToRename, setNodeToRename] = useState<string | null>(null);
   const [newNodeName, setNewNodeName] = useState("");
   const [openCopyPopover, setOpenCopyPopover] = useState<string | null>(null);
+  const [openDetailsPopover, setOpenDetailsPopover] = useState<string | null>(null);
+  
+  const [isEditTagsOpen, setIsEditTagsOpen] = useState(false);
+  const [nodeToEditTags, setNodeToEditTags] = useState<string | null>(null);
+  const [tagsInput, setTagsInput] = useState("");
+  
+  const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
+
+  const togglePasswordVisibility = (id: string) => {
+    const newSet = new Set(visiblePasswords);
+    if (newSet.has(id)) newSet.delete(id);
+    else newSet.add(id);
+    setVisiblePasswords(newSet);
+  };
   
   // Telemetria ao vivo dos aparelhos conectados
-  const [nodeTelemetry, setNodeTelemetry] = useState<Record<string, {ip: string, network: string}>>({});
+  const [nodeTelemetry, setNodeTelemetry] = useState<Record<string, {ip?: string, network?: string, battery?: number, uptime?: number, rx?: number, tx?: number, latency?: number}>>({});
   
   // O Log Context define se estamos vendo logs globais (celular) ou locais (proxy)
   const [logContext, setLogContext] = useState<{type: "node" | "proxy", title: string, id: string} | null>(null);
@@ -94,7 +110,10 @@ export default function ProxiesPage() {
         } else if (msg.type === "TELEMETRY") {
           setNodeTelemetry(prev => ({
             ...prev,
-            [msg.nodeId]: { ip: msg.payload.ip, network: msg.payload.network }
+            [msg.nodeId]: {
+              ...prev[msg.nodeId],
+              ...msg.payload
+            }
           }));
         } else if (msg.type === "LOG") {
         setLiveLogs(prev => [{
@@ -158,6 +177,27 @@ export default function ProxiesPage() {
       setIsRenameNodeOpen(false);
       setNodeToRename(null);
       // Não chamo fetchData() porque o Broadcaster WebSocket (NODE_RENAMED) vai atualizar sozinho!
+    } catch (e: unknown) {
+      if (e instanceof Error) alert(e.message);
+    }
+  };
+
+  const handleEditTags = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!nodeToEditTags) return;
+    try {
+      const tagsArray = tagsInput.split(",").map(t => t.trim()).filter(t => t.length > 0);
+      const res = await fetch(`/api/nodes/${nodeToEditTags}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tags: tagsArray })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      
+      setIsEditTagsOpen(false);
+      setNodeToEditTags(null);
+      fetchData(); 
     } catch (e: unknown) {
       if (e instanceof Error) alert(e.message);
     }
@@ -281,9 +321,12 @@ export default function ProxiesPage() {
             <table className="w-full text-left">
               <thead className="bg-[#0a0a0c] text-[#8e8e99] text-sm uppercase">
                 <tr>
-                  <th className="px-6 py-4 font-medium">Nome do Dispositivo</th>
-                  <th className="px-6 py-4 font-medium">Data de Vínculo</th>
-                  <th className="px-6 py-4 font-medium">Status de Conexão</th>
+                  <th className="px-6 py-4 font-medium">Aparelho</th>
+                  <th className="px-6 py-4 font-medium">Status</th>
+                  <th className="px-6 py-4 font-medium">Rede</th>
+                  <th className="px-6 py-4 font-medium">IP Externo</th>
+                  <th className="px-6 py-4 font-medium">Banda Larga</th>
+                  <th className="px-6 py-4 font-medium">Tags</th>
                   <th className="px-6 py-4 font-medium text-right">Ações</th>
                 </tr>
               </thead>
@@ -291,32 +334,88 @@ export default function ProxiesPage() {
                 {nodes.map(n => (
                   <tr key={n.id} className="hover:bg-[#1a1a20] transition-colors">
                     <td className="px-6 py-4">
-                      <div className="text-sm font-medium text-white">
+                      <div className="text-sm font-bold text-white">
                         {(n.deviceModel || n.deviceName).startsWith("HiveNode ") ? (n.deviceModel || n.deviceName) : `HiveNode ${n.deviceModel || n.deviceName}`}
                       </div>
-                      <div className="text-xs mt-1 flex gap-3">
-                        <span className="text-[#8e8e99] flex items-center gap-1">
-                          <Activity className="w-3 h-3 text-emerald-400" /> 
-                          {nodeTelemetry[n.id]?.network || "Aguardando..."}
-                        </span>
-                        <span className="text-[#8e8e99] flex items-center gap-1">
-                          <HardDrive className="w-3 h-3 text-blue-400" /> 
-                          {nodeTelemetry[n.id]?.ip || "---.---.---.---"}
-                        </span>
+                      <div className="text-xs mt-1 text-[#8e8e99] font-mono">
+                        {n.id.split("-")[0]}
                       </div>
-                    </td>
-                    <td className="px-6 py-4 text-[#8e8e99]">
-                      {new Date(n.createdAt).toLocaleDateString()}
                     </td>
                     <td className="px-6 py-4">
                       {n.status === "ONLINE" ? (
-                        <span className="text-emerald-400 bg-emerald-400/10 px-3 py-1 rounded-full text-xs font-bold">Online</span>
+                        <span className="text-emerald-400 bg-emerald-400/10 px-3 py-1 rounded-full text-xs font-bold border border-emerald-400/20">Online</span>
                       ) : (
-                        <span className="text-amber-500 bg-amber-500/10 px-3 py-1 rounded-full text-xs font-bold">Aguardando Túnel</span>
+                        <span className="text-amber-500 bg-amber-500/10 px-3 py-1 rounded-full text-xs font-bold border border-amber-500/20">Desconectado</span>
                       )}
                     </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2 text-sm text-[#f0f0f2]">
+                        <Wifi className="w-4 h-4 text-blue-400" />
+                        {nodeTelemetry[n.id]?.network || "---"}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-[#8e8e99] font-mono text-sm">
+                      {nodeTelemetry[n.id]?.ip || "---.---.---.---"}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex flex-col gap-1 text-xs font-mono">
+                        <span className="text-emerald-400 flex items-center gap-1"><ArrowDown className="w-3 h-3"/> {formatBytes(nodeTelemetry[n.id]?.rx || 0)}</span>
+                        <span className="text-blue-400 flex items-center gap-1"><ArrowUp className="w-3 h-3"/> {formatBytes(nodeTelemetry[n.id]?.tx || 0)}</span>
+                        <span className="text-amber-500 flex items-center gap-1"><Activity className="w-3 h-3"/> {nodeTelemetry[n.id]?.latency || 0}ms</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex flex-wrap gap-1">
+                        {n.tags && n.tags.length > 0 ? n.tags.map(tag => (
+                          <span key={tag} className="text-xs bg-[#27272e] text-[#8e8e99] px-2 py-0.5 rounded-md border border-[#3e3e4a]">
+                            {tag}
+                          </span>
+                        )) : <span className="text-xs text-[#8e8e99] opacity-50">Sem tags</span>}
+                      </div>
+                    </td>
                     <td className="px-6 py-4 text-right">
-                      <div className="flex justify-end gap-2">
+                      <div className="flex justify-end gap-2 relative">
+                        <div className="relative">
+                          <button 
+                            type="button"
+                            onClick={() => setOpenDetailsPopover(openDetailsPopover === n.id ? null : n.id)}
+                            className="p-2 text-emerald-400 hover:bg-emerald-400/10 rounded-lg transition-colors"
+                            title="Detalhes do Aparelho"
+                          >
+                            <Info className="w-5 h-5" />
+                          </button>
+                          {openDetailsPopover === n.id && (
+                            <div className="absolute right-0 top-full mt-2 w-64 bg-[#1a1a20] border border-[#27272e] rounded-lg shadow-xl z-10 overflow-hidden text-left p-4">
+                              <h3 className="text-white font-bold mb-3 text-sm">Detalhes do Sistema</h3>
+                              <div className="space-y-3 text-sm">
+                                <div className="flex justify-between items-center">
+                                  <span className="text-[#8e8e99] flex items-center gap-2"><Clock className="w-4 h-4"/> Uptime</span>
+                                  <span className="text-white font-mono">{nodeTelemetry[n.id]?.uptime ? `${Math.floor(nodeTelemetry[n.id].uptime! / 60)}m` : "---"}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                  <span className="text-[#8e8e99] flex items-center gap-2"><Battery className="w-4 h-4"/> Bateria</span>
+                                  <span className="text-white font-mono">{nodeTelemetry[n.id]?.battery ? `${Math.floor(nodeTelemetry[n.id].battery! * 100)}%` : "---"}</span>
+                                </div>
+                                <div className="flex justify-between items-center border-t border-[#27272e] pt-3 mt-3">
+                                  <span className="text-[#8e8e99] flex items-center gap-2">Vínculo</span>
+                                  <span className="text-white font-mono text-xs">{new Date(n.createdAt).toLocaleDateString()}</span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        <button 
+                          type="button"
+                          onClick={() => {
+                            setNodeToEditTags(n.id);
+                            setTagsInput((n.tags || []).join(", "));
+                            setIsEditTagsOpen(true);
+                          }}
+                          className="p-2 text-amber-500 hover:bg-amber-500/10 rounded-lg transition-colors"
+                          title="Editar Tags"
+                        >
+                          <Tag className="w-5 h-5" />
+                        </button>
                         <button 
                           type="button"
                           onClick={() => setLogContext({ type: "node", title: `Aparelho ${n.deviceModel || n.deviceName}`, id: n.id })}
@@ -337,7 +436,6 @@ export default function ProxiesPage() {
                           title="Renomear Aparelho"
                         >
                           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <title>Renomear Aparelho</title>
                             <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
                           </svg>
                         </button>
@@ -345,7 +443,7 @@ export default function ProxiesPage() {
                           type="button"
                           onClick={() => { setNodeToDelete(n.id); setIsDeleteModalOpen(true); }}
                           className="p-2 text-rose-500 hover:bg-rose-500/10 rounded-lg transition-colors"
-                          title="Desconectar e Apagar Aparelho"
+                          title="Desvincular Aparelho"
                         >
                           <Trash2 className="w-5 h-5" />
                         </button>
@@ -391,7 +489,18 @@ export default function ProxiesPage() {
                 {proxies.map(p => (
                   <tr key={p.id} className="hover:bg-[#1a1a20] transition-colors">
                     <td className="px-6 py-4 text-white font-medium">{p.proxyUser}</td>
-                    <td className="px-6 py-4 text-[#8e8e99]">{p.proxyPass}</td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2 text-[#8e8e99]">
+                        {visiblePasswords.has(p.id) ? p.proxyPass : "••••••••"}
+                        <button 
+                          onClick={() => togglePasswordVisibility(p.id)} 
+                          className="hover:text-amber-500 hover:bg-amber-500/10 p-1 rounded transition-colors"
+                          title="Mostrar/Esconder Senha"
+                        >
+                          {visiblePasswords.has(p.id) ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                    </td>
                     <td className="px-6 py-4">
                       <span className="flex items-center gap-2 text-amber-400 bg-amber-400/10 px-3 py-1 rounded-full text-xs font-bold w-max">
                         <HardDrive className="w-3 h-3" />
@@ -646,6 +755,45 @@ export default function ProxiesPage() {
                   className="flex-1 px-4 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors"
                 >
                   Salvar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Editar Tags */}
+      {isEditTagsOpen && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+          <div className="bg-[#111114] border border-[#27272e] rounded-xl w-full max-w-md p-6">
+            <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+              <Tag className="w-6 h-6 text-amber-500" />
+              Editar Tags do Aparelho
+            </h2>
+            <form onSubmit={handleEditTags}>
+              <div className="mb-6">
+                <label className="block text-[#8e8e99] text-sm mb-2">Tags (Separadas por vírgula)</label>
+                <input 
+                  type="text"
+                  placeholder="Ex: Claro 5G, SP, Backup..."
+                  value={tagsInput}
+                  onChange={(e) => setTagsInput(e.target.value)}
+                  className="w-full bg-[#0a0a0c] border border-[#27272e] rounded-lg px-4 py-3 text-white focus:outline-none focus:border-amber-500"
+                />
+              </div>
+              <div className="flex gap-4">
+                <button 
+                  type="button"
+                  onClick={() => { setIsEditTagsOpen(false); setNodeToEditTags(null); }}
+                  className="flex-1 px-4 py-3 bg-[#1a1a20] hover:bg-[#27272e] text-white rounded-lg font-medium transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit"
+                  className="flex-1 px-4 py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-lg font-medium transition-colors"
+                >
+                  Salvar Tags
                 </button>
               </div>
             </form>

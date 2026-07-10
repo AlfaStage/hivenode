@@ -42,17 +42,23 @@ export async function PATCH(
     
     const body = await request.json();
     const newName = body.deviceName;
-    if (!newName) return apiError("Novo nome é obrigatório", 400);
+    const newTags = body.tags;
+    
+    if (newName === undefined && newTags === undefined) return apiError("Nenhuma alteração enviada", 400);
 
     const node = await prisma.node.findUnique({ where: { id: resolvedParams.id } });
     if (!node || node.userId !== payload.userId) {
       return apiError("Aparelho não encontrado", 404);
     }
 
-    // Atualiza no banco de dados (A coluna chama deviceModel)
+    const dataToUpdate: any = {};
+    if (newName !== undefined) dataToUpdate.deviceModel = newName;
+    if (newTags !== undefined) dataToUpdate.tags = newTags;
+
+    // Atualiza no banco de dados
     await prisma.node.update({
       where: { id: node.id },
-      data: { deviceModel: newName }
+      data: dataToUpdate
     });
 
     // Avisa o Go Broker pra espalhar o novo nome (PC e Celular)

@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -27,8 +28,14 @@ type TunnelManager struct {
 	devices          map[string]*websocket.Conn
 	dashboardClients map[*websocket.Conn]bool
 	virtualConns     map[string]*VirtualConn
+	nodeStats        map[string]*NodeStats
 	mu               sync.RWMutex
 	BroadcastChan    chan BroadcastEvent
+}
+
+type NodeStats struct {
+	Rx uint64
+	Tx uint64
 }
 
 // VirtualConn implementa net.Conn enviando dados pelo WebSocket do Android
@@ -81,7 +88,12 @@ func (vc *VirtualConn) Write(b []byte) (n int, err error) {
 
 	vc.TM.mu.RLock()
 	ws, ok := vc.TM.devices[vc.NodeID]
+	stats, statsOk := vc.TM.nodeStats[vc.NodeID]
 	vc.TM.mu.RUnlock()
+
+	if statsOk {
+		atomic.AddUint64(&stats.Rx, uint64(len(b)))
+	}
 
 	if !ok {
 		return 0, io.EOF
@@ -145,6 +157,7 @@ func NewTunnelManager() *TunnelManager {
 		devices:          make(map[string]*websocket.Conn),
 		dashboardClients: make(map[*websocket.Conn]bool),
 		virtualConns:     make(map[string]*VirtualConn),
+		nodeStats:        make(map[string]*NodeStats),
 		BroadcastChan:    make(chan BroadcastEvent, 100),
 	}
 	go tm.runBroadcaster()
@@ -193,6 +206,9 @@ func (tm *TunnelManager) HandleWS(w http.ResponseWriter, r *http.Request) {
 	// Registrar o device Android
 	tm.mu.Lock()
 	tm.devices[nodeID] = conn
+	if _, exists := tm.nodeStats[nodeID]; !exists {
+		tm.nodeStats[nodeID] = &NodeStats{}
+	}
 	tm.mu.Unlock()
 
 	log.Printf("🔗 Novo Device conectado no WS: %s", nodeID)
@@ -237,11 +253,20 @@ func (tm *TunnelManager) HandleWS(w http.ResponseWriter, r *http.Request) {
 						Time:    time.Now().Format("15:04:05"),
 					}
 				} else if msgType == "TELEMETRY" {
+					tm.mu.RLock()
+					stats, statsOk := tm.nodeStats[nodeID]
+					tm.mu.RUnlock()
+
+					if statsOk {
+						payload["rx"] = atomic.LoadUint64(&stats.Rx)
+						payload["tx"] = atomic.LoadUint64(&stats.Tx)
+					}
+
 					// Envia a saúde/rede do celular pro Dashboard
 					tm.BroadcastChan <- BroadcastEvent{
 						Type:    "TELEMETRY",
 						NodeID:  nodeID,
-						Payload: payload, // { ip: "...", network: "..." }
+						Payload: payload, // { ip: "...", network: "...", rx: X, tx: Y }
 						Time:    time.Now().Format("15:04:05"),
 					}
 				} else if msgType == "DATA" {
@@ -252,7 +277,13 @@ func (tm *TunnelManager) HandleWS(w http.ResponseWriter, r *http.Request) {
 						if err == nil {
 							tm.mu.RLock()
 							vc, exists := tm.virtualConns[connId]
+							stats, statsOk := tm.nodeStats[nodeID]
 							tm.mu.RUnlock()
+
+							if statsOk {
+								atomic.AddUint64(&stats.Tx, uint64(len(decoded)))
+							}
+
 							if exists {
 								vc.ReadCh <- decoded
 							}
