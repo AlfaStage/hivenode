@@ -34,7 +34,7 @@ async function processTrafficLogs() {
     
     // Processar pontuação em transação
     await prisma.$transaction(async (tx) => {
-      for (const [nodeId, traffic] = Object.entries(trafficByNode)) {
+      for (const [nodeId, traffic] of Object.entries(trafficByNode)) {
         // Encontrar usuário do Node
         const node = await tx.node.findUnique({
           where: { id: nodeId },

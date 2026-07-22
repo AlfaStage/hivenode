@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyToken, requireAuth } from "@/lib/auth";
 import { apiError, apiSuccess, generateSecureString } from "@/lib/utils";
-import redis from "@/lib/redis";
+import { redis } from "@/lib/redis";
 
 // Buscar Nodes do usuário
 export async function GET(request: NextRequest) {
