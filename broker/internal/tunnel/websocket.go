@@ -11,6 +11,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -35,6 +36,8 @@ type TunnelManager struct {
 	dashboardClients map[*websocket.Conn]bool
 	virtualConns     map[string]*VirtualConn
 	nodeStats        map[string]*NodeStats
+	minerIPCounts    map[string]int
+	proxyIPCounts    map[string]int
 	mu               sync.RWMutex
 	BroadcastChan    chan BroadcastEvent
 }
@@ -166,6 +169,8 @@ func NewTunnelManager(rClient *redis.Client) *TunnelManager {
 		dashboardClients: make(map[*websocket.Conn]bool),
 		virtualConns:     make(map[string]*VirtualConn),
 		nodeStats:        make(map[string]*NodeStats),
+		minerIPCounts:    make(map[string]int),
+		proxyIPCounts:    make(map[string]int),
 		BroadcastChan:    make(chan BroadcastEvent, 100),
 	}
 	go tm.runBroadcaster()
@@ -217,6 +222,42 @@ func (tm *TunnelManager) HandleWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ip := r.Header.Get("X-Forwarded-For")
+	if ip == "" {
+		if idx := strings.LastIndex(r.RemoteAddr, ":"); idx != -1 {
+			ip = r.RemoteAddr[:idx]
+		} else {
+			ip = r.RemoteAddr
+		}
+	} else {
+		ip = strings.Split(ip, ",")[0]
+	}
+
+	visibility, err := tm.redisClient.Get(context.Background(), "node_visibility:"+nodeID).Result()
+	if err != nil {
+		visibility = "PRIVATE"
+	}
+
+	tm.mu.Lock()
+	if visibility == "PUBLIC" {
+		if tm.minerIPCounts[ip] >= 1 {
+			tm.mu.Unlock()
+			log.Printf("⛔ RATE LIMIT: IP %s já possui 1 HiveMiner conectado.", ip)
+			http.Error(w, "Max 1 Miner per IP", http.StatusForbidden)
+			return
+		}
+		tm.minerIPCounts[ip]++
+	} else {
+		if tm.proxyIPCounts[ip] >= 10 {
+			tm.mu.Unlock()
+			log.Printf("⛔ RATE LIMIT: IP %s atingiu limite de 10 HiveNodes.", ip)
+			http.Error(w, "Max 10 Nodes per IP", http.StatusForbidden)
+			return
+		}
+		tm.proxyIPCounts[ip]++
+	}
+	tm.mu.Unlock()
+
 	conn, err := tm.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println("Erro ao fazer upgrade WS:", err)
@@ -248,6 +289,18 @@ func (tm *TunnelManager) HandleWS(w http.ResponseWriter, r *http.Request) {
 			tm.mu.Lock()
 			stats, statsOk := tm.nodeStats[nodeID]
 			delete(tm.devices, nodeID)
+			
+			if visibility == "PUBLIC" {
+				tm.minerIPCounts[ip]--
+				if tm.minerIPCounts[ip] <= 0 {
+					delete(tm.minerIPCounts, ip)
+				}
+			} else {
+				tm.proxyIPCounts[ip]--
+				if tm.proxyIPCounts[ip] <= 0 {
+					delete(tm.proxyIPCounts, ip)
+				}
+			}
 			tm.mu.Unlock()
 
 			// Contabilização de Tráfego: Mandar para o Redis para o Worker de Pontos processar

@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyToken, requireAuth } from "@/lib/auth";
 import { apiError, apiSuccess, generateSecureString } from "@/lib/utils";
+import redis from "@/lib/redis";
 
 // Buscar Nodes do usuário
 export async function GET(request: NextRequest) {
@@ -41,9 +42,11 @@ export async function POST(request: NextRequest) {
     const payload = await requireAuth();
 
     const body = await request.json();
-    const { deviceName } = body;
+    const { deviceName, visibility } = body;
 
     if (!deviceName) return apiError("Nome do dispositivo é obrigatório", 400);
+
+    const safeVisibility = visibility === "PUBLIC" ? "PUBLIC" : "PRIVATE";
 
     const node = await prisma.node.create({
       data: {
@@ -51,10 +54,14 @@ export async function POST(request: NextRequest) {
         deviceModel: deviceName,
         status: "OFFLINE",
         type: "BYOD",
+        visibility: safeVisibility,
       }
     });
 
-    console.log(`[API Nodes] Novo node criado: ${node.id} por ${payload.userId}`);
+    // Registra imediatamente no Redis para o Broker Go
+    await redis.set(`node_visibility:${node.id}`, safeVisibility);
+
+    console.log(`[API Nodes] Novo node criado: ${node.id} por ${payload.userId} (${safeVisibility})`);
     return apiSuccess({ node });
   } catch (error) {
     console.error("[API Nodes] Erro ao criar node:", error);
