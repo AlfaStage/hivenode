@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { requireAuth, generateQrLinkToken } from "@/lib/auth";
-import { apiSuccess, apiError } from "@/lib/utils";
+import { apiSuccess, apiError } from "@/lib/api-utils";
 import os from "os";
 
 function getHostIp(request: NextRequest) {

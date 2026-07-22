@@ -2,15 +2,15 @@
 // Utility Functions
 // ==============================================================================
 
-import { type ClassValue, clsx } from "clsx";
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
 import crypto from "crypto";
-import { sendAdminErrorAlert } from "./email";
 
 /**
- * Merge Tailwind CSS classes condicionalmente (sem twMerge para manter leve).
+ * Merge Tailwind CSS classes condicionalmente (com twMerge para Shadcn UI).
  */
 export function cn(...inputs: ClassValue[]) {
-  return clsx(inputs);
+  return twMerge(clsx(inputs));
 }
 
 /**
@@ -57,19 +57,3 @@ export function formatBRL(value: number): string {
   }).format(value);
 }
 
-/**
- * Resposta padronizada de erro para API routes.
- */
-export function apiError(message: string, status: number = 400) {
-  if (status === 500) {
-    sendAdminErrorAlert(`API Erro Crítico (500): ${message}`).catch(console.error);
-  }
-  return Response.json({ error: message, success: false }, { status });
-}
-
-/**
- * Resposta padronizada de sucesso para API routes.
- */
-export function apiSuccess<T>(data: T, status: number = 200) {
-  return Response.json({ data, success: true, error: null }, { status });
-}

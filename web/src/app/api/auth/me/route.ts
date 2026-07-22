@@ -4,7 +4,7 @@
 
 import { getAuthenticatedUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { apiError, apiSuccess } from "@/lib/utils";
+import { apiError, apiSuccess } from "@/lib/api-utils";
 
 export async function GET() {
   try {

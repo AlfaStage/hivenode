@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
-import { apiError, apiSuccess } from "@/lib/utils";
+import { apiError, apiSuccess } from "@/lib/api-utils";
 
 export async function GET(request: NextRequest) {
   try {

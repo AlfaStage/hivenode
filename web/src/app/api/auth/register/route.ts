@@ -6,7 +6,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hashPassword, generateToken, setAuthCookie } from "@/lib/auth";
 import { registerSchema } from "@/lib/validations/auth";
-import { apiError, apiSuccess } from "@/lib/utils";
+import { apiError, apiSuccess } from "@/lib/api-utils";
 import { sendWelcomeEmail } from "@/lib/email";
 
 export async function POST(request: NextRequest) {

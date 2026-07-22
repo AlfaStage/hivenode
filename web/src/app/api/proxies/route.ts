@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyToken, requireAuth } from "@/lib/auth";
-import { apiError, apiSuccess } from "@/lib/utils";
+import { apiError, apiSuccess } from "@/lib/api-utils";
 import { sendProxyAlert } from "@/lib/email";
 import Redis from "ioredis";
 

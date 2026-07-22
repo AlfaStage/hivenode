@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { verifyToken, generateToken } from "@/lib/auth";
-import { apiSuccess, apiError } from "@/lib/utils";
+import { apiSuccess, apiError } from "@/lib/api-utils";
 import { prisma } from "@/lib/prisma";
 
 export async function POST(request: NextRequest) {

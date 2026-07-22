@@ -39,7 +39,7 @@ export default async function DashboardLayout({
   return (
     <div className="min-h-screen bg-background flex">
       {/* Sidebar remodelada */}
-      <Sidebar />
+      <Sidebar role={user.role} />
 
       {/* Main content */}
       <main className="flex-1 overflow-auto flex flex-col bg-muted/20">

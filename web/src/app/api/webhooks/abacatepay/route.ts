@@ -5,7 +5,7 @@
 import { NextRequest } from "next/server";
 import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
-import { apiError, apiSuccess } from "@/lib/utils";
+import { apiError, apiSuccess } from "@/lib/api-utils";
 
 // Função para validar a assinatura do webhook (v2)
 function verifySignature(payload: string, signature: string, secret: string) {
