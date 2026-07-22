@@ -11,19 +11,11 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import QRCode from "react-qr-code";
 
 export default function MinerDashboard() {
-  const [points, setPoints] = useState(14500.00);
+  const [points, setPoints] = useState(0);
   const [copied, setCopied] = useState(false);
   const [miners, setMiners] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [userData, setUserData] = useState<any>(null);
-
-  useEffect(() => {
-    // Simular ganho de pontos ao vivo
-    const interval = setInterval(() => {
-      setPoints(prev => prev + (Math.random() * 0.1));
-    }, 3000);
-    return () => clearInterval(interval);
-  }, []);
 
   useEffect(() => {
     // Buscar nodes (miners) reais do usuário
@@ -207,7 +199,7 @@ export default function MinerDashboard() {
                     )}
                   </TableCell>
                   <TableCell className="text-sm">
-                    <span className="text-emerald-500 font-medium">Uptime: 99.9%</span>
+                    <span className="text-muted-foreground">-</span>
                   </TableCell>
                   <TableCell className="text-right">
                     <Button variant="ghost" size="sm" className="text-red-400 hover:text-red-300 hover:bg-red-950/30">Desconectar</Button>
