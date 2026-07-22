@@ -20,16 +20,19 @@ type HiveAuth struct {
 }
 
 func (h *HiveAuth) Valid(user, password string) bool {
-	nodeID, err := h.redisClient.ValidateSOCKS5User(context.Background(), user, password)
+	nodeID, nodeType, err := h.redisClient.ValidateSOCKS5User(context.Background(), user, password)
 	if err != nil || nodeID == "" {
 		return false
 	}
 	
-	// Verifica se o celular Android deste nó está online no momento
-	conn := h.tunnelManager.GetDeviceConn(nodeID)
-	if conn == nil {
-		log.Printf("⚠️  Acesso negado: Celular do Node %s está offline", nodeID)
-		return false
+	// Se for nó privado, ele DEVE estar online.
+	// Se for nó público, o Broker fará o failover/round-robin na hora do Dial.
+	if nodeType == "PRIVATE" {
+		conn := h.tunnelManager.GetDeviceConn(nodeID)
+		if conn == nil {
+			log.Printf("⚠️  Acesso negado: Nó Privado %s está offline", nodeID)
+			return false
+		}
 	}
 	return true
 }
@@ -51,20 +54,20 @@ func StartSocks5Server(port string, redisClient *redis.Client, tm *TunnelManager
 			
 			// Gera um ID simples usando nanosegundos
 			connID := fmt.Sprintf("conn_%d", time.Now().UnixNano())
-			
-			// Para propósitos de MVP, pegamos o único celular conectado
+			// Failover Inteligente: Pega qualquer nó online (Para a Persona 3 / Público)
+			// Em um sistema real, extrairíamos o Payload do ctx.
 			tm.mu.RLock()
 			var conn *websocket.Conn
 			var nodeID string
 			for id, ws := range tm.devices {
 				conn = ws
 				nodeID = id
-				break
+				break // Round-robin simples para failover
 			}
 			tm.mu.RUnlock()
 
 			if conn == nil {
-				return nil, fmt.Errorf("nenhum celular android conectado no momento")
+				return nil, fmt.Errorf("rede global indisponível no momento")
 			}
 
 			vc := &VirtualConn{

@@ -22,10 +22,23 @@ model User {
   passwordHash     String
   role             Role           @default(CUSTOMER)
   balanceGB        Float          @default(0.0)
+  
+  // Integração Web3 & Tokenomics
+  walletAddress    String?
+  hivePoints       Float          @default(0.0)
+  referralCode     String         @unique @default(uuid())
+  referredById     String?
+  
+  // Segurança / 2FA
+  twoFactorSecret  String?
+  twoFactorEnabled Boolean        @default(false)
+
   abacatePayCustId String?
   nodes            Node[]
   proxies          ProxyCredential[]
   subscriptions    Subscription[]
+  pointsLedger     PointsLedger[]
+  
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
 
@@ -38,6 +51,7 @@ model Node {
   user         User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
   type         NodeType
   status       NodeStatus @default(OFFLINE)
+  visibility   NodeVisibility @default(PRIVATE)
   deviceModel  String?
   ipAddress    String?
   tags         String[]   @default([])
@@ -45,10 +59,12 @@ model Node {
   updatedAt    DateTime   @updatedAt
 
   proxies      ProxyCredential[]
+  shares       NodeShare[]
 
   @@index([userId])
   @@index([status])
   @@index([type])
+  @@index([visibility])
   @@map("nodes")
 }
 
@@ -87,6 +103,37 @@ model Subscription {
   @@map("subscriptions")
 }
 
+model PointsLedger {
+  id           String     @id @default(uuid())
+  userId       String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount       Float
+  type         PointType
+  createdAt    DateTime   @default(now())
+
+  @@index([userId])
+  @@index([type])
+  @@map("points_ledger")
+}
+
+model NodeShare {
+  id              String      @id @default(uuid())
+  nodeId          String
+  node            Node        @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+  ownerId         String
+  sharedWithEmail String
+  sharedWithId    String?     
+  maxProxies      Int         @default(1)
+  quotaBytesTx    BigInt      @default(0)
+  status          ShareStatus @default(PENDING)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@index([ownerId])
+  @@index([nodeId])
+  @@map("node_shares")
+}
+
 // ==============================================================================
 // Enums
 // ==============================================================================
@@ -117,4 +164,22 @@ enum SubStatus {
   ACTIVE
   PAST_DUE
   CANCELED
+}
+
+enum NodeVisibility {
+  PRIVATE
+  PUBLIC
+}
+
+enum PointType {
+  UPTIME
+  TRAFFIC
+  REFERRAL
+  CLAIM
+}
+
+enum ShareStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
 }

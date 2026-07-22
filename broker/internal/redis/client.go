@@ -35,29 +35,45 @@ func NewClient(url string) (*Client, error) {
 	return &Client{client}, nil
 }
 
-// ValidateSOCKS5User verifica no Redis (onde a Web API guardou o hash)
-// e retorna o ID do Node (Device Android) associado a esse proxyUser.
-func (c *Client) ValidateSOCKS5User(ctx context.Context, username, password string) (string, error) {
+func (c *Client) ValidateSOCKS5User(ctx context.Context, username, password string) (string, string, error) {
+	// 1. Rate Limiting Básico (Prevenção de Brute Force)
+	rlKey := "ratelimit:socks5:" + username
+	attempts, err := c.Incr(ctx, rlKey).Result()
+	if err == nil && attempts == 1 {
+		c.Expire(ctx, rlKey, 15*time.Minute)
+	}
+	if attempts > 5 {
+		return "", "", fmt.Errorf("rate limit excedido para o usuário %s", username)
+	}
+
+	// 2. Busca credencial no Redis
 	val, err := c.Get(ctx, "proxy:"+username).Result()
 	if err != nil {
 		if err == goredis.Nil {
-			return "", fmt.Errorf("usuário de proxy não encontrado")
+			return "", "", fmt.Errorf("usuário de proxy não encontrado")
 		}
-		return "", err
+		return "", "", err
 	}
 
 	parts := strings.Split(val, ":")
-	if len(parts) != 2 {
-		return "", fmt.Errorf("credencial inválida no redis")
+	if len(parts) < 2 {
+		return "", "", fmt.Errorf("credencial inválida no redis")
 	}
 
 	nodeId := parts[0]
 	expectedPass := parts[1]
-
-	if password != expectedPass {
-		return "", fmt.Errorf("senha do proxy incorreta")
+	nodeType := "PRIVATE"
+	if len(parts) == 3 {
+		nodeType = parts[2] // Ex: nodeId:senha:PUBLIC
 	}
 
-	log.Printf("✅ Proxy Autenticado [%s] -> Roteando para Celular [%s]", username, nodeId)
-	return nodeId, nil
+	if password != expectedPass {
+		return "", "", fmt.Errorf("senha do proxy incorreta")
+	}
+
+	// Sucesso na autenticação: limpa o rate limit
+	c.Del(ctx, rlKey)
+
+	log.Printf("✅ Proxy Autenticado [%s] -> Roteando para [%s] Tipo: %s", username, nodeId, nodeType)
+	return nodeId, nodeType, nil
 }

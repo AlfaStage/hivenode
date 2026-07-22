@@ -1,7 +1,12 @@
 package tunnel
 
 import (
+	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net"
@@ -11,6 +16,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/hivenode/broker/internal/redis"
 )
 
 // BroadcastEvent representa um pacote de tempo real enviado para o Painel Web
@@ -23,6 +29,7 @@ type BroadcastEvent struct {
 
 // TunnelManager gerencia as conexões WebSocket dos devices Android e do Painel
 type TunnelManager struct {
+	redisClient      *redis.Client
 	upgrader         websocket.Upgrader
 	devices          map[string]*websocket.Conn
 	dashboardClients map[*websocket.Conn]bool
@@ -147,8 +154,9 @@ func (vc *VirtualConn) SetDeadline(t time.Time) error      { return nil }
 func (vc *VirtualConn) SetReadDeadline(t time.Time) error  { return nil }
 func (vc *VirtualConn) SetWriteDeadline(t time.Time) error { return nil }
 
-func NewTunnelManager() *TunnelManager {
+func NewTunnelManager(rClient *redis.Client) *TunnelManager {
 	tm := &TunnelManager{
+		redisClient: rClient,
 		upgrader: websocket.Upgrader{
 			CheckOrigin: func(r *http.Request) bool {
 				return true // Aceitar do app Android e do Painel Web
@@ -188,12 +196,24 @@ func (tm *TunnelManager) RemoveDashboardClient(conn *websocket.Conn) {
 	tm.mu.Unlock()
 }
 
-// HandleWS é a rota /tunnel onde o App Android conecta
 func (tm *TunnelManager) HandleWS(w http.ResponseWriter, r *http.Request) {
-	// TODO: FASE 3 - Validar JWT no Header (Authorization: Bearer <token>)
 	nodeID := r.URL.Query().Get("nodeId")
-	if nodeID == "" {
-		http.Error(w, "Missing nodeId", http.StatusBadRequest)
+	sig := r.URL.Query().Get("sig") // Assinatura Criptográfica
+
+	if nodeID == "" || sig == "" {
+		http.Error(w, "Missing nodeId or sig", http.StatusBadRequest)
+		return
+	}
+
+	// 1. Proteção Anti-Fraude: Validar Assinatura HMAC
+	// O client móvel deve gerar a assinatura usando um segredo global/por-usuário
+	mac := hmac.New(sha256.New, []byte("hivenode_secret_key"))
+	mac.Write([]byte(nodeID))
+	expectedMAC := hex.EncodeToString(mac.Sum(nil))
+	
+	if sig != expectedMAC {
+		log.Printf("⚠️ FRAUDE DETECTADA: Assinatura HMAC inválida (IP: %s)", r.RemoteAddr)
+		http.Error(w, "Invalid HMAC Signature", http.StatusUnauthorized)
 		return
 	}
 
@@ -226,8 +246,16 @@ func (tm *TunnelManager) HandleWS(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			log.Printf("❌ Device desconectado: %s", nodeID)
 			tm.mu.Lock()
+			stats, statsOk := tm.nodeStats[nodeID]
 			delete(tm.devices, nodeID)
 			tm.mu.Unlock()
+
+			// Contabilização de Tráfego: Mandar para o Redis para o Worker de Pontos processar
+			if statsOk && (stats.Tx > 0 || stats.Rx > 0) {
+				payload := fmt.Sprintf("%s:%d:%d", nodeID, stats.Tx, stats.Rx)
+				tm.redisClient.RPush(context.Background(), "traffic_logs", payload)
+				log.Printf("💰 Tráfego salvo no Ledger Buffer (Redis): %s", payload)
+			}
 
 			// Dispara o Evento de "Offline" pro Painel Web
 			tm.BroadcastChan <- BroadcastEvent{

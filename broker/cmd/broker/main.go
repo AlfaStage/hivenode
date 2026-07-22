@@ -25,7 +25,7 @@ func main() {
 	}
 
 	// 3. Inicializar Tunnel Manager (Gerencia os WebSockets dos Androids)
-	tunnelManager := tunnel.NewTunnelManager()
+	tunnelManager := tunnel.NewTunnelManager(redisClient)
 
 	// 4. Subir API HTTP do Broker (para Healthcheck e WebSockets)
 	mux := http.NewServeMux()
