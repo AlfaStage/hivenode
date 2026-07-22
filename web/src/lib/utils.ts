@@ -4,6 +4,7 @@
 
 import { type ClassValue, clsx } from "clsx";
 import crypto from "crypto";
+import { sendAdminErrorAlert } from "./email";
 
 /**
  * Merge Tailwind CSS classes condicionalmente (sem twMerge para manter leve).
@@ -60,6 +61,9 @@ export function formatBRL(value: number): string {
  * Resposta padronizada de erro para API routes.
  */
 export function apiError(message: string, status: number = 400) {
+  if (status === 500) {
+    sendAdminErrorAlert(`API Erro Crítico (500): ${message}`).catch(console.error);
+  }
   return Response.json({ error: message, success: false }, { status });
 }
 

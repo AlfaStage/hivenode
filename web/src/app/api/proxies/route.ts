@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyToken, requireAuth } from "@/lib/auth";
 import { apiError, apiSuccess } from "@/lib/utils";
+import { sendProxyAlert } from "@/lib/email";
 import Redis from "ioredis";
 
 const redis = new Redis(process.env.REDIS_URL || "redis://redis:6379");
@@ -42,6 +43,11 @@ export async function POST(request: NextRequest) {
       totalBytesRx: Number(proxy.totalBytesRx),
       totalBytesTx: Number(proxy.totalBytesTx)
     };
+
+    const user = await prisma.user.findUnique({ where: { id: payload.userId }, select: { email: true } });
+    if (user?.email) {
+      sendProxyAlert(user.email, proxyUser).catch(console.error);
+    }
 
     return apiSuccess({ proxy: safeProxy });
   } catch (error: any) {

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { verifyToken, requireAuth } from "@/lib/auth";
 import { apiError, apiSuccess, generateSecureString } from "@/lib/utils";
 import { redis } from "@/lib/redis";
+import { sendNodeAlert } from "@/lib/email";
 
 // Buscar Nodes do usuário
 export async function GET(request: NextRequest) {
@@ -60,6 +61,11 @@ export async function POST(request: NextRequest) {
 
     // Registra imediatamente no Redis para o Broker Go
     await redis.set(`node_visibility:${node.id}`, safeVisibility);
+
+    const user = await prisma.user.findUnique({ where: { id: payload.userId }, select: { email: true } });
+    if (user?.email) {
+      sendNodeAlert(user.email, deviceName, safeVisibility).catch(console.error);
+    }
 
     console.log(`[API Nodes] Novo node criado: ${node.id} por ${payload.userId} (${safeVisibility})`);
     return apiSuccess({ node });

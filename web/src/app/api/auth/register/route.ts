@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { hashPassword, generateToken, setAuthCookie } from "@/lib/auth";
 import { registerSchema } from "@/lib/validations/auth";
 import { apiError, apiSuccess } from "@/lib/utils";
+import { sendWelcomeEmail } from "@/lib/email";
 
 export async function POST(request: NextRequest) {
   try {
@@ -56,6 +57,9 @@ export async function POST(request: NextRequest) {
     // Gerar JWT e setar cookie
     const token = await generateToken(user.id, user.role);
     await setAuthCookie(token);
+
+    // Disparar e-mail de boas vindas
+    sendWelcomeEmail(user.email, user.role).catch(console.error);
 
     return apiSuccess({
       user,
