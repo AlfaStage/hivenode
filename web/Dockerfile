@@ -45,8 +45,9 @@ ENV NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
 # Mock de DATABASE_URL para o prisma generate não quebrar durante o build
 ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
 
+ENV NODE_OPTIONS="--max-old-space-size=768"
 RUN npx prisma generate
-RUN npm run build
+RUN npx next build
 
 # --- Stage 4: Runner de produção ---
 FROM node:22-alpine AS runner
