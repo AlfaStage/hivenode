@@ -36,6 +36,8 @@ export default function ProxiesPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isQrOpen, setIsQrOpen] = useState(false);
   const [qrPayload, setQrPayload] = useState("");
+  const [cliCode, setCliCode] = useState("");
+  const [approving, setApproving] = useState(false);
   
   // Forms
   const [selectedNode, setSelectedNode] = useState("");
@@ -145,6 +147,27 @@ export default function ProxiesPage() {
     } catch (e: unknown) {
       if (e instanceof Error) alert(e.message);
     }
+  };
+
+  const handleApproveCliCode = async () => {
+    if (!cliCode) return;
+    setApproving(true);
+    try {
+      const res = await fetch("/api/auth/device-code/approve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userCode: cliCode })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Código inválido");
+      alert("Aparelho vinculado com sucesso!");
+      setIsQrOpen(false);
+      setCliCode("");
+      fetchData();
+    } catch (e: unknown) {
+      if (e instanceof Error) alert(e.message);
+    }
+    setApproving(false);
   };
 
   const handleDeleteNode = async () => {
@@ -632,7 +655,7 @@ export default function ProxiesPage() {
       {/* Modal QR Code */}
       {isQrOpen && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-          <div className="bg-[#111114] border border-[#27272e] rounded-xl w-full max-w-sm p-6 text-center">
+          <div className="bg-[#111114] border border-[#27272e] rounded-xl w-full max-w-2xl p-6 text-center max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-bold text-white flex items-center gap-2">
                 <QrCode className="w-5 h-5 text-emerald-500" />
@@ -689,17 +712,24 @@ export default function ProxiesPage() {
                   </div>
                 </div>
 
-                <div className="p-4 bg-[#0a0a0c] border border-[#27272e] rounded-xl">
-                  <p className="text-xs font-bold text-slate-300 mb-1">Código de Vínculo de 6 Dígitos</p>
-                  <p className="text-xs text-slate-400 mb-2">Digite no app ou na CLI (`hivenode-cli link --code CÓDIGO`):</p>
-                  <div className="flex items-center justify-between bg-[#15151a] p-3 rounded-lg border border-[#2f2f38]">
-                    <span className="font-mono text-lg font-black text-amber-400 tracking-wider">HV-8X92</span>
+                <div className="p-4 bg-[#0a0a0c] border border-[#27272e] rounded-xl text-left">
+                  <p className="text-xs font-bold text-slate-300 mb-1">Aprovar Código do Terminal</p>
+                  <p className="text-xs text-slate-400 mb-2">Se a CLI informou um código de 6 caracteres, digite abaixo:</p>
+                  <div className="flex gap-2">
+                    <input 
+                      type="text" 
+                      placeholder="Ex: HIVE-X"
+                      value={cliCode}
+                      onChange={(e) => setCliCode(e.target.value.toUpperCase())}
+                      maxLength={8}
+                      className="w-full bg-[#15151a] border border-[#2f2f38] rounded-lg px-3 py-2 text-amber-400 font-mono text-sm focus:border-amber-500 focus:outline-none uppercase"
+                    />
                     <button 
-                      type="button" 
-                      onClick={() => navigator.clipboard.writeText("HV-8X92")}
-                      className="px-3 py-1 bg-amber-500 text-black font-bold rounded text-xs"
+                      onClick={handleApproveCliCode} 
+                      disabled={approving || cliCode.length < 5}
+                      className="bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-black font-bold px-4 rounded-lg"
                     >
-                      Copiar Código
+                      {approving ? "..." : "Vincular"}
                     </button>
                   </div>
                 </div>

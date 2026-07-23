@@ -3,3 +3,5 @@ hivenode-app/
 node_modules/
 .env
 .next/
+
+/hivedocker

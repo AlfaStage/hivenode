@@ -31,7 +31,7 @@ check_ip_type() {
 show_status() {
   if [ -f "$CONFIG_FILE" ]; then
     NODE_ID=$(grep "NODE_ID" "$CONFIG_FILE" | cut -d'=' -f2)
-    echo "🐝 HiveNode Status:"
+    echo "🐝 HiveNode / HiveMiner Status:"
     echo "   Node ID: $NODE_ID"
     echo "   Túnel: ATIVO"
     echo "   Tráfego (Último Minuto): 1.2 MB"
@@ -39,58 +39,105 @@ show_status() {
     echo "   Tráfego (Hoje): 1.2 GB"
     echo "   Tráfego (Mês): 14.5 GB"
   else
-    echo "⚠️ Aparelho não vinculado. Execute: hivenode-cli link --code CÓDIGO_6_DÍGITOS"
+    echo "⚠️ Aparelho não vinculado. Execute: hivecli auth miner"
   fi
 }
 
-link_device() {
-  TOKEN=""
-  CODE=""
-  for arg in "$@"; do
-    case $arg in
-      --token=*) TOKEN="\${arg#*=}" ;;
-      --code=*) CODE="\${arg#*=}" ;;
-    esac
-  done
-
-  if [ -n "$CODE" ]; then
-    echo "🔑 Vinculando via Código Curto $CODE..."
-    RES=$(curl -s -X POST "$BASE_URL/api/auth/pair-code" -H "Content-Type: application/json" -d "{\\"pairCode\\": \\"$CODE\\"}")
-    TOKEN=$(echo "$RES" | grep -o '"linkToken": *"[^"]*"' | cut -d'"' -f4 || echo "")
+auth_device() {
+  TYPE="$1"
+  TOKEN="$2"
+  
+  if [ -z "$TYPE" ]; then
+    TYPE="miner"
   fi
 
-  if [ -z "$TOKEN" ]; then
-    echo "❌ Erro: Código ou Token de vínculo inválido."
+  # Se passou token via linha de comando, usar o método antigo direto
+  if [ -n "$TOKEN" ]; then
+    echo "🔗 Vinculando silenciosamente usando o token..."
+    check_ip_type || true
+    mkdir -p /etc
+    echo "NODE_ID=$(date +%s)" > "$CONFIG_FILE"
+    echo "LINK_TOKEN=$TOKEN" >> "$CONFIG_FILE"
+    echo "✅ Dispositivo vinculado com sucesso!"
+    exit 0
+  fi
+
+  echo "⏳ Gerando código de vínculo para dispositivo do tipo: $TYPE..."
+  
+  # Gera o Device Code no backend
+  GEN_RES=$(curl -s -X POST "$BASE_URL/api/auth/device-code/generate" -H "Content-Type: application/json" -d "{\\"type\\": \\"$TYPE\\"}")
+  
+  DEVICE_CODE=$(echo "$GEN_RES" | grep -o '"deviceCode":"[^"]*' | cut -d'"' -f4)
+  USER_CODE=$(echo "$GEN_RES" | grep -o '"userCode":"[^"]*' | cut -d'"' -f4)
+  URI=$(echo "$GEN_RES" | grep -o '"verificationUri":"[^"]*' | cut -d'"' -f4)
+
+  if [ -z "$DEVICE_CODE" ] || [ -z "$USER_CODE" ]; then
+    echo "❌ Erro ao se comunicar com o servidor. Tente novamente mais tarde."
     exit 1
   fi
 
-  check_ip_type || true
+  echo ""
+  echo "============================================================"
+  echo "🔗 Vínculo Necessário"
+  echo "1. Acesse: $URI"
+  echo "2. Digite o código abaixo no modal de vínculo:"
+  echo ""
+  echo "       $USER_CODE"
+  echo ""
+  echo "(O código expira em 5 minutos. Aguardando aprovação...)"
+  echo "============================================================"
 
-  mkdir -p /etc
-  echo "NODE_ID=$(date +%s)" > "$CONFIG_FILE"
-  echo "LINK_TOKEN=$TOKEN" >> "$CONFIG_FILE"
-  echo "✅ Dispositivo vinculado com sucesso à sua conta HiveNode!"
+  # Loop de Polling
+  ATTEMPTS=0
+  MAX_ATTEMPTS=60 # 5 min (60 * 5s)
+
+  while [ $ATTEMPTS -lt $MAX_ATTEMPTS ]; do
+    sleep 5
+    POLL_RES=$(curl -s -X POST "$BASE_URL/api/auth/device-code/poll" -H "Content-Type: application/json" -d "{\\"deviceCode\\": \\"$DEVICE_CODE\\"}")
+    STATUS=$(echo "$POLL_RES" | grep -o '"status":"[^"]*' | cut -d'"' -f4)
+    
+    if [ "$STATUS" = "success" ]; then
+      TOKEN=$(echo "$POLL_RES" | grep -o '"token":"[^"]*' | cut -d'"' -f4)
+      echo ""
+      echo "✅ Código aprovado pelo usuário!"
+      
+      check_ip_type || true
+      mkdir -p /etc
+      echo "NODE_ID=$(date +%s)" > "$CONFIG_FILE"
+      echo "LINK_TOKEN=$TOKEN" >> "$CONFIG_FILE"
+      echo "✅ Dispositivo vinculado com sucesso!"
+      exit 0
+    fi
+    
+    ATTEMPTS=$((ATTEMPTS+1))
+    printf "."
+  done
+
+  echo ""
+  echo "❌ Tempo esgotado. Tente gerar um novo código rodando: hivecli auth $TYPE"
+  exit 1
 }
 
 case "$1" in
-  link)
+  auth)
     shift
-    link_device "$@"
+    auth_device "$@"
     ;;
   status)
     show_status
     ;;
   start)
-    echo "🚀 Iniciando o túnel HiveNode..."
+    echo "🚀 Iniciando o túnel..."
     show_status
     ;;
   stop)
-    echo "🛑 Parando o túnel HiveNode..."
+    echo "🛑 Parando o túnel..."
     echo "Túnel desativado temporariamente."
     ;;
   *)
-    echo "Uso: hivenode-cli {link|status|start|stop}"
-    echo "Exemplo: hivenode-cli link --code HV-8X92"
+    echo "Uso: hivecli {auth|status|start|stop}"
+    echo "  hivecli auth miner          -> Inicia fluxo interativo de vínculo"
+    echo "  hivecli auth miner [TOKEN]  -> Vínculo direto silencioso"
     ;;
 esac
 `;

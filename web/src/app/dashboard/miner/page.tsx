@@ -16,6 +16,42 @@ export default function MinerDashboard() {
   const [miners, setMiners] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [userData, setUserData] = useState<any>(null);
+  const [qrPayload, setQrPayload] = useState("");
+  const [isQrOpen, setIsQrOpen] = useState(false);
+  const [cliCode, setCliCode] = useState("");
+  const [approving, setApproving] = useState(false);
+
+  const handleGenerateQr = async () => {
+    try {
+      const res = await fetch("/api/auth/qr-link");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setQrPayload(`hiveminer|${data.data.linkToken}`);
+      setIsQrOpen(true);
+    } catch (e: any) {
+      alert(e.message);
+    }
+  };
+
+  const handleApproveCliCode = async () => {
+    if (!cliCode) return;
+    setApproving(true);
+    try {
+      const res = await fetch("/api/auth/device-code/approve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userCode: cliCode })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Código inválido");
+      alert("Aparelho vinculado com sucesso!");
+      setIsQrOpen(false);
+      setCliCode("");
+    } catch (e: any) {
+      alert(e.message);
+    }
+    setApproving(false);
+  };
 
   useEffect(() => {
     // Buscar nodes (miners) reais do usuário
@@ -113,13 +149,13 @@ export default function MinerDashboard() {
           <Server className="text-emerald-500" /> Seus Aparelhos (Miners)
         </h2>
         
-        <Dialog>
+          <Dialog open={isQrOpen} onOpenChange={setIsQrOpen}>
           <DialogTrigger asChild>
-            <Button className="bg-emerald-600 hover:bg-emerald-500 text-white gap-2 font-bold border-none">
+            <Button onClick={handleGenerateQr} className="bg-emerald-600 hover:bg-emerald-500 text-white gap-2 font-bold border-none">
               <Plus className="w-4 h-4" /> Conectar Aparelho
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-md border-emerald-500/30 bg-[#0a0a0c]">
+          <DialogContent className="sm:max-w-2xl border-emerald-500/30 bg-[#0a0a0c] overflow-y-auto max-h-[90vh]">
             <DialogHeader>
               <DialogTitle className="text-emerald-500 text-xl font-bold flex items-center gap-2">
                 <Smartphone className="w-5 h-5" /> Vincular Novo HiveMiner
@@ -129,42 +165,37 @@ export default function MinerDashboard() {
               </DialogDescription>
             </DialogHeader>
             <div className="flex flex-col space-y-6 py-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
                 {/* QR Code & APK Downloads */}
                 <div className="flex flex-col items-center p-4 bg-[#0a0a0c] border border-border rounded-xl">
                   <div className="bg-white p-3 rounded-xl mb-4 shadow-[0_0_20px_rgba(16,185,129,0.2)]">
-                    {userData?.id ? (
-                      <QRCode value={`hiveminer://link?token=${userData.id}`} size={160} />
+                    {qrPayload ? (
+                      <QRCode value={qrPayload} size={160} />
                     ) : (
                       <div className="w-[160px] h-[160px] bg-muted flex items-center justify-center text-muted-foreground text-xs text-center">Carregando Token...</div>
                     )}
                   </div>
-                  <div className="space-y-2 w-full">
-                    <p className="text-xs font-bold text-muted-foreground text-center uppercase tracking-wider">APKs Oficiais Android</p>
+                  <div className="space-y-3 w-full">
+                    <p className="text-xs font-bold text-muted-foreground text-center uppercase tracking-wider">Download do Aplicativo</p>
                     <a 
                       href="https://expo.dev/artifacts/eas/idNUBIBrLxPhFC9l5nLiEAVBuDdJfBTc6HZRSBgtu2A.apk"
                       target="_blank"
                       rel="noreferrer"
-                      className="flex items-center justify-center gap-2 w-full py-2 px-3 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-lg text-xs font-bold transition-all"
+                      className="flex items-center justify-center gap-2 w-full py-3 px-3 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-lg text-sm font-bold transition-all"
                     >
-                      📥 Baixar APK HiveMiner (Minerador)
+                      📥 APK HiveMiner (Android 6+)
                     </a>
-                    <a 
-                      href="https://expo.dev/artifacts/eas/1YQ2fLEnc-22diSwjBz241jUo-4rBmq_CBZuhgAhpFc.apk"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="flex items-center justify-center gap-2 w-full py-2 px-3 bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 border border-amber-500/30 rounded-lg text-xs font-bold transition-all"
-                    >
-                      📥 Baixar APK HiveNode (Proxy)
-                    </a>
+                    <p className="text-[10px] text-muted-foreground text-center italic">
+                      O aplicativo para Android 4+ está em desenvolvimento e será lançado em breve.
+                    </p>
                   </div>
                 </div>
 
                 {/* Linux CLI & Short Code */}
                 <div className="space-y-4 text-left">
                   <div className="p-4 bg-[#0a0a0c] border border-border rounded-xl">
-                    <p className="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-1">Instalação Linux (CLI / Terminal)</p>
-                    <p className="text-xs text-muted-foreground mb-3">Comando universal para instalar em servidores ou PCs Linux:</p>
+                    <p className="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-1">Instalação Linux / PC</p>
+                    <p className="text-xs text-muted-foreground mb-3">Rode no terminal para instalar a CLI unificada:</p>
                     <div className="bg-black p-3 rounded-lg border border-border font-mono text-xs text-emerald-400 flex items-center justify-between overflow-x-auto">
                       <span>curl -fsSL https://hivenode.alfastage.com.br/install.sh | sh</span>
                       <Button variant="ghost" size="sm" className="h-6 text-[10px] text-emerald-400 hover:bg-emerald-500/20" onClick={() => navigator.clipboard.writeText("curl -fsSL https://hivenode.alfastage.com.br/install.sh | sh")}>
@@ -174,12 +205,23 @@ export default function MinerDashboard() {
                   </div>
 
                   <div className="p-4 bg-[#0a0a0c] border border-border rounded-xl">
-                    <p className="text-xs font-bold text-foreground mb-1">Código de Vínculo de 6 Dígitos</p>
-                    <p className="text-xs text-muted-foreground mb-2">Digite no app ou na CLI (`hiveminer-cli link --code CÓDIGO`):</p>
-                    <div className="flex items-center justify-between bg-muted/40 p-3 rounded-lg border border-border">
-                      <span className="font-mono text-lg font-black text-emerald-400 tracking-wider">HM-73K9</span>
-                      <Button size="sm" className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs" onClick={() => navigator.clipboard.writeText("HM-73K9")}>
-                        Copiar Código
+                    <p className="text-xs font-bold text-foreground mb-1">Aprovar Código do Terminal</p>
+                    <p className="text-xs text-muted-foreground mb-3">Se a CLI informou um código de 6 caracteres, digite abaixo para vincular o aparelho:</p>
+                    <div className="flex gap-2">
+                      <input 
+                        type="text" 
+                        placeholder="Ex: HIVE-X"
+                        value={cliCode}
+                        onChange={(e) => setCliCode(e.target.value.toUpperCase())}
+                        maxLength={8}
+                        className="w-full bg-black border border-border rounded-lg px-3 py-2 text-white font-mono text-sm focus:border-emerald-500 focus:outline-none uppercase"
+                      />
+                      <Button 
+                        onClick={handleApproveCliCode} 
+                        disabled={approving || cliCode.length < 5}
+                        className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-4"
+                      >
+                        {approving ? "⏳" : "Aprovar"}
                       </Button>
                     </div>
                   </div>
