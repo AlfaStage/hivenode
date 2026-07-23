@@ -1,16 +1,14 @@
 import { PrismaClient } from '@prisma/client';
-import { createClient } from 'redis';
+import Redis from 'ioredis';
 
 const prisma = new PrismaClient();
-const redis = createClient({
-  url: process.env.REDIS_URL || 'redis://localhost:6379'
-});
+const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
 
 async function processTrafficLogs() {
   const BATCH_SIZE = 100;
   
   try {
-    const logs = await redis.lPopCount('traffic_logs', BATCH_SIZE);
+    const logs = await redis.lpop('traffic_logs', BATCH_SIZE);
     
     if (!logs || logs.length === 0) return;
     
@@ -73,7 +71,6 @@ async function processTrafficLogs() {
 }
 
 async function startWorker() {
-  await redis.connect();
   console.log('🐝 HiveNode Points Worker iniciado. Escutando Redis...');
   
   // Rodar a cada 5 minutos

@@ -50,23 +50,11 @@ func main() {
 
 	// Rota Interna para verificar Aparelhos Online
 	mux.HandleFunc("/live-nodes", func(w http.ResponseWriter, r *http.Request) {
-		importJson := true // Hack para importar encoding/json caso falte no escopo
-		_ = importJson
 		w.Header().Set("Content-Type", "application/json")
-		
-		// Retorna um array JSON com os IDs online (['id1', 'id2'])
 		nodes := tunnelManager.GetConnectedNodes()
-		
-		importJsonStr := `[`
-		for i, id := range nodes {
-			if i > 0 {
-				importJsonStr += `,`
-			}
-			importJsonStr += `"` + id + `"`
+		if err := json.NewEncoder(w).Encode(nodes); err != nil {
+			http.Error(w, "encode error", http.StatusInternalServerError)
 		}
-		importJsonStr += `]`
-		
-		w.Write([]byte(importJsonStr))
 	})
 
 	// Rota WebSocket de Transmissão em Tempo Real para o Painel Web (Next.js)

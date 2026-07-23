@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Settings, Activity, Save, CheckCircle2, Mail, ShieldCheck, AlertTriangle } from "lucide-react";
+import { Settings, Activity, Save, CheckCircle2, Mail, ShieldCheck, AlertTriangle, CreditCard, Key, Eye, EyeOff } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,13 @@ export default function AdminSettingsPage() {
     lgpdAuditEnabled: true,
   });
 
+  // AbacatePay Key State
+  const [apiKey, setApiKey] = useState("");
+  const [webhookSecret, setWebhookSecret] = useState("");
+  const [keyInfo, setKeyInfo] = useState<{ hasApiKey: boolean; hasWebhookSecret: boolean; apiKeyLastChars: string | null }>({ hasApiKey: false, hasWebhookSecret: false, apiKeyLastChars: null });
+  const [savingKey, setSavingKey] = useState(false);
+  const [keySuccess, setKeySuccess] = useState("");
+
   useEffect(() => {
     fetch("/api/admin/settings")
       .then((res) => res.json())
@@ -30,6 +37,14 @@ export default function AdminSettingsPage() {
         setLoading(false);
       })
       .catch(() => setLoading(false));
+
+    // Fetch payment key status
+    fetch("/api/admin/payment-key")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success) setKeyInfo(data.data);
+      })
+      .catch(() => {});
   }, []);
 
   const handleSave = async (e: React.FormEvent) => {
@@ -167,6 +182,106 @@ export default function AdminSettingsPage() {
           </Button>
         </div>
       </form>
+
+      {/* AbacatePay API Key Section */}
+      <div className="border-t border-border pt-8">
+        <h2 className="text-xl font-bold text-foreground flex items-center gap-2 mb-4">
+          <Key className="w-5 h-5 text-emerald-400" />
+          Chave de Pagamento (AbacatePay)
+        </h2>
+
+        {keySuccess && (
+          <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-sm font-semibold flex items-center gap-2 animate-fade-in mb-4">
+            <CheckCircle2 className="w-5 h-5 shrink-0" />
+            <span>{keySuccess}</span>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Card className="border-border bg-card/40">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <CreditCard className="w-5 h-5 text-emerald-400" />
+                API Key
+              </CardTitle>
+              <CardDescription>
+                {keyInfo.hasApiKey ? (
+                  <span className="flex items-center gap-2">Chave configurada: <code className="font-mono text-emerald-400">{keyInfo.apiKeyLastChars}</code></span>
+                ) : (
+                  "Nenhuma chave configurada."
+                )}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <label className="text-xs font-semibold text-muted-foreground">Nova API Key</label>
+              <Input
+                type="password"
+                placeholder="Colar nova API Key aqui..."
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                className="bg-muted border-border text-sm font-mono"
+              />
+            </CardContent>
+          </Card>
+
+          <Card className="border-border bg-card/40">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-blue-400" />
+                Webhook Secret
+              </CardTitle>
+              <CardDescription>
+                {keyInfo.hasWebhookSecret ? "Secret configurado" : "Nenhum secret configurado."}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <label className="text-xs font-semibold text-muted-foreground">Novo Webhook Secret</label>
+              <Input
+                type="password"
+                placeholder="Colar webhook secret aqui..."
+                value={webhookSecret}
+                onChange={(e) => setWebhookSecret(e.target.value)}
+                className="bg-muted border-border text-sm font-mono"
+              />
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="flex justify-end mt-4">
+          <Button
+            onClick={async () => {
+              if (!apiKey && !webhookSecret) return;
+              setSavingKey(true);
+              try {
+                const res = await fetch("/api/admin/payment-key", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ apiKey: apiKey || undefined, webhookSecret: webhookSecret || undefined }),
+                });
+                const data = await res.json();
+                if (data.success) {
+                  setKeySuccess("Chaves salvas com sucesso! A chave agora está protegida.");
+                  setApiKey("");
+                  setWebhookSecret("");
+                  // Refresh key info
+                  const infoRes = await fetch("/api/admin/payment-key");
+                  const infoData = await infoRes.json();
+                  if (infoData.success) setKeyInfo(infoData.data);
+                  setTimeout(() => setKeySuccess(""), 3000);
+                }
+              } catch (e) {
+                console.error(e);
+              }
+              setSavingKey(false);
+            }}
+            disabled={savingKey || (!apiKey && !webhookSecret)}
+            className="h-12 px-8 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-base flex items-center gap-2"
+          >
+            <Key className="w-5 h-5" />
+            {savingKey ? "Salvando..." : "Salvar Chaves de Pagamento"}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

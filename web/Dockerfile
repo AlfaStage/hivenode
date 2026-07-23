@@ -71,8 +71,9 @@ COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/tsconfig.json ./tsconfig.json
 
-# Instala Prisma CLI + tsx limpos (garante WASM, engines e symlinks corretos)
+# Instala Prisma CLI + tsx limpos (garante WASM, engines e symlinks corretos) + wget para Healthcheck
 RUN npm install --no-save prisma tsx typescript @prisma/adapter-pg 2>&1
+RUN apk --no-cache add wget
 
 # Script de inicialização: sincroniza schema no banco e depois inicia o servidor
 RUN echo '#!/bin/sh' > /app/start.sh && \
@@ -81,6 +82,9 @@ RUN echo '#!/bin/sh' > /app/start.sh && \
     echo 'echo "🚀 Iniciando Next.js..."' >> /app/start.sh && \
     echo 'exec node server.js' >> /app/start.sh && \
     chmod +x /app/start.sh
+
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 --start-period=15s \
+  CMD wget -qO- http://localhost:3000/api/health || exit 1
 
 USER nextjs
 EXPOSE 3000

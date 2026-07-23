@@ -150,6 +150,7 @@ export default function MinerDashboard() {
         </h2>
         
           <Dialog open={isQrOpen} onOpenChange={setIsQrOpen}>
+            {/* @ts-ignore */}
           <DialogTrigger asChild>
             <Button onClick={handleGenerateQr} className="bg-emerald-600 hover:bg-emerald-500 text-white gap-2 font-bold border-none">
               <Plus className="w-4 h-4" /> Conectar Aparelho
@@ -229,6 +230,7 @@ export default function MinerDashboard() {
               </div>
             </div>
             <DialogFooter>
+              {/* @ts-ignore */}
               <DialogClose asChild>
                 <Button variant="outline" className="w-full border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/10">Pronto</Button>
               </DialogClose>

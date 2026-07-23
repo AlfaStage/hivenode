@@ -1,22 +1,35 @@
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
+// web/src/middleware.ts
+import { NextResponse, type NextRequest } from 'next/server';
+import { jwtVerify } from 'jose';
 
-export function middleware(request: NextRequest) {
-  const token = request.cookies.get('hivenode_token')?.value;
+const SECRET = new TextEncoder().encode(process.env.JWT_SECRET!);
+
+export async function middleware(request: NextRequest) {
+  const token = request.cookies.get('hivenode-token')?.value;
   const path = request.nextUrl.pathname;
 
-  // Redireciona usuários não logados das rotas privadas
   if (!token && (path.startsWith('/saas') || path.startsWith('/miner'))) {
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
-  // TODO: Em um cenário real, decodificaria o JWT para pegar a Role/Persona
-  // Aqui assumiremos que a separação ocorrerá via interface baseada em cookies ou BD.
-  // Como as rotas foram desmembradas, o middleware garante que ao menos haja token.
-  
+  if (!token && path.startsWith('/admin')) {
+    return NextResponse.redirect(new URL('/login', request.url));
+  }
+
+  if (token && path.startsWith('/admin')) {
+    try {
+      const { payload } = await jwtVerify(token, SECRET);
+      if (payload.role !== 'ADMIN') {
+        return NextResponse.redirect(new URL('/dashboard', request.url));
+      }
+    } catch {
+      return NextResponse.redirect(new URL('/login', request.url));
+    }
+  }
+
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ['/saas/:path*', '/miner/:path*'],
+  matcher: ['/saas/:path*', '/miner/:path*', '/admin/:path*'],
 };

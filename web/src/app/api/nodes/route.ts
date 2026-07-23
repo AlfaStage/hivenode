@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyToken, requireAuth } from "@/lib/auth";
-import { apiError, apiSuccess, generateSecureString } from "@/lib/api-utils";
+import { apiError, apiSuccess } from "@/lib/api-utils";
 import { redis } from "@/lib/redis";
 import { sendNodeAlert } from "@/lib/email";
 
@@ -48,6 +48,43 @@ export async function POST(request: NextRequest) {
     if (!deviceName) return apiError("Nome do dispositivo é obrigatório", 400);
 
     const safeVisibility = visibility === "PUBLIC" ? "PUBLIC" : "PRIVATE";
+
+    // 1. Calcular limite total de aparelhos com base em todos os planos ativos
+    const userSubs = await prisma.subscription.findMany({
+      where: { userId: payload.userId, status: "ACTIVE" },
+      include: {
+        user: { select: { activePlanId: true } },
+      }
+    });
+
+    let totalAllowed = 0;
+    let hasUnlimited = false;
+
+    if (userSubs.length === 0) {
+      // Usuário sem plano: não pode ter aparelhos (ou define um limite gratuito se existir)
+      // Se não tem assinaturas, bloqueia.
+      return apiError("Você precisa assinar um plano para adicionar aparelhos", 403);
+    }
+
+    // Buscar todos os planos relacionados às assinaturas
+    for (const sub of userSubs) {
+      if (sub.planId) {
+        const p = await prisma.plan.findUnique({ where: { id: sub.planId } });
+        if (p) {
+          if (p.maxDevices === 0) hasUnlimited = true;
+          totalAllowed += p.maxDevices;
+        }
+      }
+    }
+
+    if (!hasUnlimited) {
+      const currentNodesCount = await prisma.node.count({
+        where: { userId: payload.userId }
+      });
+      if (currentNodesCount >= totalAllowed) {
+        return apiError(`Limite de aparelhos excedido (Máximo: ${totalAllowed}). Faça um upgrade para adicionar mais.`, 403);
+      }
+    }
 
     const node = await prisma.node.create({
       data: {

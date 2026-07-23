@@ -3,9 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { verifyToken, requireAuth } from "@/lib/auth";
 import { apiError, apiSuccess } from "@/lib/api-utils";
 import { sendProxyAlert } from "@/lib/email";
-import Redis from "ioredis";
-
-const redis = new Redis(process.env.REDIS_URL || "redis://redis:6379");
+import { redis } from "@/lib/redis";
 
 export async function POST(request: NextRequest) {
   try {
@@ -21,6 +19,37 @@ export async function POST(request: NextRequest) {
     const node = await prisma.node.findUnique({ where: { id: nodeId } });
     if (!node || node.userId !== payload.userId) {
       return apiError("Aparelho Físico não encontrado ou não pertence a você", 404);
+    }
+
+    // 1. Calcular limite total de proxies com base em todos os planos ativos
+    const userSubs = await prisma.subscription.findMany({
+      where: { userId: payload.userId, status: "ACTIVE" },
+    });
+
+    let totalAllowed = 0;
+    let hasUnlimited = false;
+
+    if (userSubs.length === 0) {
+      return apiError("Você precisa assinar um plano para criar proxies", 403);
+    }
+
+    for (const sub of userSubs) {
+      if (sub.planId) {
+        const p = await prisma.plan.findUnique({ where: { id: sub.planId } });
+        if (p) {
+          if (p.maxProxies === 0) hasUnlimited = true;
+          totalAllowed += p.maxProxies;
+        }
+      }
+    }
+
+    if (!hasUnlimited) {
+      const currentProxiesCount = await prisma.proxyCredential.count({
+        where: { userId: payload.userId }
+      });
+      if (currentProxiesCount >= totalAllowed) {
+        return apiError(`Limite de proxies excedido (Máximo: ${totalAllowed}). Faça um upgrade para adicionar mais.`, 403);
+      }
     }
 
     const proxy = await prisma.proxyCredential.create({

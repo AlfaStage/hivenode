@@ -34,9 +34,11 @@ model User {
   twoFactorEnabled Boolean        @default(false)
 
   abacatePayCustId String?
+  activePlanId     String?
   nodes            Node[]
   proxies          ProxyCredential[]
   subscriptions    Subscription[]
+  payments         Payment[]
   pointsLedger     PointsLedger[]
   
   createdAt        DateTime       @default(now())
@@ -91,6 +93,7 @@ model Subscription {
   id               String    @id @default(uuid())
   userId           String
   user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planId           String?
   planType         PlanType
   status           SubStatus @default(ACTIVE)
   abacatePaySubId  String?
@@ -101,6 +104,60 @@ model Subscription {
   @@index([userId])
   @@index([status])
   @@map("subscriptions")
+}
+
+model Plan {
+  id               String       @id @default(uuid())
+  slug             String       @unique
+  name             String
+  category         PlanCategory
+  priceInCents     Int          @default(0)
+  maxDevices       Int          @default(0)
+  maxProxies       Int          @default(0)
+  gbIncluded       Float        @default(0)
+  gbPriceCents     Int          @default(0)
+  isRecurring      Boolean      @default(false)
+  billingCycle     String?
+  isPublic         Boolean      @default(true)
+  isAdminOnly      Boolean      @default(false)
+  extraDeviceCents Int          @default(0)
+  extraProxyCents  Int          @default(0)
+  minMonthsForPPU  Int          @default(0)
+  minAvgGbForPPU   Float        @default(0)
+  abacateProductId String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  @@map("plans")
+}
+
+model Payment {
+  id                String        @id @default(uuid())
+  userId            String
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planId            String?
+  type              PaymentType
+  amountCents       Int
+  status            PaymentStatus @default(PENDING)
+  abacateCheckoutId String?
+  abacateSubId      String?
+  metadata          Json?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@map("payments")
+}
+
+model SystemConfig {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("system_config")
 }
 
 model PointsLedger {
@@ -156,14 +213,44 @@ enum NodeStatus {
 }
 
 enum PlanType {
+  FOUNDER
+  STARTER
+  PRO
+  ENTERPRISE
+  GB_BASIC
+  GB_INTERMEDIATE
+  GB_ADVANCED
+  PAY_AS_YOU_GO
+  FREE
   BYOD_MONTHLY
   PREMIUM_METERED
+}
+
+enum PlanCategory {
+  GENERAL
+  PRIVATE_FLEET
+  GLOBAL_FLEET
+  PAY_PER_USE
 }
 
 enum SubStatus {
   ACTIVE
   PAST_DUE
   CANCELED
+  PENDING
+}
+
+enum PaymentType {
+  SUBSCRIPTION
+  ONE_TIME
+  PAY_PER_USE
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
 }
 
 enum NodeVisibility {

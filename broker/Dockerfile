@@ -39,14 +39,17 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
 # --- Stage 3: Runner de produção ---
 FROM alpine:3.20 AS runner
 
-# Certificados SSL para conexões TLS externas (Redis, etc)
-RUN apk --no-cache add ca-certificates
+# Certificados SSL para conexões TLS externas (Redis, etc) e wget para Healthcheck
+RUN apk --no-cache add ca-certificates wget
 
 WORKDIR /app
 
 # Segurança: roda como user não-root
 RUN addgroup -S broker && adduser -S broker -G broker
 COPY --from=builder /broker .
+
+HEALTHCHECK --interval=30s --timeout=3s --retries=3 --start-period=10s \
+  CMD wget -qO- http://localhost:10001/health || exit 1
 
 USER broker
 EXPOSE 10000 10001
