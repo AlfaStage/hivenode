@@ -90,9 +90,14 @@ export async function POST(request: NextRequest) {
     // Registra imediatamente no Redis para o Broker Go
     await redis.set(`node_visibility:${node.id}`, safeVisibility);
 
-    const user = await prisma.user.findUnique({ where: { id: payload.userId }, select: { email: true } });
-    if (user?.email) {
-      sendNodeAlert(user.email, deviceName, safeVisibility).catch(console.error);
+    const user = await prisma.user.findUnique({ where: { id: payload.userId }, select: { email: true, tunnelSecret: true } });
+    if (user) {
+      if (user.tunnelSecret) {
+        await redis.set(`user_tunnel_secret:${node.id}`, user.tunnelSecret);
+      }
+      if (user.email) {
+        sendNodeAlert(user.email, deviceName, safeVisibility).catch(console.error);
+      }
     }
 
     console.log(`[API Nodes] Novo node criado: ${node.id} por ${payload.userId} (${safeVisibility})`);

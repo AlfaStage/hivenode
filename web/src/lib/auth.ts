@@ -15,6 +15,7 @@ import { cookies, headers } from "next/headers";
 export interface TokenPayload extends JWTPayload {
   userId: string;
   role: string;
+  tunnelSecret?: string;
 }
 
 // ==============================================================================
@@ -48,9 +49,10 @@ function getJwtSecret(): Uint8Array {
 
 export async function generateToken(
   userId: string,
-  role: string
+  role: string,
+  tunnelSecret?: string
 ): Promise<string> {
-  const token = await new SignJWT({ userId, role })
+  const token = await new SignJWT({ userId, role, tunnelSecret })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("7d")

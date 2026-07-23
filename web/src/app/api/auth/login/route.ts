@@ -31,6 +31,7 @@ export async function POST(request: NextRequest) {
         passwordHash: true,
         balanceGB: true,
         createdAt: true,
+        tunnelSecret: true,
       },
     });
 
@@ -45,7 +46,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Gerar JWT e setar cookie
-    const token = await generateToken(user.id, user.role);
+    const token = await generateToken(user.id, user.role, user.tunnelSecret);
     await setAuthCookie(token);
 
     // Remover passwordHash do retorno

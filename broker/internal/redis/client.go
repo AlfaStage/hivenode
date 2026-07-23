@@ -8,6 +8,7 @@ import (
 	"time"
 
 	goredis "github.com/redis/go-redis/v9"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type Client struct {
@@ -67,7 +68,7 @@ func (c *Client) ValidateSOCKS5User(ctx context.Context, username, password stri
 		nodeType = parts[2] // Ex: nodeId:senha:PUBLIC
 	}
 
-	if password != expectedPass {
+	if bcrypt.CompareHashAndPassword([]byte(expectedPass), []byte(password)) != nil {
 		return "", "", fmt.Errorf("senha do proxy incorreta")
 	}
 

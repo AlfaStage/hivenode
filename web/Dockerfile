@@ -78,7 +78,7 @@ RUN apk --no-cache add wget
 # Script de inicialização: sincroniza schema no banco e depois inicia o servidor
 RUN echo '#!/bin/sh' > /app/start.sh && \
     echo 'echo "🔄 Sincronizando schema Prisma com o banco..."' >> /app/start.sh && \
-    echo 'npx prisma db push --accept-data-loss 2>&1 || echo "⚠️ Prisma push falhou, continuando..."' >> /app/start.sh && \
+    echo 'npx prisma migrate deploy 2>&1 || echo "⚠️ Prisma migrate deploy falhou, continuando..."' >> /app/start.sh && \
     echo 'echo "🚀 Iniciando Next.js..."' >> /app/start.sh && \
     echo 'exec node server.js' >> /app/start.sh && \
     chmod +x /app/start.sh

@@ -30,6 +30,7 @@ model User {
   referredById     String?
   
   // Segurança / 2FA
+  tunnelSecret     String         @default(uuid())
   twoFactorSecret  String?
   twoFactorEnabled Boolean        @default(false)
 
@@ -158,6 +159,18 @@ model SystemConfig {
   updatedAt DateTime @updatedAt
 
   @@map("system_config")
+}
+
+model WebhookEvent {
+  id          String   @id @default(uuid())
+  externalId  String   @unique  // event.id do AbacatePay
+  eventType   String
+  payload     Json
+  processedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  
+  @@index([externalId, eventType])
+  @@map("webhook_events")
 }
 
 model PointsLedger {

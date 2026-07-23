@@ -318,6 +318,14 @@ func (tm *TunnelManager) RemoveDashboardClient(conn *websocket.Conn) {
 	tm.mu.Unlock()
 }
 
+func (tm *TunnelManager) getTunnelSecret(nodeID string) []byte {
+	secret, err := tm.redisClient.Get(context.Background(), "user_tunnel_secret:"+nodeID).Result()
+	if err != nil || secret == "" {
+		return []byte("fallback_should_not_happen")
+	}
+	return []byte(secret)
+}
+
 func (tm *TunnelManager) HandleWS(w http.ResponseWriter, r *http.Request) {
 	nodeID := r.URL.Query().Get("nodeId")
 	sig := r.URL.Query().Get("sig") // Assinatura Criptográfica
@@ -327,8 +335,8 @@ func (tm *TunnelManager) HandleWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 1. Proteção Anti-Fraude: Validar Assinatura HMAC
-	mac := hmac.New(sha256.New, []byte("hivenode_secret_key"))
+	// 1. Proteção Anti-Fraude: Validar Assinatura HMAC com segredo do usuário
+	mac := hmac.New(sha256.New, tm.getTunnelSecret(nodeID))
 	mac.Write([]byte(nodeID))
 	expectedMAC := hex.EncodeToString(mac.Sum(nil))
 

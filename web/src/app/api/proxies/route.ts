@@ -50,17 +50,20 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const bcryptjs = require("bcryptjs");
+    const maskedPass = await bcryptjs.hash(proxyPass, 4);
+
     const proxy = await prisma.proxyCredential.create({
       data: {
         userId: payload.userId,
         nodeId,
         proxyUser,
-        proxyPass,
+        proxyPass: maskedPass,
       }
     });
 
     try {
-      await redis.set(`proxy:${proxyUser}`, `${nodeId}:${proxyPass}`);
+      await redis.set(`proxy:${proxyUser}`, `${nodeId}:${maskedPass}`);
     } catch (redisError) {
       console.log("Aviso: Falha ao injetar no Redis imediatamente, o Broker fará fallback.", redisError);
     }

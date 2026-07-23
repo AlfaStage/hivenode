@@ -57,147 +57,104 @@ export async function POST(request: NextRequest) {
 
     const eventType = event.type || event.event;
     console.log(`[Webhook] Evento recebido: ${eventType}`);
+    const externalId = event.id || event.data?.id || crypto.randomUUID();
 
-    switch (eventType) {
-      // ===============================================================
-      // CHECKOUT (Compra Única - Pacotes GB)
-      // ===============================================================
-      case "checkout.completed": {
-        const checkoutId = event.data?.id || event.data?.checkoutId;
-        const payment = await prisma.payment.findFirst({
-          where: { abacateCheckoutId: checkoutId },
+    try {
+      await prisma.$transaction(async (tx) => {
+        // 1. Inserir idempotente
+        await tx.webhookEvent.create({
+          data: { externalId: `${externalId}:${eventType}`, eventType, payload: event }
         });
 
-        if (payment) {
-          // Atualizar status do pagamento
-          await prisma.payment.update({
-            where: { id: payment.id },
-            data: { status: "PAID" },
-          });
-
-          // Buscar plano para saber quantos GB creditar
-          if (payment.planId) {
-            const plan = await prisma.plan.findUnique({
-              where: { id: payment.planId },
-            });
-
-            if (plan && plan.gbIncluded > 0) {
-              await prisma.user.update({
-                where: { id: payment.userId },
+        // 2. Processamento real
+        switch (eventType) {
+          case "checkout.completed": {
+            const checkoutId = event.data?.id || event.data?.checkoutId;
+            const payment = await tx.payment.findFirst({ where: { abacateCheckoutId: checkoutId } });
+            if (payment) {
+              await tx.payment.update({ where: { id: payment.id }, data: { status: "PAID" } });
+              if (payment.planId) {
+                const plan = await tx.plan.findUnique({ where: { id: payment.planId } });
+                if (plan && plan.gbIncluded > 0) {
+                  await tx.user.update({
+                    where: { id: payment.userId },
+                    data: { balanceGB: { increment: plan.gbIncluded }, activePlanId: plan.id },
+                  });
+                }
+              }
+              await tx.node.updateMany({
+                where: { userId: payment.userId, status: "BLOCKED" },
+                data: { status: "OFFLINE" },
+              });
+            }
+            break;
+          }
+          case "checkout.refunded": {
+            const checkoutId = event.data?.id || event.data?.checkoutId;
+            const payment = await tx.payment.findFirst({ where: { abacateCheckoutId: checkoutId } });
+            if (payment) {
+              await tx.payment.update({ where: { id: payment.id }, data: { status: "REFUNDED" } });
+              if (payment.planId) {
+                const plan = await tx.plan.findUnique({ where: { id: payment.planId } });
+                if (plan && plan.gbIncluded > 0) {
+                  await tx.user.update({
+                    where: { id: payment.userId },
+                    data: { balanceGB: { decrement: plan.gbIncluded } },
+                  });
+                }
+              }
+            }
+            break;
+          }
+          case "subscription.completed":
+          case "subscription.renewed": {
+            const subId = event.data?.id || event.data?.subscriptionId;
+            const subscription = await tx.subscription.findFirst({ where: { abacatePaySubId: subId } });
+            if (subscription) {
+              const nextPeriod = new Date();
+              nextPeriod.setMonth(nextPeriod.getMonth() + 1);
+              await tx.subscription.update({
+                where: { id: subscription.id },
+                data: { status: "ACTIVE", currentPeriodEnd: nextPeriod },
+              });
+              if (subscription.planId) {
+                await tx.user.update({
+                  where: { id: subscription.userId },
+                  data: { activePlanId: subscription.planId },
+                });
+              }
+              await tx.payment.create({
                 data: {
-                  balanceGB: { increment: plan.gbIncluded },
-                  activePlanId: plan.id,
+                  userId: subscription.userId,
+                  planId: subscription.planId,
+                  type: "SUBSCRIPTION",
+                  amountCents: event.data?.amount || 0,
+                  status: "PAID",
+                  abacateSubId: subId,
                 },
               });
-              console.log(`[Webhook] ✅ +${plan.gbIncluded} GB para user ${payment.userId}`);
             }
+            break;
           }
-
-          // Desbloquear nodes se estavam bloqueados
-          await prisma.node.updateMany({
-            where: { userId: payment.userId, status: "BLOCKED" },
-            data: { status: "OFFLINE" },
-          });
-        }
-        break;
-      }
-
-      case "checkout.refunded": {
-        const checkoutId = event.data?.id || event.data?.checkoutId;
-        const payment = await prisma.payment.findFirst({
-          where: { abacateCheckoutId: checkoutId },
-        });
-
-        if (payment) {
-          await prisma.payment.update({
-            where: { id: payment.id },
-            data: { status: "REFUNDED" },
-          });
-
-          // Reverter GB se tinha plano
-          if (payment.planId) {
-            const plan = await prisma.plan.findUnique({ where: { id: payment.planId } });
-            if (plan && plan.gbIncluded > 0) {
-              await prisma.user.update({
-                where: { id: payment.userId },
-                data: { balanceGB: { decrement: plan.gbIncluded } },
-              });
-              console.log(`[Webhook] ↩️ -${plan.gbIncluded} GB (estorno) user ${payment.userId}`);
+          case "subscription.cancelled": {
+            const subId = event.data?.id || event.data?.subscriptionId;
+            const subscription = await tx.subscription.findFirst({ where: { abacatePaySubId: subId } });
+            if (subscription) {
+              await tx.subscription.update({ where: { id: subscription.id }, data: { status: "CANCELED" } });
             }
+            break;
           }
+          default:
+            console.log(`[Webhook] Evento não tratado: ${eventType}`);
         }
-        break;
+      });
+    } catch (error: any) {
+      if (error.code === 'P2002') {
+        console.log(`[Webhook] Evento duplicado evitado: ${externalId}:${eventType}`);
+        return apiSuccess({ received: true, duplicate: true });
       }
-
-      // ===============================================================
-      // ASSINATURA (Planos Recorrentes - Starter/Pro/Enterprise)
-      // ===============================================================
-      case "subscription.completed":
-      case "subscription.renewed": {
-        const subId = event.data?.id || event.data?.subscriptionId;
-        const subscription = await prisma.subscription.findFirst({
-          where: { abacatePaySubId: subId },
-        });
-
-        if (subscription) {
-          const nextPeriod = new Date();
-          nextPeriod.setMonth(nextPeriod.getMonth() + 1);
-
-          await prisma.subscription.update({
-            where: { id: subscription.id },
-            data: {
-              status: "ACTIVE",
-              currentPeriodEnd: nextPeriod,
-            },
-          });
-
-          // Atualizar plano ativo do usuário
-          if (subscription.planId) {
-            await prisma.user.update({
-              where: { id: subscription.userId },
-              data: { activePlanId: subscription.planId },
-            });
-          }
-
-          // Registrar pagamento
-          await prisma.payment.create({
-            data: {
-              userId: subscription.userId,
-              planId: subscription.planId,
-              type: "SUBSCRIPTION",
-              amountCents: event.data?.amount || 0,
-              status: "PAID",
-              abacateSubId: subId,
-            },
-          });
-
-          console.log(`[Webhook] ✅ Assinatura ${eventType === "subscription.renewed" ? "renovada" : "ativada"} - user ${subscription.userId}`);
-        }
-        break;
-      }
-
-      case "subscription.cancelled": {
-        const subId = event.data?.id || event.data?.subscriptionId;
-        const subscription = await prisma.subscription.findFirst({
-          where: { abacatePaySubId: subId },
-        });
-
-        if (subscription) {
-          await prisma.subscription.update({
-            where: { id: subscription.id },
-            data: { status: "CANCELED" },
-          });
-
-          console.log(`[Webhook] 🛑 Assinatura cancelada - user ${subscription.userId}`);
-        }
-        break;
-      }
-
-      // ===============================================================
-      // EVENTOS NÃO TRATADOS (Log apenas)
-      // ===============================================================
-      default:
-        console.log(`[Webhook] Evento não tratado: ${eventType}`);
+      console.error("[Webhook] Erro processando transação:", error);
+      return apiError("Internal error", 500);
     }
 
     return apiSuccess({ received: true });
