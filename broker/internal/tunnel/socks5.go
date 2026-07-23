@@ -56,15 +56,13 @@ func StartSocks5Server(port string, redisClient *redis.Client, tm *TunnelManager
 			connID := fmt.Sprintf("conn_%d", time.Now().UnixNano())
 			// Failover Inteligente: Pega qualquer nó online (Para a Persona 3 / Público)
 			// Em um sistema real, extrairíamos o Payload do ctx.
-			tm.mu.RLock()
 			var conn *websocket.Conn
 			var nodeID string
-			for id, ws := range tm.devices {
+			tm.devices.Range(func(id string, ws *websocket.Conn) bool {
 				conn = ws
 				nodeID = id
-				break // Round-robin simples para failover
-			}
-			tm.mu.RUnlock()
+				return false // Break after first item for simple round-robin/failover
+			})
 
 			if conn == nil {
 				return nil, fmt.Errorf("rede global indisponível no momento")

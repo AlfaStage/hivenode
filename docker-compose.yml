@@ -100,6 +100,9 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.hivenode-broker.rule=Host(`api.hivenode.alfastage.com.br`)"
       - "traefik.http.services.hivenode-broker.loadbalancer.server.port=10001"
+      - "traefik.http.services.hivenode-broker.loadbalancer.sticky.cookie.name=hivenode-affinity"
+      - "traefik.http.services.hivenode-broker.loadbalancer.sticky.cookie.secure=true"
+      - "traefik.http.services.hivenode-broker.loadbalancer.sticky.cookie.sameSite=lax"
     environment:
       - REDIS_URL=redis://:hivenode_redis_2026@redis:6379/0
       - SOCKS5_PORT=${BROKER_SOCKS5_PORT:-10000}

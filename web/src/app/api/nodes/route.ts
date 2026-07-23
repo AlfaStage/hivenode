@@ -17,11 +17,9 @@ export async function GET(request: NextRequest) {
 
     let liveNodes: string[] = [];
     try {
-      // Pergunta pra Memória RAM do Broker (sem depender de redis/postgres) na Porta 10001
-      const res = await fetch("http://broker:10001/live-nodes", { cache: 'no-store' });
-      if (res.ok) liveNodes = await res.json();
+      liveNodes = await redis.smembers("hivenode:online_nodes");
     } catch (e) {
-      console.log("Aviso: Falha ao puxar live nodes do broker");
+      console.log("Aviso: Falha ao puxar live nodes do Redis");
     }
 
     const mappedNodes = nodes.map(n => ({
@@ -52,28 +50,21 @@ export async function POST(request: NextRequest) {
     // 1. Calcular limite total de aparelhos com base em todos os planos ativos
     const userSubs = await prisma.subscription.findMany({
       where: { userId: payload.userId, status: "ACTIVE" },
-      include: {
-        user: { select: { activePlanId: true } },
-      }
+      include: { plan: true },
     });
 
     let totalAllowed = 0;
     let hasUnlimited = false;
 
     if (userSubs.length === 0) {
-      // Usuário sem plano: não pode ter aparelhos (ou define um limite gratuito se existir)
-      // Se não tem assinaturas, bloqueia.
       return apiError("Você precisa assinar um plano para adicionar aparelhos", 403);
     }
 
-    // Buscar todos os planos relacionados às assinaturas
+    // Buscar todos os planos relacionados às assinaturas de forma eficiente
     for (const sub of userSubs) {
-      if (sub.planId) {
-        const p = await prisma.plan.findUnique({ where: { id: sub.planId } });
-        if (p) {
-          if (p.maxDevices === 0) hasUnlimited = true;
-          totalAllowed += p.maxDevices;
-        }
+      if (sub.plan) {
+        if (sub.plan.maxDevices === 0) hasUnlimited = true;
+        totalAllowed += sub.plan.maxDevices;
       }
     }
 

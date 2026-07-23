@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"hash/fnv"
 	"io"
 	"log"
 	"net"
@@ -20,6 +21,85 @@ import (
 	"github.com/hivenode/broker/internal/redis"
 )
 
+var bufPool = sync.Pool{
+	New: func() interface{} {
+		b := make([]byte, 0, 32*1024) // 32KB default
+		return &b
+	},
+}
+
+const SHARD_COUNT = 64
+
+type sharedDevices struct {
+	shards [SHARD_COUNT]struct {
+		mu    sync.RWMutex
+		items map[string]*websocket.Conn
+	}
+}
+
+func newSharedDevices() *sharedDevices {
+	sd := &sharedDevices{}
+	for i := range sd.shards {
+		sd.shards[i].items = make(map[string]*websocket.Conn)
+	}
+	return sd
+}
+
+func (sd *sharedDevices) getShard(id string) *struct {
+	mu    sync.RWMutex
+	items map[string]*websocket.Conn
+} {
+	h := fnv.New32a()
+	h.Write([]byte(id))
+	return &sd.shards[h.Sum32()%SHARD_COUNT]
+}
+
+func (sd *sharedDevices) Set(id string, conn *websocket.Conn) {
+	s := sd.getShard(id)
+	s.mu.Lock()
+	s.items[id] = conn
+	s.mu.Unlock()
+}
+
+func (sd *sharedDevices) Get(id string) (*websocket.Conn, bool) {
+	s := sd.getShard(id)
+	s.mu.RLock()
+	c, ok := s.items[id]
+	s.mu.RUnlock()
+	return c, ok
+}
+
+func (sd *sharedDevices) Delete(id string) {
+	s := sd.getShard(id)
+	s.mu.Lock()
+	delete(s.items, id)
+	s.mu.Unlock()
+}
+
+func (sd *sharedDevices) Len() int {
+	count := 0
+	for i := range sd.shards {
+		sd.shards[i].mu.RLock()
+		count += len(sd.shards[i].items)
+		sd.shards[i].mu.RUnlock()
+	}
+	return count
+}
+
+func (sd *sharedDevices) Range(f func(id string, conn *websocket.Conn) bool) {
+	for i := range sd.shards {
+		s := &sd.shards[i]
+		s.mu.RLock()
+		for k, v := range s.items {
+			if !f(k, v) {
+				s.mu.RUnlock()
+				return
+			}
+		}
+		s.mu.RUnlock()
+	}
+}
+
 // BroadcastEvent representa um pacote de tempo real enviado para o Painel Web
 type BroadcastEvent struct {
 	Type    string      `json:"type"` // "NODE_ONLINE", "NODE_OFFLINE", "LOG"
@@ -32,7 +112,7 @@ type BroadcastEvent struct {
 type TunnelManager struct {
 	redisClient      *redis.Client
 	upgrader         websocket.Upgrader
-	devices          map[string]*websocket.Conn
+	devices          *sharedDevices
 	dashboardClients map[*websocket.Conn]bool
 	virtualConns     map[string]*VirtualConn
 	nodeStats        map[string]*NodeStats
@@ -56,8 +136,10 @@ type VirtualConn struct {
 	DialRespCh chan bool
 	CloseCh    chan struct{}
 	closed     bool
-	mu      sync.Mutex
-	buffer  []byte
+	mu         sync.Mutex
+	buffer     []byte
+	rxLocal    uint64
+	txLocal    uint64
 }
 
 func (vc *VirtualConn) Read(b []byte) (n int, err error) {
@@ -73,7 +155,7 @@ func (vc *VirtualConn) Read(b []byte) (n int, err error) {
 		}
 		n = copy(b, data)
 		if n < len(data) {
-			vc.buffer = data[n:]
+			vc.buffer = data[n:] // cópia só quando parcial
 		}
 		return n, nil
 	case <-vc.CloseCh:
@@ -89,20 +171,31 @@ func (vc *VirtualConn) Write(b []byte) (n int, err error) {
 	}
 	vc.mu.Unlock()
 
-	// Formato Binário: [connIdLen (1)] + [connId] + [payload]
 	idBytes := []byte(vc.ConnID)
-	outBuffer := make([]byte, 1+len(idBytes)+len(b))
-	outBuffer[0] = byte(len(idBytes))
-	copy(outBuffer[1:], idBytes)
-	copy(outBuffer[1+len(idBytes):], b)
+	bufPtr := bufPool.Get().(*[]byte)
+	defer bufPool.Put(bufPtr)
 
+	needed := 1 + len(idBytes) + len(b)
+	if cap(*bufPtr) < needed {
+		*bufPtr = make([]byte, needed)
+	}
+	out := (*bufPtr)[:needed]
+
+	out[0] = byte(len(idBytes))
+	copy(out[1:], idBytes)
+	copy(out[1+len(idBytes):], b)
+
+	ws, ok := vc.TM.devices.Get(vc.NodeID)
 	vc.TM.mu.RLock()
-	ws, ok := vc.TM.devices[vc.NodeID]
 	stats, statsOk := vc.TM.nodeStats[vc.NodeID]
 	vc.TM.mu.RUnlock()
 
 	if statsOk {
-		atomic.AddUint64(&stats.Rx, uint64(len(b)))
+		vc.rxLocal += uint64(len(b))
+		if vc.rxLocal >= 5*1024*1024 { // 5MB
+			atomic.AddUint64(&stats.Rx, vc.rxLocal)
+			vc.rxLocal = 0
+		}
 	}
 
 	if !ok {
@@ -110,7 +203,7 @@ func (vc *VirtualConn) Write(b []byte) (n int, err error) {
 	}
 
 	vc.TM.mu.Lock()
-	err = ws.WriteMessage(websocket.BinaryMessage, outBuffer)
+	err = ws.WriteMessage(websocket.BinaryMessage, out)
 	vc.TM.mu.Unlock()
 
 	if err != nil {
@@ -134,10 +227,7 @@ func (vc *VirtualConn) Close() error {
 		"connId": vc.ConnID,
 	}
 
-	vc.TM.mu.RLock()
-	ws, ok := vc.TM.devices[vc.NodeID]
-	vc.TM.mu.RUnlock()
-
+	ws, ok := vc.TM.devices.Get(vc.NodeID)
 	if ok {
 		vc.TM.mu.Lock()
 		ws.WriteJSON(msg)
@@ -145,6 +235,10 @@ func (vc *VirtualConn) Close() error {
 	}
 
 	vc.TM.mu.Lock()
+	if stats, exists := vc.TM.nodeStats[vc.NodeID]; exists {
+		atomic.AddUint64(&stats.Rx, vc.rxLocal)
+		atomic.AddUint64(&stats.Tx, vc.txLocal)
+	}
 	delete(vc.TM.virtualConns, vc.ConnID)
 	vc.TM.mu.Unlock()
 	return nil
@@ -165,7 +259,7 @@ func NewTunnelManager(rClient *redis.Client) *TunnelManager {
 				return true // Aceitar do app Android e do Painel Web
 			},
 		},
-		devices:          make(map[string]*websocket.Conn),
+		devices:          newSharedDevices(),
 		dashboardClients: make(map[*websocket.Conn]bool),
 		virtualConns:     make(map[string]*VirtualConn),
 		nodeStats:        make(map[string]*NodeStats),
@@ -174,16 +268,39 @@ func NewTunnelManager(rClient *redis.Client) *TunnelManager {
 		BroadcastChan:    make(chan BroadcastEvent, 100),
 	}
 	go tm.runBroadcaster()
+	go tm.startRedisBroadcast()
 	return tm
 }
 
+func (tm *TunnelManager) broadcast(ev BroadcastEvent) {
+	// Publica no Redis para que outros brokers (caso haja) também recebam
+	data, _ := json.Marshal(ev)
+	tm.redisClient.Publish(context.Background(), "broker:broadcast", data)
+}
+
+func (tm *TunnelManager) broadcastLocal(ev BroadcastEvent) {
+	tm.mu.RLock()
+	for client := range tm.dashboardClients {
+		client.WriteJSON(ev)
+	}
+	tm.mu.RUnlock()
+}
+
 func (tm *TunnelManager) runBroadcaster() {
+	// Apenas escuta os canais locais (ainda suportados) e repassa para broadcastLocal
 	for event := range tm.BroadcastChan {
-		tm.mu.RLock()
-		for client := range tm.dashboardClients {
-			client.WriteJSON(event)
+		tm.broadcastLocal(event)
+	}
+}
+
+func (tm *TunnelManager) startRedisBroadcast() {
+	sub := tm.redisClient.Subscribe(context.Background(), "broker:broadcast")
+	ch := sub.Channel()
+	for msg := range ch {
+		var ev BroadcastEvent
+		if err := json.Unmarshal([]byte(msg.Payload), &ev); err == nil {
+			tm.broadcastLocal(ev) // manda pros dashboards conectados neste broker
 		}
-		tm.mu.RUnlock()
 	}
 }
 
@@ -211,11 +328,10 @@ func (tm *TunnelManager) HandleWS(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 1. Proteção Anti-Fraude: Validar Assinatura HMAC
-	// O client móvel deve gerar a assinatura usando um segredo global/por-usuário
 	mac := hmac.New(sha256.New, []byte("hivenode_secret_key"))
 	mac.Write([]byte(nodeID))
 	expectedMAC := hex.EncodeToString(mac.Sum(nil))
-	
+
 	if sig != expectedMAC {
 		log.Printf("⚠️ FRAUDE DETECTADA: Assinatura HMAC inválida (IP: %s)", r.RemoteAddr)
 		http.Error(w, "Invalid HMAC Signature", http.StatusUnauthorized)
@@ -265,30 +381,36 @@ func (tm *TunnelManager) HandleWS(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Registrar o device Android
+	tm.devices.Set(nodeID, conn)
 	tm.mu.Lock()
-	tm.devices[nodeID] = conn
 	if _, exists := tm.nodeStats[nodeID]; !exists {
 		tm.nodeStats[nodeID] = &NodeStats{}
 	}
 	tm.mu.Unlock()
 
+	// Sincronizar com Redis para leitura via GET /api/nodes
+	tm.redisClient.SAdd(context.Background(), "hivenode:online_nodes", nodeID)
+
 	log.Printf("🔗 Novo Device conectado no WS: %s", nodeID)
 
-	// Dispara o Evento de "Online" pro Painel Web
-	tm.BroadcastChan <- BroadcastEvent{
+	// Dispara o Evento de "Online" pro Painel Web via Redis Broadcast
+	tm.broadcast(BroadcastEvent{
 		Type:    "NODE_ONLINE",
 		NodeID:  nodeID,
 		Payload: nil,
 		Time:    time.Now().Format(time.RFC3339),
-	}
+	})
 
 	for {
 		msgTypeRaw, msgBytes, err := conn.ReadMessage()
 		if err != nil {
 			log.Printf("❌ Device desconectado: %s", nodeID)
+			
+			tm.devices.Delete(nodeID)
+			tm.redisClient.SRem(context.Background(), "hivenode:online_nodes", nodeID)
+			
 			tm.mu.Lock()
 			stats, statsOk := tm.nodeStats[nodeID]
-			delete(tm.devices, nodeID)
 			
 			if visibility == "PUBLIC" {
 				tm.minerIPCounts[ip]--
@@ -311,12 +433,12 @@ func (tm *TunnelManager) HandleWS(w http.ResponseWriter, r *http.Request) {
 			}
 
 			// Dispara o Evento de "Offline" pro Painel Web
-			tm.BroadcastChan <- BroadcastEvent{
+			tm.broadcast(BroadcastEvent{
 				Type:    "NODE_OFFLINE",
 				NodeID:  nodeID,
 				Payload: nil,
 				Time:    time.Now().Format(time.RFC3339),
-			}
+			})
 			break
 		}
 
@@ -334,7 +456,15 @@ func (tm *TunnelManager) HandleWS(w http.ResponseWriter, r *http.Request) {
 					tm.mu.RUnlock()
 
 					if statsOk {
-						atomic.AddUint64(&stats.Tx, uint64(len(payload)))
+						if exists {
+							vc.txLocal += uint64(len(payload))
+							if vc.txLocal >= 5*1024*1024 {
+								atomic.AddUint64(&stats.Tx, vc.txLocal)
+								vc.txLocal = 0
+							}
+						} else {
+							atomic.AddUint64(&stats.Tx, uint64(len(payload)))
+						}
 					}
 
 					if exists {
@@ -352,12 +482,12 @@ func (tm *TunnelManager) HandleWS(w http.ResponseWriter, r *http.Request) {
 			if ok {
 				// Se o celular enviou um pacote de Telemetria (LOG)
 				if msgType == "LOG" {
-					tm.BroadcastChan <- BroadcastEvent{
+					tm.broadcast(BroadcastEvent{
 						Type:    "LOG",
 						NodeID:  nodeID,
 						Payload: payload["payload"],
 						Time:    time.Now().Format("15:04:05"),
-					}
+					})
 				} else if msgType == "TELEMETRY" {
 					tm.mu.RLock()
 					stats, statsOk := tm.nodeStats[nodeID]
@@ -369,12 +499,12 @@ func (tm *TunnelManager) HandleWS(w http.ResponseWriter, r *http.Request) {
 					}
 
 					// Envia a saúde/rede do celular pro Dashboard
-					tm.BroadcastChan <- BroadcastEvent{
+					tm.broadcast(BroadcastEvent{
 						Type:    "TELEMETRY",
 						NodeID:  nodeID,
-						Payload: payload, // { ip: "...", network: "...", rx: X, tx: Y }
+						Payload: payload,
 						Time:    time.Now().Format("15:04:05"),
-					}
+					})
 				} else if msgType == "DIAL_OK" {
 					connId, _ := payload["connId"].(string)
 					if connId != "" {
@@ -427,29 +557,22 @@ func (tm *TunnelManager) AddVirtualConn(vc *VirtualConn) {
 
 // GetWS returns the raw websocket for dial commands
 func (tm *TunnelManager) GetWS(nodeID string) *websocket.Conn {
-	tm.mu.RLock()
-	defer tm.mu.RUnlock()
-	return tm.devices[nodeID]
+	ws, _ := tm.devices.Get(nodeID)
+	return ws
 }
 
 // GetDeviceConn retorna a conexão WS do Android se estiver online
 func (tm *TunnelManager) GetDeviceConn(nodeID string) *websocket.Conn {
-	tm.mu.RLock()
-	defer tm.mu.RUnlock()
-	return tm.devices[nodeID]
+	ws, _ := tm.devices.Get(nodeID)
+	return ws
 }
 
 // KickDevice derruba a conexão de um Node específico
 func (tm *TunnelManager) KickDevice(nodeID string) {
-	tm.mu.Lock()
-	conn, exists := tm.devices[nodeID]
+	conn, exists := tm.devices.Get(nodeID)
 	if exists {
-		delete(tm.devices, nodeID)
-	}
-	tm.mu.Unlock()
-
-	if exists {
-		// Manda uma mensagem de fechamento limpa com o motivo "KICKED"
+		tm.devices.Delete(nodeID)
+		tm.redisClient.SRem(context.Background(), "hivenode:online_nodes", nodeID)
 		conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "KICKED"))
 		conn.Close()
 		log.Printf("🔨 Device Kickado pelo sistema: %s", nodeID)
@@ -458,11 +581,10 @@ func (tm *TunnelManager) KickDevice(nodeID string) {
 
 // GetConnectedNodes retorna a lista de IDs de todos os aparelhos conectados agora
 func (tm *TunnelManager) GetConnectedNodes() []string {
-	tm.mu.RLock()
-	defer tm.mu.RUnlock()
-	nodes := make([]string, 0, len(tm.devices))
-	for id := range tm.devices {
+	var nodes []string
+	tm.devices.Range(func(id string, conn *websocket.Conn) bool {
 		nodes = append(nodes, id)
-	}
+		return true
+	})
 	return nodes
 }

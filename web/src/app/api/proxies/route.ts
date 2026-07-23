@@ -24,6 +24,7 @@ export async function POST(request: NextRequest) {
     // 1. Calcular limite total de proxies com base em todos os planos ativos
     const userSubs = await prisma.subscription.findMany({
       where: { userId: payload.userId, status: "ACTIVE" },
+      include: { plan: true },
     });
 
     let totalAllowed = 0;
@@ -34,12 +35,9 @@ export async function POST(request: NextRequest) {
     }
 
     for (const sub of userSubs) {
-      if (sub.planId) {
-        const p = await prisma.plan.findUnique({ where: { id: sub.planId } });
-        if (p) {
-          if (p.maxProxies === 0) hasUnlimited = true;
-          totalAllowed += p.maxProxies;
-        }
+      if (sub.plan) {
+        if (sub.plan.maxProxies === 0) hasUnlimited = true;
+        totalAllowed += sub.plan.maxProxies;
       }
     }
 
