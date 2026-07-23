@@ -18,6 +18,8 @@ export async function PUT(
         role: body.role,
         balanceGB: body.balanceGB !== undefined ? Number(body.balanceGB) : undefined,
         hivePoints: body.hivePoints !== undefined ? Number(body.hivePoints) : undefined,
+        walletAddress: body.walletAddress !== undefined ? body.walletAddress : undefined,
+        twoFactorEnabled: body.twoFactorEnabled !== undefined ? Boolean(body.twoFactorEnabled) : undefined,
       },
     });
 

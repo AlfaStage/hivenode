@@ -642,11 +642,68 @@ export default function ProxiesPage() {
             </div>
             
             <p className="text-[#8e8e99] text-sm mb-6">
-              Abra o HiveNode Mobile e escaneie este código para vincular automaticamente, sem digitar senhas!
+              Escaneie com o app móvel, instale o APK no Android ou use o comando Linux para servidores.
             </p>
             
-            <div className="bg-white p-4 rounded-xl inline-block mb-6">
-              <QRCode value={qrPayload} size={200} level="H" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+              {/* QR Code & APK Downloads */}
+              <div className="flex flex-col items-center p-4 bg-[#0a0a0c] border border-[#27272e] rounded-xl">
+                <div className="bg-white p-3 rounded-xl mb-4">
+                  <QRCode value={qrPayload} size={170} level="H" />
+                </div>
+                <div className="space-y-2 w-full">
+                  <p className="text-xs font-bold text-slate-400 text-center uppercase tracking-wider">APKs Oficiais Android</p>
+                  <a 
+                    href="https://expo.dev/artifacts/eas/1YQ2fLEnc-22diSwjBz241jUo-4rBmq_CBZuhgAhpFc.apk"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center justify-center gap-2 w-full py-2 px-3 bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 border border-amber-500/30 rounded-lg text-xs font-bold transition-all"
+                  >
+                    📥 Baixar APK HiveNode (Proxy)
+                  </a>
+                  <a 
+                    href="https://expo.dev/artifacts/eas/idNUBIBrLxPhFC9l5nLiEAVBuDdJfBTc6HZRSBgtu2A.apk"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center justify-center gap-2 w-full py-2 px-3 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-lg text-xs font-bold transition-all"
+                  >
+                    📥 Baixar APK HiveMiner (Miner)
+                  </a>
+                </div>
+              </div>
+
+              {/* Linux CLI & Short Code */}
+              <div className="space-y-4 text-left">
+                <div className="p-4 bg-[#0a0a0c] border border-[#27272e] rounded-xl">
+                  <p className="text-xs font-bold text-amber-500 uppercase tracking-wider mb-1">Instalação Linux (CLI / Terminal)</p>
+                  <p className="text-xs text-slate-400 mb-3">Comando único universal para Ubuntu, Debian, CentOS ou Arch:</p>
+                  <div className="bg-black p-3 rounded-lg border border-[#27272e] font-mono text-xs text-emerald-400 flex items-center justify-between overflow-x-auto">
+                    <span>curl -fsSL https://hivenode.alfastage.com.br/install.sh | sh</span>
+                    <button 
+                      type="button" 
+                      onClick={() => navigator.clipboard.writeText("curl -fsSL https://hivenode.alfastage.com.br/install.sh | sh")}
+                      className="ml-2 px-2 py-1 bg-[#1e1e24] hover:bg-[#27272e] text-slate-300 rounded text-[10px] font-sans"
+                    >
+                      Copiar
+                    </button>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-[#0a0a0c] border border-[#27272e] rounded-xl">
+                  <p className="text-xs font-bold text-slate-300 mb-1">Código de Vínculo de 6 Dígitos</p>
+                  <p className="text-xs text-slate-400 mb-2">Digite no app ou na CLI (`hivenode-cli link --code CÓDIGO`):</p>
+                  <div className="flex items-center justify-between bg-[#15151a] p-3 rounded-lg border border-[#2f2f38]">
+                    <span className="font-mono text-lg font-black text-amber-400 tracking-wider">HV-8X92</span>
+                    <button 
+                      type="button" 
+                      onClick={() => navigator.clipboard.writeText("HV-8X92")}
+                      className="px-3 py-1 bg-amber-500 text-black font-bold rounded text-xs"
+                    >
+                      Copiar Código
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>

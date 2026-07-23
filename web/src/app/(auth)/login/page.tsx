@@ -137,7 +137,10 @@ export default function LoginPage() {
             className="w-full h-11 rounded-xl bg-primary text-primary-foreground font-semibold flex items-center justify-center gap-2 hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 cursor-pointer"
           >
             {loading ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
+              <div className="w-full flex items-center justify-center gap-2">
+                <div className="w-5 h-5 rounded-full border-2 border-primary-foreground border-t-transparent animate-spin" />
+                <span>Autenticando...</span>
+              </div>
             ) : (
               <>
                 <LogIn className="w-5 h-5" />
