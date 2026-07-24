@@ -1,7 +1,7 @@
 "use client";
 
-import { ArrowRight, Building2, CheckCircle2, Clock, CreditCard, Crown, ExternalLink, Gauge, Package, Rocket, ShieldCheck, XCircle, Zap } from "lucide-react";
 import { useEffect, useState } from "react";
+import { ArrowRight, Building2, CheckCircle2, Clock, CreditCard, Crown, ExternalLink, Gauge, Package, Rocket, ShieldCheck, XCircle, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
@@ -65,29 +65,28 @@ export default function BillingPage() {
   const [couponCode, setCouponCode] = useState("");
 
   useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [plansRes, meRes] = await Promise.all([
+          fetch("/api/admin/plans").then((r) => r.json()).catch(() => ({ data: { plans: [] } })),
+          fetch("/api/auth/me").then((r) => r.json()),
+        ]);
+
+        if (plansRes.success || plansRes.data?.plans) {
+          setPlans((plansRes.data?.plans || []).filter((p: Plan) => p.isPublic && !p.isAdminOnly));
+        }
+        if (meRes.success) {
+          setUserData(meRes.data);
+          setPayments(meRes.data.payments || []);
+        }
+      } catch (e) {
+        console.error(e);
+      }
+      setLoading(false);
+    };
      
     fetchData();
   }, []);
-
-  const fetchData = async () => {
-    try {
-      const [plansRes, meRes] = await Promise.all([
-        fetch("/api/admin/plans").then((r) => r.json()).catch(() => ({ data: { plans: [] } })),
-        fetch("/api/auth/me").then((r) => r.json()),
-      ]);
-
-      if (plansRes.success || plansRes.data?.plans) {
-        setPlans((plansRes.data?.plans || []).filter((p: Plan) => p.isPublic && !p.isAdminOnly));
-      }
-      if (meRes.success) {
-        setUserData(meRes.data);
-        setPayments(meRes.data.payments || []);
-      }
-    } catch (e) {
-      console.error(e);
-    }
-    setLoading(false);
-  };
 
   const handlePurchase = async (plan: Plan) => {
     setPurchasing(plan.id);

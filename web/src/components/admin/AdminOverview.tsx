@@ -2,21 +2,18 @@ import { Users, Server, HardDrive, Activity } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface AdminOverviewProps {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  users: any[];
+  users: Record<string, unknown>[];
 }
 
 export function AdminOverview({ users }: AdminOverviewProps) {
   const totalUsers = users.length;
-  const totalNodes = users.reduce((acc, u) => acc + (u.nodes?.length || 0), 0);
+  const totalNodes = users.reduce((acc, u) => acc + ((u.nodes as unknown[])?.length || 0), 0);
   const totalProxies = users.reduce((acc, u) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return acc + (u.nodes?.reduce((a: number, n: any) => a + (n.proxies?.length || 0), 0) || 0);
+    return acc + ((u.nodes as Record<string, unknown>[])?.reduce((a: number, n: Record<string, unknown>) => a + ((n.proxies as unknown[])?.length || 0), 0) || 0);
   }, 0);
 
   const activeNodes = users.reduce((acc, u) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return acc + (u.nodes?.filter((n: any) => n.status === "ONLINE").length || 0);
+    return acc + ((u.nodes as Record<string, unknown>[])?.filter((n: Record<string, unknown>) => n.status === "ONLINE").length || 0);
   }, 0);
 
   return (

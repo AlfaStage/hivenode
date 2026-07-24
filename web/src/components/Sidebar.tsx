@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 import { 
   LayoutDashboard, Server, Shield, CreditCard, ShieldCheck, 
   Users, Pickaxe, ChevronDown, ChevronRight, Zap, Coins, Settings 
 } from "lucide-react";
-import { useState, useEffect } from "react";
 
 export function Sidebar({ role }: { role?: string }) {
   const pathname = usePathname();

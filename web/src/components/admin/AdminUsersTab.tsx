@@ -7,24 +7,21 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Input } from "@/components/ui/input";
 
 interface AdminUsersTabProps {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  users: any[];
+  users: Record<string, unknown>[];
   onUpdate: () => void;
 }
 
 export function AdminUsersTab({ users, onUpdate }: AdminUsersTabProps) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [editingUser, setEditingUser] = useState<any>(null);
+  const [editingUser, setEditingUser] = useState<Record<string, unknown> | null>(null);
   const [editForm, setEditForm] = useState({ role: "", balanceGB: 0, hivePoints: 0 });
   const [loading, setLoading] = useState(false);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handleEditClick = (user: any) => {
+  const handleEditClick = (user: Record<string, unknown>) => {
     setEditingUser(user);
     setEditForm({
-      role: user.role,
-      balanceGB: user.balanceGB,
-      hivePoints: user.hivePoints,
+      role: String(user.role),
+      balanceGB: Number(user.balanceGB),
+      hivePoints: Number(user.hivePoints),
     });
   };
 
@@ -77,21 +74,21 @@ export function AdminUsersTab({ users, onUpdate }: AdminUsersTabProps) {
           </TableHeader>
           <TableBody>
             {users.map((user) => (
-              <TableRow key={user.id} className="border-[#27272e] hover:bg-[#1a1a20]/50">
-                <TableCell className="font-medium text-white">{user.email}</TableCell>
+              <TableRow key={String(user.id)} className="border-[#27272e] hover:bg-[#1a1a20]/50">
+                <TableCell className="font-medium text-white">{String(user.email)}</TableCell>
                 <TableCell>
                   <Badge variant={user.role === "ADMIN" ? "default" : "secondary"} className={user.role === "ADMIN" ? "bg-amber-500/20 text-amber-500 hover:bg-amber-500/30 border-amber-500/50" : ""}>
-                    {user.role}
+                    {String(user.role)}
                   </Badge>
                 </TableCell>
-                <TableCell className="text-emerald-400 font-mono">{user.balanceGB} GB</TableCell>
-                <TableCell className="text-amber-400 font-mono">{user.hivePoints} PTS</TableCell>
+                <TableCell className="text-emerald-400 font-mono">{String(user.balanceGB)} GB</TableCell>
+                <TableCell className="text-amber-400 font-mono">{String(user.hivePoints)} PTS</TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-2">
                     <Button variant="outline" size="sm" onClick={() => handleEditClick(user)} className="border-slate-700 hover:bg-slate-800">
                       <Edit className="w-4 h-4 text-slate-300" />
                     </Button>
-                    <Button variant="outline" size="sm" onClick={() => handleDelete(user.id)} className="border-red-900/30 hover:bg-red-900/20 text-red-500">
+                    <Button variant="outline" size="sm" onClick={() => handleDelete(String(user.id))} className="border-red-900/30 hover:bg-red-900/20 text-red-500">
                       <Trash2 className="w-4 h-4" />
                     </Button>
                   </div>
@@ -109,8 +106,9 @@ export function AdminUsersTab({ users, onUpdate }: AdminUsersTabProps) {
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <label className="text-sm font-medium text-slate-400">Cargo</label>
+              <label htmlFor="role" className="text-sm font-medium text-slate-400">Cargo</label>
               <select
+                id="role"
                 className="flex h-10 w-full rounded-md border border-[#27272e] bg-[#0d0d10] px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 value={editForm.role}
                 onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
@@ -120,8 +118,9 @@ export function AdminUsersTab({ users, onUpdate }: AdminUsersTabProps) {
               </select>
             </div>
             <div className="grid gap-2">
-              <label className="text-sm font-medium text-slate-400">Saldo (GB)</label>
+              <label htmlFor="balanceGB" className="text-sm font-medium text-slate-400">Saldo (GB)</label>
               <Input
+                id="balanceGB"
                 type="number"
                 value={editForm.balanceGB}
                 onChange={(e) => setEditForm({ ...editForm, balanceGB: parseFloat(e.target.value) })}
@@ -129,8 +128,9 @@ export function AdminUsersTab({ users, onUpdate }: AdminUsersTabProps) {
               />
             </div>
             <div className="grid gap-2">
-              <label className="text-sm font-medium text-slate-400">HivePoints</label>
+              <label htmlFor="hivePoints" className="text-sm font-medium text-slate-400">HivePoints</label>
               <Input
+                id="hivePoints"
                 type="number"
                 value={editForm.hivePoints}
                 onChange={(e) => setEditForm({ ...editForm, hivePoints: parseFloat(e.target.value) })}

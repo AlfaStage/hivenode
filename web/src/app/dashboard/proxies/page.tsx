@@ -5,7 +5,7 @@ import QRCode from "react-qr-code";
 import { 
   Shield, Plus, Activity, HardDrive, 
   Eye, EyeOff, TerminalSquare, QrCode, Trash2, Copy,
-  Wifi, Signal, Battery, Clock, Tag, Info, ArrowDown, ArrowUp
+  Wifi, Battery, Clock, Tag, Info, ArrowDown, ArrowUp
 } from "lucide-react";
 
 type Node = {
@@ -585,7 +585,7 @@ export default function ProxiesPage() {
                           className="text-amber-500 hover:bg-amber-500/10 rounded-lg p-2 transition-colors"
                           title="Rotacionar Senha"
                         >
-                          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.5 2v6h-6M2.13 15.57a9 9 0 1 0 3.84-10.36L2 8"/></svg>
+                          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><title>Rotacionar Senha</title><path d="M21.5 2v6h-6M2.13 15.57a9 9 0 1 0 3.84-10.36L2 8"/></svg>
                         </button>
                         <button 
                           type="button"
@@ -748,6 +748,7 @@ export default function ProxiesPage() {
                       className="w-full bg-[#15151a] border border-[#2f2f38] rounded-lg px-3 py-2 text-amber-400 font-mono text-sm focus:border-amber-500 focus:outline-none uppercase"
                     />
                     <button 
+                      type="button"
                       onClick={handleApproveCliCode} 
                       disabled={approving || cliCode.length < 5}
                       className="bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-black font-bold px-4 rounded-lg"
@@ -882,8 +883,9 @@ export default function ProxiesPage() {
             </h2>
             <form onSubmit={handleEditTags}>
               <div className="mb-6">
-                <label className="block text-[#8e8e99] text-sm mb-2">Tags (Separadas por vírgula)</label>
+                <label htmlFor="tagsInput" className="block text-[#8e8e99] text-sm mb-2">Tags (Separadas por vírgula)</label>
                 <input 
+                  id="tagsInput"
                   type="text"
                   placeholder="Ex: Claro 5G, SP, Backup..."
                   value={tagsInput}

@@ -4,18 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
 interface AdminProxiesTabProps {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  users: any[];
+  users: Record<string, unknown>[];
   onUpdate: () => void;
 }
 
 export function AdminProxiesTab({ users, onUpdate }: AdminProxiesTabProps) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const proxies = users.flatMap(u => 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    u.nodes.flatMap((n: any) => 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      n.proxies.map((p: any) => ({ ...p, nodeModel: n.deviceModel, ownerEmail: u.email }))
+    (u.nodes as Record<string, unknown>[]).flatMap((n) => 
+      (n.proxies as Record<string, unknown>[]).map((p) => ({ ...p, nodeModel: n.deviceModel, ownerEmail: u.email }))
     )
   );
 
@@ -63,10 +59,10 @@ export function AdminProxiesTab({ users, onUpdate }: AdminProxiesTabProps) {
           </TableHeader>
           <TableBody>
             {proxies.map((proxy) => (
-              <TableRow key={proxy.id} className="border-[#27272e] hover:bg-[#1a1a20]/50">
-                <TableCell className="font-mono text-sm text-slate-300">{proxy.proxyUser}</TableCell>
-                <TableCell className="text-slate-400">{proxy.ownerEmail}</TableCell>
-                <TableCell className="text-slate-400">{proxy.nodeModel || "Desconhecido"}</TableCell>
+              <TableRow key={String(proxy.id)} className="border-[#27272e] hover:bg-[#1a1a20]/50">
+                <TableCell className="font-mono text-sm text-slate-300">{String(proxy.proxyUser)}</TableCell>
+                <TableCell className="text-slate-400">{String(proxy.ownerEmail)}</TableCell>
+                <TableCell className="text-slate-400">{String(proxy.nodeModel || "Desconhecido")}</TableCell>
                 <TableCell className="text-right font-mono text-xs text-slate-500">
                   <span className="text-emerald-500">Tx: {(Number(proxy.totalBytesTx)/1024/1024).toFixed(1)} MB</span><br/>
                   <span className="text-blue-500">Rx: {(Number(proxy.totalBytesRx)/1024/1024).toFixed(1)} MB</span>
@@ -81,15 +77,15 @@ export function AdminProxiesTab({ users, onUpdate }: AdminProxiesTabProps) {
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-2">
                     {proxy.status !== "BLOCKED" ? (
-                      <Button variant="outline" size="sm" onClick={() => handleUpdateStatus(proxy.id, "BLOCKED")} className="border-red-900/30 text-red-500 hover:bg-red-900/20" title="Pausar Proxy">
+                      <Button variant="outline" size="sm" onClick={() => handleUpdateStatus(String(proxy.id), "BLOCKED")} className="border-red-900/30 text-red-500 hover:bg-red-900/20" title="Pausar Proxy">
                         <Ban className="w-4 h-4" />
                       </Button>
                     ) : (
-                      <Button variant="outline" size="sm" onClick={() => handleUpdateStatus(proxy.id, "ONLINE")} className="border-emerald-900/30 text-emerald-500 hover:bg-emerald-900/20" title="Desbloquear Proxy">
+                      <Button variant="outline" size="sm" onClick={() => handleUpdateStatus(String(proxy.id), "ONLINE")} className="border-emerald-900/30 text-emerald-500 hover:bg-emerald-900/20" title="Desbloquear Proxy">
                         <CheckCircle className="w-4 h-4" />
                       </Button>
                     )}
-                    <Button variant="outline" size="sm" onClick={() => handleDelete(proxy.id)} className="border-red-900/30 hover:bg-red-900/20 text-red-500" title="Excluir Proxy">
+                    <Button variant="outline" size="sm" onClick={() => handleDelete(String(proxy.id))} className="border-red-900/30 hover:bg-red-900/20 text-red-500" title="Excluir Proxy">
                       <Trash2 className="w-4 h-4" />
                     </Button>
                   </div>

@@ -1,7 +1,7 @@
+import { Award, Server, ShieldAlert, Zap } from "lucide-react";
 import { DashboardLiveBadge } from "@/components/dashboard/DashboardLiveBadge";
 import { requireAuth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { Award, Server, ShieldAlert, Zap } from "lucide-react";
 
 export default async function DashboardPage() {
   const authUser = await requireAuth();

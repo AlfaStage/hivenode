@@ -5,14 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
 interface AdminNodesTabProps {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  users: any[];
+  users: Record<string, unknown>[];
   onUpdate: () => void;
 }
 
 export function AdminNodesTab({ users, onUpdate }: AdminNodesTabProps) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const nodes = users.flatMap(u => u.nodes.map((n: any) => ({ ...n, ownerEmail: u.email })));
+  const nodes = users.flatMap(u => (u.nodes as Record<string, unknown>[]).map((n) => ({ ...n, ownerEmail: u.email })));
 
   const handleUpdateStatus = async (id: string, newStatus: string) => {
     try {
@@ -59,12 +57,12 @@ export function AdminNodesTab({ users, onUpdate }: AdminNodesTabProps) {
           <TableBody>
             {nodes.map((node) => (
               <TableRow key={node.id} className="border-[#27272e] hover:bg-[#1a1a20]/50">
-                <TableCell className="font-mono text-xs text-slate-500">{node.id.split("-")[0]}...</TableCell>
-                <TableCell className="text-slate-300">{node.ownerEmail}</TableCell>
-                <TableCell className="text-slate-300">{node.deviceModel || "Desconhecido"}</TableCell>
+                <TableCell className="font-mono text-xs text-slate-500">{String(node.id).split("-")[0]}...</TableCell>
+                <TableCell className="text-slate-300">{String(node.ownerEmail)}</TableCell>
+                <TableCell className="text-slate-300">{String(node.deviceModel || "Desconhecido")}</TableCell>
                 <TableCell>
                   <Badge variant="outline" className="border-slate-600 text-slate-400">
-                    {node.visibility}
+                    {String(node.visibility)}
                   </Badge>
                 </TableCell>
                 <TableCell>
@@ -75,15 +73,15 @@ export function AdminNodesTab({ users, onUpdate }: AdminNodesTabProps) {
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-2">
                     {node.status !== "BLOCKED" ? (
-                      <Button variant="outline" size="sm" onClick={() => handleUpdateStatus(node.id, "BLOCKED")} className="border-red-900/30 text-red-500 hover:bg-red-900/20" title="Bloquear Aparelho">
+                      <Button variant="outline" size="sm" onClick={() => handleUpdateStatus(String(node.id), "BLOCKED")} className="border-red-900/30 text-red-500 hover:bg-red-900/20" title="Bloquear Aparelho">
                         <Ban className="w-4 h-4" />
                       </Button>
                     ) : (
-                      <Button variant="outline" size="sm" onClick={() => handleUpdateStatus(node.id, "OFFLINE")} className="border-emerald-900/30 text-emerald-500 hover:bg-emerald-900/20" title="Desbloquear Aparelho">
+                      <Button variant="outline" size="sm" onClick={() => handleUpdateStatus(String(node.id), "OFFLINE")} className="border-emerald-900/30 text-emerald-500 hover:bg-emerald-900/20" title="Desbloquear Aparelho">
                         <CheckCircle className="w-4 h-4" />
                       </Button>
                     )}
-                    <Button variant="outline" size="sm" onClick={() => handleDelete(node.id)} className="border-red-900/30 hover:bg-red-900/20 text-red-500">
+                    <Button variant="outline" size="sm" onClick={() => handleDelete(String(node.id))} className="border-red-900/30 hover:bg-red-900/20 text-red-500">
                       <Trash2 className="w-4 h-4" />
                     </Button>
                   </div>

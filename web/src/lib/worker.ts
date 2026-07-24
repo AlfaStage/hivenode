@@ -4,7 +4,7 @@
 // Este worker processa o consumo de banda (Tráfego) reportado pelo Broker.
 // ==============================================================================
 
-import { Worker, Job } from "bullmq";
+import { Worker, type Job } from "bullmq";
 import { redis } from "./redis";
 import { prisma } from "./prisma";
 
