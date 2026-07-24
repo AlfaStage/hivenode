@@ -59,7 +59,7 @@ services:
     container_name: hivenode-migrate
     environment:
       - DATABASE_URL=postgresql://hivenode_user:hivenode_dev_2026@postgres:5432/hivenode?schema=public
-    command: ["sh", "-c", "npx prisma db push --accept-data-loss && npm run db:seed && npx tsx prisma/seed-plans.ts"]
+    command: ["sh", "-c", "npx prisma db push --accept-data-loss && (npx tsx src/lib/seed.ts || echo 'seed skipped') && (npx tsx prisma/seed-plans.ts || echo 'seed-plans skipped')"]
     networks:
       - hivenode-net
     depends_on:
