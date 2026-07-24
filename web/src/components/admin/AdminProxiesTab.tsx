@@ -4,14 +4,18 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
 interface AdminProxiesTabProps {
-  users: Record<string, unknown>[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  users: any[];
   onUpdate: () => void;
 }
 
 export function AdminProxiesTab({ users, onUpdate }: AdminProxiesTabProps) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const proxies = users.flatMap(u => 
-    (u.nodes as Record<string, unknown>[]).flatMap((n) => 
-      (n.proxies as Record<string, unknown>[]).map((p) => ({ ...p, nodeModel: n.deviceModel, ownerEmail: u.email }))
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    u.nodes.flatMap((n: any) => 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      n.proxies.map((p: any) => ({ ...p, nodeModel: n.deviceModel, ownerEmail: u.email }))
     )
   );
 

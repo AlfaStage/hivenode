@@ -7,21 +7,24 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Input } from "@/components/ui/input";
 
 interface AdminUsersTabProps {
-  users: Record<string, unknown>[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  users: any[];
   onUpdate: () => void;
 }
 
 export function AdminUsersTab({ users, onUpdate }: AdminUsersTabProps) {
-  const [editingUser, setEditingUser] = useState<Record<string, unknown> | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [editingUser, setEditingUser] = useState<any>(null);
   const [editForm, setEditForm] = useState({ role: "", balanceGB: 0, hivePoints: 0 });
   const [loading, setLoading] = useState(false);
 
-  const handleEditClick = (user: Record<string, unknown>) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleEditClick = (user: any) => {
     setEditingUser(user);
     setEditForm({
-      role: user.role as string,
-      balanceGB: user.balanceGB as number,
-      hivePoints: user.hivePoints as number,
+      role: user.role,
+      balanceGB: user.balanceGB,
+      hivePoints: user.hivePoints,
     });
   };
 

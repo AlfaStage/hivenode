@@ -5,12 +5,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
 interface AdminNodesTabProps {
-  users: Record<string, unknown>[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  users: any[];
   onUpdate: () => void;
 }
 
 export function AdminNodesTab({ users, onUpdate }: AdminNodesTabProps) {
-  const nodes = users.flatMap(u => (u.nodes as Record<string, unknown>[]).map((n) => ({ ...n, ownerEmail: u.email })));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const nodes = users.flatMap(u => u.nodes.map((n: any) => ({ ...n, ownerEmail: u.email })));
 
   const handleUpdateStatus = async (id: string, newStatus: string) => {
     try {
