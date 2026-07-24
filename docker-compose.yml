@@ -49,6 +49,25 @@ services:
       retries: 5
 
   # ----------------------------------------------------------------------------
+  # Migrate (Aplica as migrações do Prisma no DB antes do Web subir)
+  # ----------------------------------------------------------------------------
+  migrate:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+      target: runner
+    container_name: hivenode-migrate
+    environment:
+      - DATABASE_URL=postgresql://hivenode_user:hivenode_dev_2026@postgres:5432/hivenode
+    command: ["npm", "run", "db:migrate:deploy"]
+    networks:
+      - hivenode-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  # ----------------------------------------------------------------------------
   # Web: Next.js (Frontend + API)
   # ----------------------------------------------------------------------------
   web:
@@ -81,6 +100,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       broker:
         condition: service_started
 
@@ -116,6 +137,8 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
 volumes:
   postgres_data:

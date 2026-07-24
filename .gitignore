@@ -1,7 +1,8 @@
 hiveminer-app/
 hivenode-app/
 node_modules/
-.env
+.env*
+!.env.example
 .next/
 
 /hivedocker

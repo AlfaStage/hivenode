@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="16dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="HiveNode Legacy"
+            android:textSize="28sp"
+            android:paddingBottom="24dp" />
+
+        <EditText
+            android:id="@+id/txtEmail"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="E-mail"
+            android:inputType="textEmailAddress" />
+
+        <EditText
+            android:id="@+id/txtPassword"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Senha"
+            android:inputType="textPassword" />
+
+        <Button
+            android:id="@+id/btnLogin"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Entrar" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="ou escolha uma alternativa:"
+            android:paddingTop="20dp" />
+
+        <Button
+            android:id="@+id/btnDeviceCode"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Código 6 chars" />
+
+        <Button
+            android:id="@+id/btnPairCode"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="QR / Pair Code" />
+
+    </LinearLayout>
+</ScrollView>

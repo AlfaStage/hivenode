@@ -95,12 +95,12 @@ func main() {
 		}
 
 		// 1. Avisa os Painéis Web Abertos (Broadcaster)
-		tunnelManager.BroadcastChan <- tunnel.BroadcastEvent{
+		tunnelManager.Broadcast(tunnel.BroadcastEvent{
 			Type:    "NODE_RENAMED",
 			NodeID:  payload.NodeID,
 			Payload: payload.NewName,
 			Time:    time.Now().Format("15:04:05"),
-		}
+		})
 
 		// 2. Avisa o Android Específico (Via Túnel Privado WS)
 		conn := tunnelManager.GetDeviceConn(payload.NodeID)

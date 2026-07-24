@@ -1,9 +1,23 @@
 {
+  "source": [
+    "package.json",
+    "hivenode-app/package.json",
+    "hiveminer-app/package.json",
+    "web/package.json",
+    "hivedocker/package.json"
+  ],
+  "indent": "  ",
+  "semverGroups": [
+    {
+      "range": "",
+      "dependencies": ["**"],
+      "packages": ["**"]
+    }
+  ],
   "versionGroups": [
     {
       "dependencies": ["**"],
-      "packages": ["**"],
-      "snapTo": "highest"
+      "packages": ["**"]
     }
   ]
 }

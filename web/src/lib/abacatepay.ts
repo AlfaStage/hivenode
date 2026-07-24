@@ -5,6 +5,8 @@
 import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
 
+import { decrypt } from "@/lib/crypto";
+
 const ABACATE_BASE_URL = "https://api.abacatepay.com/v2";
 
 // Busca a API Key do banco de dados (nunca de env)
@@ -13,7 +15,10 @@ async function getApiKey(): Promise<string | null> {
     const config = await prisma.systemConfig.findUnique({
       where: { key: "abacatepay_api_key" },
     });
-    return config?.value || null;
+    if (config?.value) {
+      return decrypt(config.value) || config.value; // Fallback para não quebrar se estiver plaintext ainda
+    }
+    return null;
   } catch {
     return process.env.ABACATE_PAY_API_KEY || null;
   }

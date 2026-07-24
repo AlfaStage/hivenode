@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="br.alfastage.hivenode.legacy">
+
+    <!-- Internet (desde API 1) -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+
+    <!-- WakeLock - manter CPU viva -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <!-- WifiLock - manter Wi-Fi antena alta performance -->
+    <uses-permission android:name="android.permission.WIFI_MODE_FULL_HIGH_PERF" /> <!-- API 3 -->
+
+    <!-- Boot completo - auto start -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!-- Foreground Service (Android 4.0+) -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+
+    <!-- Wake on Boot - older Android 4.x supports parciais -->
+    <application
+        android:allowBackup="true"
+        android:icon="@drawable/ic_notification"
+        android:label="@string/app_name"
+        android:theme="@android:style/Theme.Holo.Light"
+        android:persistent="true">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:label="Hive Legacy">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <service
+            android:name=".TunnelService"
+            android:exported="false"
+            android:process=":tunnel" />
+
+        <receiver
+            android:name=".BootReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name=".NetworkReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.net.conn.CONNECTIVITY_CHANGE" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>

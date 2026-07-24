@@ -72,4 +72,18 @@ worker.on("failed", (job, err) => {
   console.error(`[BullMQ] Job ${job?.id} falhou com erro: ${err.message}`);
 });
 
-export { worker };
+import { sendAdminErrorAlert } from "./email";
+
+const errorWorker = new Worker(
+  "error-alerts",
+  async (job: Job<{ message: string }>) => {
+    await sendAdminErrorAlert(`API Erro Crítico (500): ${job.data.message}`);
+  },
+  { connection: redis as unknown as import('bullmq').ConnectionOptions }
+);
+
+errorWorker.on("failed", (job, err) => {
+  console.error(`[BullMQ] Error Alert Job ${job?.id} falhou com erro: ${err.message}`);
+});
+
+export { worker, errorWorker };

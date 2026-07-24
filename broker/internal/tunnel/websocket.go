@@ -139,8 +139,8 @@ type VirtualConn struct {
 	closed     bool
 	mu         sync.Mutex
 	buffer     []byte
-	rxLocal    uint64
-	txLocal    uint64
+	rxLocal    atomic.Uint64
+	txLocal    atomic.Uint64
 }
 
 func (vc *VirtualConn) Read(b []byte) (n int, err error) {
@@ -192,10 +192,11 @@ func (vc *VirtualConn) Write(b []byte) (n int, err error) {
 	vc.TM.mu.RUnlock()
 
 	if statsOk {
-		vc.rxLocal += uint64(len(b))
-		if vc.rxLocal >= 5*1024*1024 { // 5MB
-			atomic.AddUint64(&stats.Rx, vc.rxLocal)
-			vc.rxLocal = 0
+		newRx := vc.rxLocal.Add(uint64(len(b)))
+		if newRx >= 5*1024*1024 { // 5MB
+			// reset local and add to global
+			atomic.AddUint64(&stats.Rx, newRx)
+			vc.rxLocal.Store(0)
 		}
 	}
 
@@ -203,9 +204,10 @@ func (vc *VirtualConn) Write(b []byte) (n int, err error) {
 		return 0, io.EOF
 	}
 
-	vc.TM.mu.Lock()
+	// Removido lock global (vc.TM.mu) em volta de ws.WriteMessage para evitar gargalo de performance
+	vc.mu.Lock()
 	err = ws.WriteMessage(websocket.BinaryMessage, out)
-	vc.TM.mu.Unlock()
+	vc.mu.Unlock()
 
 	if err != nil {
 		return 0, err
@@ -230,15 +232,15 @@ func (vc *VirtualConn) Close() error {
 
 	ws, ok := vc.TM.devices.Get(vc.NodeID)
 	if ok {
-		vc.TM.mu.Lock()
+		vc.mu.Lock()
 		ws.WriteJSON(msg)
-		vc.TM.mu.Unlock()
+		vc.mu.Unlock()
 	}
 
 	vc.TM.mu.Lock()
 	if stats, exists := vc.TM.nodeStats[vc.NodeID]; exists {
-		atomic.AddUint64(&stats.Rx, vc.rxLocal)
-		atomic.AddUint64(&stats.Tx, vc.txLocal)
+		atomic.AddUint64(&stats.Rx, vc.rxLocal.Load())
+		atomic.AddUint64(&stats.Tx, vc.txLocal.Load())
 	}
 	delete(vc.TM.virtualConns, vc.ConnID)
 	vc.TM.mu.Unlock()
@@ -274,7 +276,8 @@ func NewTunnelManager(rClient *redis.Client) *TunnelManager {
 	return tm
 }
 
-func (tm *TunnelManager) broadcast(ev BroadcastEvent) {
+// Broadcast envia o evento para o Pub/Sub Redis (escala horizontalmente)
+func (tm *TunnelManager) Broadcast(ev BroadcastEvent) {
 	// Publica no Redis para que outros brokers (caso haja) também recebam
 	data, _ := json.Marshal(ev)
 	tm.redisClient.Publish(context.Background(), "broker:broadcast", data)
@@ -320,12 +323,12 @@ func (tm *TunnelManager) RemoveDashboardClient(conn *websocket.Conn) {
 	tm.mu.Unlock()
 }
 
-func (tm *TunnelManager) getTunnelSecret(nodeID string) []byte {
+func (tm *TunnelManager) getTunnelSecret(nodeID string) ([]byte, error) {
 	secret, err := tm.redisClient.Get(context.Background(), "user_tunnel_secret:"+nodeID).Result()
 	if err != nil || secret == "" {
-		return []byte("fallback_should_not_happen")
+		return nil, fmt.Errorf("tunnel secret não encontrado para node %s", nodeID)
 	}
-	return []byte(secret)
+	return []byte(secret), nil
 }
 
 func (tm *TunnelManager) HandleWS(w http.ResponseWriter, r *http.Request) {
@@ -338,15 +341,16 @@ func (tm *TunnelManager) HandleWS(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 1. Proteção Anti-Fraude: Validar Assinatura HMAC com segredo do usuário
-	mac := hmac.New(sha256.New, tm.getTunnelSecret(nodeID))
+	secret, err := tm.getTunnelSecret(nodeID)
+	if err != nil {
+		http.Error(w, "Tunnel secret unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	mac := hmac.New(sha256.New, secret)
 	mac.Write([]byte(nodeID))
 	expectedMAC := hex.EncodeToString(mac.Sum(nil))
 
-	// Fallback para Expo Crypto (SHA256 simples concatenado)
-	simpleHash := sha256.Sum256([]byte(nodeID + ":" + string(tm.getTunnelSecret(nodeID))))
-	expectedSimple := hex.EncodeToString(simpleHash[:])
-
-	if sig != expectedMAC && sig != expectedSimple {
+	if sig != expectedMAC {
 		log.Printf("⚠️ FRAUDE DETECTADA: Assinatura HMAC/SHA256 inválida (IP: %s)", r.RemoteAddr)
 		http.Error(w, "Invalid Signature", http.StatusUnauthorized)
 		return
@@ -430,12 +434,14 @@ func (tm *TunnelManager) HandleWS(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	// Sincronizar com Redis para leitura via GET /api/nodes
-	tm.redisClient.SAdd(context.Background(), "hivenode:online_nodes", nodeID)
+	if err := tm.redisClient.SAdd(context.Background(), "hivenode:online_nodes", nodeID).Err(); err != nil {
+		log.Printf("⚠️ Erro ao registrar node no Redis (SAdd): %v", err)
+	}
 
 	log.Printf("🔗 Novo Device conectado no WS: %s", nodeID)
 
 	// Dispara o Evento de "Online" pro Painel Web via Redis Broadcast
-	tm.broadcast(BroadcastEvent{
+	tm.Broadcast(BroadcastEvent{
 		Type:    "NODE_ONLINE",
 		NodeID:  nodeID,
 		Payload: nil,
@@ -448,7 +454,9 @@ func (tm *TunnelManager) HandleWS(w http.ResponseWriter, r *http.Request) {
 			log.Printf("❌ Device desconectado: %s", nodeID)
 			
 			tm.devices.Delete(nodeID)
-			tm.redisClient.SRem(context.Background(), "hivenode:online_nodes", nodeID)
+			if err := tm.redisClient.SRem(context.Background(), "hivenode:online_nodes", nodeID).Err(); err != nil {
+				log.Printf("⚠️ Erro ao remover node no Redis (SRem): %v", err)
+			}
 			
 			tm.mu.Lock()
 			stats, statsOk := tm.nodeStats[nodeID]
@@ -475,7 +483,7 @@ func (tm *TunnelManager) HandleWS(w http.ResponseWriter, r *http.Request) {
 			}
 
 			// Dispara o Evento de "Offline" pro Painel Web
-			tm.broadcast(BroadcastEvent{
+			tm.Broadcast(BroadcastEvent{
 				Type:    "NODE_OFFLINE",
 				NodeID:  nodeID,
 				Payload: nil,
@@ -499,10 +507,10 @@ func (tm *TunnelManager) HandleWS(w http.ResponseWriter, r *http.Request) {
 
 					if statsOk {
 						if exists {
-							vc.txLocal += uint64(len(payload))
-							if vc.txLocal >= 5*1024*1024 {
-								atomic.AddUint64(&stats.Tx, vc.txLocal)
-								vc.txLocal = 0
+							newTx := vc.txLocal.Add(uint64(len(payload)))
+							if newTx >= 5*1024*1024 {
+								atomic.AddUint64(&stats.Tx, newTx)
+								vc.txLocal.Store(0)
 							}
 						} else {
 							atomic.AddUint64(&stats.Tx, uint64(len(payload)))
@@ -527,7 +535,7 @@ func (tm *TunnelManager) HandleWS(w http.ResponseWriter, r *http.Request) {
 				}
 				// Se o celular enviou um pacote de Telemetria (LOG)
 				if msgType == "LOG" {
-					tm.broadcast(BroadcastEvent{
+					tm.Broadcast(BroadcastEvent{
 						Type:    "LOG",
 						NodeID:  nodeID,
 						Payload: payload["payload"],
@@ -547,7 +555,7 @@ func (tm *TunnelManager) HandleWS(w http.ResponseWriter, r *http.Request) {
 					}
 
 					// Envia a saúde/rede do celular pro Dashboard
-					tm.broadcast(BroadcastEvent{
+					tm.Broadcast(BroadcastEvent{
 						Type:    "TELEMETRY",
 						NodeID:  nodeID,
 						Payload: payload,
@@ -601,6 +609,40 @@ func (tm *TunnelManager) AddVirtualConn(vc *VirtualConn) {
 	tm.mu.Lock()
 	tm.virtualConns[vc.ConnID] = vc
 	tm.mu.Unlock()
+
+	// Inicia o flush periódico dos bytes locais para o global a cada 30s (BillingFlushSecs)
+	go func() {
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				vc.mu.Lock()
+				closed := vc.closed
+				vc.mu.Unlock()
+				if closed {
+					return
+				}
+
+				tm.mu.RLock()
+				stats, statsOk := tm.nodeStats[vc.NodeID]
+				tm.mu.RUnlock()
+
+				if statsOk {
+					rx := vc.rxLocal.Swap(0)
+					if rx > 0 {
+						atomic.AddUint64(&stats.Rx, rx)
+					}
+					tx := vc.txLocal.Swap(0)
+					if tx > 0 {
+						atomic.AddUint64(&stats.Tx, tx)
+					}
+				}
+			case <-vc.CloseCh:
+				return
+			}
+		}
+	}()
 }
 
 // GetWS returns the raw websocket for dial commands
@@ -620,7 +662,9 @@ func (tm *TunnelManager) KickDevice(nodeID string) {
 	conn, exists := tm.devices.Get(nodeID)
 	if exists {
 		tm.devices.Delete(nodeID)
-		tm.redisClient.SRem(context.Background(), "hivenode:online_nodes", nodeID)
+		if err := tm.redisClient.SRem(context.Background(), "hivenode:online_nodes", nodeID).Err(); err != nil {
+			log.Printf("⚠️ Erro ao remover node no Redis no KickDevice (SRem): %v", err)
+		}
 		conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "KICKED"))
 		conn.Close()
 		log.Printf("🔨 Device Kickado pelo sistema: %s", nodeID)

@@ -50,8 +50,19 @@ func StartSocks5Server(port string, redisClient *redis.Client, tm *TunnelManager
 		AuthMethods: []socks5.Authenticator{auth},
 		Logger:      log.New(log.Writer(), "[SOCKS5] ", log.LstdFlags),
 		Dial: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			host, _, err := net.SplitHostPort(addr)
+			if err != nil {
+				return nil, fmt.Errorf("invalid address format")
+			}
+			ip := net.ParseIP(host)
+			if ip != nil {
+				if ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsUnspecified() {
+					log.Printf("⚠️ Tentativa de SSRF bloqueada pelo Broker para o host: %s", addr)
+					return nil, fmt.Errorf("acesso a IPs internos não permitido")
+				}
+			}
+
 			log.Printf("Interceptando TCP para %s. Preparando túnel VirtualConn...", addr)
-			
 			// Gera um ID simples usando nanosegundos
 			connID := fmt.Sprintf("conn_%d", time.Now().UnixNano())
 			// Failover Inteligente: Pega qualquer nó online (Para a Persona 3 / Público)
@@ -87,7 +98,7 @@ func StartSocks5Server(port string, redisClient *redis.Client, tm *TunnelManager
 			}
 			
 			tm.mu.Lock()
-			err := conn.WriteJSON(msg)
+			err = conn.WriteJSON(msg)
 			tm.mu.Unlock()
 			
 			if err != nil {
