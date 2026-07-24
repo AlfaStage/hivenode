@@ -698,7 +698,7 @@ export default function ProxiesPage() {
                 <div className="space-y-2 w-full">
                   <p className="text-xs font-bold text-slate-400 text-center uppercase tracking-wider">APKs Oficiais Android</p>
                   <a 
-                    href="https://expo.dev/artifacts/eas/1YQ2fLEnc-22diSwjBz241jUo-4rBmq_CBZuhgAhpFc.apk"
+                    href="https://expo.dev/artifacts/eas/QAjitJ15Xm0302G60u_gQ-3fLAtPpf-gsHqLLQNo-t8.apk"
                     target="_blank"
                     rel="noreferrer"
                     className="flex items-center justify-center gap-2 w-full py-2 px-3 bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 border border-amber-500/30 rounded-lg text-xs font-bold transition-all"
@@ -706,7 +706,7 @@ export default function ProxiesPage() {
                     📥 Baixar APK HiveNode (Proxy)
                   </a>
                   <a 
-                    href="https://expo.dev/artifacts/eas/idNUBIBrLxPhFC9l5nLiEAVBuDdJfBTc6HZRSBgtu2A.apk"
+                    href="https://expo.dev/artifacts/eas/mvhpPxGjdeMgszlNfmRP-HNQMPcpHbWyQ_QhI3L17fs.apk"
                     target="_blank"
                     rel="noreferrer"
                     className="flex items-center justify-center gap-2 w-full py-2 px-3 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-lg text-xs font-bold transition-all"
