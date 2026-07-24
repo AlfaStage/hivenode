@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
 import { Shield, Smartphone, TerminalSquare } from "lucide-react";
+import { useState } from "react";
 
 export default function DeviceApprovePage() {
   const [userCode, setUserCode] = useState("");
@@ -29,8 +29,9 @@ export default function DeviceApprovePage() {
         text: "Aparelho aprovado com sucesso! Peça ao aparelho (ou HiveDocker) para prosseguir."
       });
       setUserCode("");
-    } catch (e: any) {
-      setMessage({ type: "error", text: e.message });
+    } catch (e: unknown) {
+      const err = e as Error;
+      setMessage({ type: "error", text: err.message });
     }
     setLoading(false);
   };
@@ -54,17 +55,17 @@ export default function DeviceApprovePage() {
       <div className="bg-[#111114] p-8 border border-[#27272e] rounded-xl">
         <form onSubmit={handleApprove} className="space-y-6">
           <div>
-            <label className="block text-sm font-bold text-[#8e8e99] mb-2 uppercase tracking-wider">
+            <label htmlFor="userCode" className="block text-sm font-bold text-[#8e8e99] mb-2 uppercase tracking-wider">
               Código de Verificação
             </label>
             <input 
+              id="userCode"
               type="text" 
               value={userCode}
               onChange={(e) => setUserCode(e.target.value)}
               placeholder="Ex: HIVE-X"
               maxLength={8}
               className="w-full bg-[#0a0a0c] border border-[#27272e] rounded-xl px-5 py-4 text-white text-2xl font-mono text-center focus:border-amber-500 focus:outline-none uppercase tracking-widest"
-              autoFocus
             />
           </div>
           

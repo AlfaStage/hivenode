@@ -4,7 +4,7 @@ type Event =
   | { type: "NODE_ONLINE"; nodeId: string; time: string }
   | { type: "NODE_OFFLINE"; nodeId: string; time: string }
   | { type: "LOG"; nodeId: string; payload: string; time: string }
-  | { type: "TELEMETRY"; nodeId: string; payload: any; time: string };
+  | { type: "TELEMETRY"; nodeId: string; payload: unknown; time: string };
 
 export function useDashboardStream() {
   const [events, setEvents] = useState<Event[]>([]);

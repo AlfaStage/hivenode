@@ -65,7 +65,7 @@ const worker = new Worker<BillingJobData>(
       },
     });
   },
-  { connection: redis as any }
+  { connection: redis as unknown as import('bullmq').ConnectionOptions }
 );
 
 worker.on("failed", (job, err) => {

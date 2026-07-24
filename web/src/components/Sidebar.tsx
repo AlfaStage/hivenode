@@ -10,14 +10,7 @@ import { useState, useEffect } from "react";
 
 export function Sidebar({ role }: { role?: string }) {
   const pathname = usePathname();
-  const [isAdminOpen, setIsAdminOpen] = useState(false);
-
-  // Auto-open admin menu if we are in any admin sub-route
-  useEffect(() => {
-    if (pathname?.startsWith("/dashboard/admin")) {
-      setIsAdminOpen(true);
-    }
-  }, [pathname]);
+  const [isAdminOpen, setIsAdminOpen] = useState(pathname?.startsWith("/dashboard/admin") ?? false);
 
   const links = [
     { href: "/dashboard", label: "Visão Geral", icon: LayoutDashboard },

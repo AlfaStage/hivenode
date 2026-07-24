@@ -1,16 +1,16 @@
-import { useState } from "react";
+
 import { Server, Ban, Trash2, CheckCircle } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
 interface AdminNodesTabProps {
-  users: any[];
+  users: Record<string, unknown>[];
   onUpdate: () => void;
 }
 
 export function AdminNodesTab({ users, onUpdate }: AdminNodesTabProps) {
-  const nodes = users.flatMap(u => u.nodes.map((n: any) => ({ ...n, ownerEmail: u.email })));
+  const nodes = users.flatMap(u => (u.nodes as Record<string, unknown>[]).map((n) => ({ ...n, ownerEmail: u.email })));
 
   const handleUpdateStatus = async (id: string, newStatus: string) => {
     try {

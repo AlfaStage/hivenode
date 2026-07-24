@@ -4,14 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
 interface AdminProxiesTabProps {
-  users: any[];
+  users: Record<string, unknown>[];
   onUpdate: () => void;
 }
 
 export function AdminProxiesTab({ users, onUpdate }: AdminProxiesTabProps) {
   const proxies = users.flatMap(u => 
-    u.nodes.flatMap((n: any) => 
-      n.proxies.map((p: any) => ({ ...p, nodeModel: n.deviceModel, ownerEmail: u.email }))
+    (u.nodes as Record<string, unknown>[]).flatMap((n) => 
+      (n.proxies as Record<string, unknown>[]).map((p) => ({ ...p, nodeModel: n.deviceModel, ownerEmail: u.email }))
     )
   );
 

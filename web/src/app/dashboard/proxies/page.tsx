@@ -426,11 +426,11 @@ export default function ProxiesPage() {
                               <div className="space-y-3 text-sm">
                                 <div className="flex justify-between items-center">
                                   <span className="text-[#8e8e99] flex items-center gap-2"><Clock className="w-4 h-4"/> Uptime</span>
-                                  <span className="text-white font-mono">{nodeTelemetry[n.id]?.uptime ? `${Math.floor(nodeTelemetry[n.id].uptime! / 60)}m` : "---"}</span>
+                                  <span className="text-white font-mono">{nodeTelemetry[n.id]?.uptime ? `${Math.floor((nodeTelemetry[n.id].uptime ?? 0) / 60)}m` : "---"}</span>
                                 </div>
                                 <div className="flex justify-between items-center">
                                   <span className="text-[#8e8e99] flex items-center gap-2"><Battery className="w-4 h-4"/> Bateria</span>
-                                  <span className="text-white font-mono">{nodeTelemetry[n.id]?.battery ? `${Math.floor(nodeTelemetry[n.id].battery! * 100)}%` : "---"}</span>
+                                  <span className="text-white font-mono">{nodeTelemetry[n.id]?.battery ? `${Math.floor((nodeTelemetry[n.id].battery ?? 0) * 100)}%` : "---"}</span>
                                 </div>
                                 <div className="flex justify-between items-center border-t border-[#27272e] pt-3 mt-3">
                                   <span className="text-[#8e8e99] flex items-center gap-2">Vínculo</span>
@@ -472,6 +472,7 @@ export default function ProxiesPage() {
                           title="Renomear Aparelho"
                         >
                           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <title>Configurar</title>
                             <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
                           </svg>
                         </button>
@@ -529,6 +530,7 @@ export default function ProxiesPage() {
                       <div className="flex items-center gap-2 text-[#8e8e99]">
                         {visiblePasswords.has(p.id) ? p.proxyPass : "••••••••"}
                         <button 
+                          type="button"
                           onClick={() => togglePasswordVisibility(p.id)} 
                           className="hover:text-amber-500 hover:bg-amber-500/10 p-1 rounded transition-colors"
                           title="Mostrar/Esconder Senha"

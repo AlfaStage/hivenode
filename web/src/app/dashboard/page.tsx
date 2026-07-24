@@ -1,7 +1,7 @@
-import { prisma } from "@/lib/prisma";
-import { requireAuth } from "@/lib/auth";
 import { DashboardLiveBadge } from "@/components/dashboard/DashboardLiveBadge";
-import { Server, ShieldAlert, Zap, Award } from "lucide-react";
+import { requireAuth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import { Award, Server, ShieldAlert, Zap } from "lucide-react";
 
 export default async function DashboardPage() {
   const authUser = await requireAuth();
@@ -94,6 +94,7 @@ export default async function DashboardPage() {
       <div className="bg-card/40 backdrop-blur-md border border-border/50 shadow-sm rounded-3xl p-10 flex flex-col items-center justify-center text-center text-muted-foreground min-h-[300px]">
         <div className="p-4 bg-muted/50 rounded-2xl mb-4">
           <svg className="w-8 h-8 text-muted-foreground/50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <title>Gráficos de Consumo</title>
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
           </svg>
         </div>

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { CreditCard, ArrowRight, Zap, ShieldCheck, Crown, Rocket, Building2, Package, Gauge, ExternalLink, CheckCircle2, Clock, XCircle } from "lucide-react";
+import { ArrowRight, Building2, CheckCircle2, Clock, CreditCard, Crown, ExternalLink, Gauge, Package, Rocket, ShieldCheck, XCircle, Zap } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
@@ -32,6 +32,12 @@ interface PaymentRecord {
   planId: string | null;
 }
 
+interface Subscription {
+  id: string;
+  planId: string;
+  status: string;
+}
+
 const PLAN_ICONS: Record<string, React.ReactNode> = {
   founder: <Crown className="w-5 h-5 text-amber-400" />,
   starter: <ShieldCheck className="w-5 h-5 text-blue-400" />,
@@ -53,12 +59,13 @@ const STATUS_BADGES: Record<string, { color: string; label: string; icon: React.
 export default function BillingPage() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
-  const [userData, setUserData] = useState<{ balanceGB: number; activePlanId: string | null; email: string; hivePoints: number; subscriptions: any[] } | null>(null);
+  const [userData, setUserData] = useState<{ balanceGB: number; activePlanId: string | null; email: string; hivePoints: number; subscriptions: Subscription[] } | null>(null);
   const [loading, setLoading] = useState(true);
   const [purchasing, setPurchasing] = useState<string | null>(null);
   const [couponCode, setCouponCode] = useState("");
 
   useEffect(() => {
+     
     fetchData();
   }, []);
 
@@ -98,7 +105,7 @@ export default function BillingPage() {
       } else {
         alert(data.error || "Erro ao processar. Verifique se o plano está configurado no gateway de pagamento.");
       }
-    } catch (e) {
+    } catch (_e) {
       alert("Erro de conexão. Tente novamente.");
     }
     setPurchasing(null);
@@ -112,7 +119,7 @@ export default function BillingPage() {
   const formatLimit = (val: number) => (val === 0 ? "∞ Ilimitado" : val.toString());
 
   const activeSubscriptions = userData?.subscriptions || [];
-  const activePlanIds = activeSubscriptions.map((s: any) => s.planId).filter(Boolean);
+  const activePlanIds = activeSubscriptions.map((s: Subscription) => s.planId).filter(Boolean);
 
   const privateFleet = plans.filter((p) => p.category === "PRIVATE_FLEET");
   const globalFleet = plans.filter((p) => p.category === "GLOBAL_FLEET");
@@ -174,7 +181,7 @@ export default function BillingPage() {
           </div>
           <div className="flex-1 space-y-3 overflow-y-auto max-h-[160px] pr-2">
             {activeSubscriptions.length > 0 ? (
-              activeSubscriptions.map((sub: any) => {
+              activeSubscriptions.map((sub: Subscription) => {
                 const p = plans.find(plan => plan.id === sub.planId);
                 if (!p) return null;
                 return (

@@ -2,6 +2,7 @@
 // Lib: AbacatePay v2 Integration
 // ==============================================================================
 
+import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
 
 const ABACATE_BASE_URL = "https://api.abacatepay.com/v2";
@@ -144,7 +145,6 @@ export async function listProducts() {
 
 // Verificar HMAC de webhook
 export function verifyWebhookSignature(payload: string, signature: string, secret: string): boolean {
-  const crypto = require("crypto");
   const hmac = crypto.createHmac("sha256", secret);
   const digest = hmac.update(payload).digest("hex");
   return signature === digest;

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Users, Edit, Trash2, Ban } from "lucide-react";
+import { Users, Edit, Trash2 } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -7,21 +7,21 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Input } from "@/components/ui/input";
 
 interface AdminUsersTabProps {
-  users: any[];
+  users: Record<string, unknown>[];
   onUpdate: () => void;
 }
 
 export function AdminUsersTab({ users, onUpdate }: AdminUsersTabProps) {
-  const [editingUser, setEditingUser] = useState<any>(null);
+  const [editingUser, setEditingUser] = useState<Record<string, unknown> | null>(null);
   const [editForm, setEditForm] = useState({ role: "", balanceGB: 0, hivePoints: 0 });
   const [loading, setLoading] = useState(false);
 
-  const handleEditClick = (user: any) => {
+  const handleEditClick = (user: Record<string, unknown>) => {
     setEditingUser(user);
     setEditForm({
-      role: user.role,
-      balanceGB: user.balanceGB,
-      hivePoints: user.hivePoints,
+      role: user.role as string,
+      balanceGB: user.balanceGB as number,
+      hivePoints: user.hivePoints as number,
     });
   };
 
