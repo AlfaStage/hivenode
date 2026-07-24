@@ -118,6 +118,7 @@ type TunnelManager struct {
 	nodeStats        map[string]*NodeStats
 	minerIPCounts    map[string]int
 	proxyIPCounts    map[string]int
+	nodeNetwork      map[string]string // nodeId -> "WIFI" ou "4G/5G"
 	mu               sync.RWMutex
 	BroadcastChan    chan BroadcastEvent
 }
@@ -265,6 +266,7 @@ func NewTunnelManager(rClient *redis.Client) *TunnelManager {
 		nodeStats:        make(map[string]*NodeStats),
 		minerIPCounts:    make(map[string]int),
 		proxyIPCounts:    make(map[string]int),
+		nodeNetwork:      make(map[string]string),
 		BroadcastChan:    make(chan BroadcastEvent, 100),
 	}
 	go tm.runBroadcaster()
@@ -431,6 +433,7 @@ func (tm *TunnelManager) HandleWS(w http.ResponseWriter, r *http.Request) {
 					delete(tm.proxyIPCounts, ip)
 				}
 			}
+			delete(tm.nodeNetwork, nodeID)
 			tm.mu.Unlock()
 
 			// Contabilização de Tráfego: Mandar para o Redis para o Worker de Pontos processar
@@ -497,9 +500,12 @@ func (tm *TunnelManager) HandleWS(w http.ResponseWriter, r *http.Request) {
 						Time:    time.Now().Format("15:04:05"),
 					})
 				} else if msgType == "TELEMETRY" {
-					tm.mu.RLock()
+					network, _ := payload["network"].(string)
+					
+					tm.mu.Lock()
+					tm.nodeNetwork[nodeID] = network
 					stats, statsOk := tm.nodeStats[nodeID]
-					tm.mu.RUnlock()
+					tm.mu.Unlock()
 
 					if statsOk {
 						payload["rx"] = atomic.LoadUint64(&stats.Rx)
@@ -595,4 +601,11 @@ func (tm *TunnelManager) GetConnectedNodes() []string {
 		return true
 	})
 	return nodes
+}
+
+// GetNodeNetwork retorna o tipo de rede reportado pelo nó
+func (tm *TunnelManager) GetNodeNetwork(nodeID string) string {
+	tm.mu.RLock()
+	defer tm.mu.RUnlock()
+	return tm.nodeNetwork[nodeID]
 }

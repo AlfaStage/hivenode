@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
+import { DashboardLiveBadge } from "@/components/dashboard/DashboardLiveBadge";
 import { Server, ShieldAlert, Zap, Award } from "lucide-react";
 
 export default async function DashboardPage() {
@@ -22,13 +23,16 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-10 animate-fade-in">
-      <div>
-        <h1 className="text-3xl font-black tracking-tight text-foreground">
-          Olá, {user?.email?.split("@")[0]}
-        </h1>
-        <p className="text-base text-muted-foreground mt-2 font-medium">
-          Bem-vindo ao painel de controle de alta performance HiveNode.
-        </p>
+      <div className="flex justify-between items-start">
+        <div>
+          <h1 className="text-3xl font-black tracking-tight text-foreground">
+            Olá, {user?.email?.split("@")[0]}
+          </h1>
+          <p className="text-base text-muted-foreground mt-2 font-medium">
+            Bem-vindo ao painel de controle de alta performance HiveNode.
+          </p>
+        </div>
+        <DashboardLiveBadge />
       </div>
 
       {/* Stats Cards */}

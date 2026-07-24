@@ -28,28 +28,21 @@ export async function POST(request: NextRequest) {
 
     // Verificar se já tem assinatura ativa PARA ESTE MESMO TIPO de plano
     // Um usuário pode ter Frota Privada + Pacotes GB + Miner ao mesmo tempo
-    const existingSub = await prisma.subscription.findFirst({
-      where: {
-        userId: user.id,
-        status: "ACTIVE",
-        planId: { not: null },
-      },
-      include: { user: false },
+    const existingSubs = await prisma.subscription.findMany({
+      where: { userId: user.id, status: "ACTIVE" },
+      include: { plan: true }
     });
 
-    if (existingSub) {
-      // Buscar plano da assinatura existente
-      const existingPlan = existingSub.planId
-        ? await prisma.plan.findUnique({ where: { id: existingSub.planId } })
-        : null;
+    // Checa conflito de categoria em memória
+    const conflict = existingSubs.find(s => 
+      s.plan && s.plan.category === plan.category
+    );
 
-      // Bloquear somente se for da MESMA categoria (ex: já tem Starter, quer Pro → bloqueia)
-      if (existingPlan && existingPlan.category === plan.category) {
-        return apiError(
-          `Você já possui uma assinatura ativa na categoria "${existingPlan.category === "PRIVATE_FLEET" ? "Frota Privada" : existingPlan.category}". Cancele a atual antes de trocar.`,
-          409
-        );
-      }
+    if (conflict) {
+      return apiError(
+        `Você já possui uma assinatura ativa na categoria "${plan.category === "PRIVATE_FLEET" ? "Frota Privada" : plan.category}". Cancele a atual antes de trocar.`,
+        409
+      );
     }
 
     // Garantir que o cliente existe no AbacatePay
@@ -103,6 +96,7 @@ export async function POST(request: NextRequest) {
         userId: user.id,
         planId: plan.id,
         planType: (planTypeMap[plan.slug] || "STARTER") as any,
+        planCategory: plan.category as any,
         status: "PENDING",
         abacatePaySubId: subRes.data?.id,
         currentPeriodEnd: nextPeriod,

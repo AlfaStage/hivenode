@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
         switch (eventType) {
           case "checkout.completed": {
             const checkoutId = event.data?.id || event.data?.checkoutId;
-            const payment = await tx.payment.findFirst({ where: { abacateCheckoutId: checkoutId } });
+            const payment = await tx.payment.findUnique({ where: { abacateCheckoutId: checkoutId } });
             if (payment) {
               await tx.payment.update({ where: { id: payment.id }, data: { status: "PAID" } });
               if (payment.planId) {
@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
           }
           case "checkout.refunded": {
             const checkoutId = event.data?.id || event.data?.checkoutId;
-            const payment = await tx.payment.findFirst({ where: { abacateCheckoutId: checkoutId } });
+            const payment = await tx.payment.findUnique({ where: { abacateCheckoutId: checkoutId } });
             if (payment) {
               await tx.payment.update({ where: { id: payment.id }, data: { status: "REFUNDED" } });
               if (payment.planId) {
@@ -109,7 +109,7 @@ export async function POST(request: NextRequest) {
           case "subscription.completed":
           case "subscription.renewed": {
             const subId = event.data?.id || event.data?.subscriptionId;
-            const subscription = await tx.subscription.findFirst({ where: { abacatePaySubId: subId } });
+            const subscription = await tx.subscription.findUnique({ where: { abacatePaySubId: subId } });
             if (subscription) {
               const nextPeriod = new Date();
               nextPeriod.setMonth(nextPeriod.getMonth() + 1);
@@ -138,7 +138,7 @@ export async function POST(request: NextRequest) {
           }
           case "subscription.cancelled": {
             const subId = event.data?.id || event.data?.subscriptionId;
-            const subscription = await tx.subscription.findFirst({ where: { abacatePaySubId: subId } });
+            const subscription = await tx.subscription.findUnique({ where: { abacatePaySubId: subId } });
             if (subscription) {
               await tx.subscription.update({ where: { id: subscription.id }, data: { status: "CANCELED" } });
             }

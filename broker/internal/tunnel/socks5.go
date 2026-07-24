@@ -96,13 +96,20 @@ func StartSocks5Server(port string, redisClient *redis.Client, tm *TunnelManager
 			}
 
 			// Aguarda a confirmação do celular (DIAL_OK ou DIAL_ERR)
+			timeout := 10 * time.Second
+			if network := tm.GetNodeNetwork(nodeID); network == "4G/5G" {
+				timeout = 20 * time.Second
+			} else if network == "Wi-Fi" {
+				timeout = 8 * time.Second
+			}
+
 			select {
 			case success := <-vc.DialRespCh:
 				if !success {
 					vc.Close()
 					return nil, fmt.Errorf("celular recusou a conexao TCP para %s", addr)
 				}
-			case <-time.After(10 * time.Second):
+			case <-time.After(timeout):
 				vc.Close()
 				return nil, fmt.Errorf("timeout esperando celular conectar ao %s", addr)
 			}

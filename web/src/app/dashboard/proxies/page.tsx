@@ -241,6 +241,19 @@ export default function ProxiesPage() {
     }
   };
 
+  const handleRotateProxy = async (id: string) => {
+    if (!confirm("Tem certeza? Esta ação invalidará a senha atual e gerará uma nova.")) return;
+    try {
+      const res = await fetch(`/api/proxies/${id}/rotate`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      alert(`Nova senha gerada com sucesso!\nNova senha: ${data.data.proxyPass}`);
+      fetchData();
+    } catch (e: unknown) {
+      if (e instanceof Error) alert(e.message);
+    }
+  };
+
   const handleCreateProxy = async (e: React.FormEvent) => {
     e.preventDefault();
     setCreating(true);
@@ -563,6 +576,14 @@ export default function ProxiesPage() {
                           title="Ver Logs Específicos Desta Credencial"
                         >
                           <Eye className="w-5 h-5" />
+                        </button>
+                        <button 
+                          type="button"
+                          onClick={() => handleRotateProxy(p.id)}
+                          className="text-amber-500 hover:bg-amber-500/10 rounded-lg p-2 transition-colors"
+                          title="Rotacionar Senha"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.5 2v6h-6M2.13 15.57a9 9 0 1 0 3.84-10.36L2 8"/></svg>
                         </button>
                         <button 
                           type="button"

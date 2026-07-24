@@ -96,14 +96,17 @@ model Subscription {
   user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   planId           String?
   planType         PlanType
+  planCategory     PlanCategory?
   status           SubStatus @default(ACTIVE)
-  abacatePaySubId  String?
+  abacatePaySubId  String?   @unique
   currentPeriodEnd DateTime
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
   @@index([userId])
   @@index([status])
+  @@index([userId, status])
+  @@index([userId, status, planCategory])
   @@map("subscriptions")
 }
 
@@ -140,14 +143,15 @@ model Payment {
   type              PaymentType
   amountCents       Int
   status            PaymentStatus @default(PENDING)
-  abacateCheckoutId String?
-  abacateSubId      String?
+  abacateCheckoutId String?       @unique
+  abacateSubId      String?       @unique
   metadata          Json?
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
 
   @@index([userId])
   @@index([status])
+  @@index([userId, status])
   @@map("payments")
 }
 
