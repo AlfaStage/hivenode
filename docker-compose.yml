@@ -49,26 +49,6 @@ services:
       retries: 5
 
   # ----------------------------------------------------------------------------
-  # Migrate (Aplica as migrações do Prisma no DB usando stage builder)
-  # ----------------------------------------------------------------------------
-  migrate:
-    build:
-      context: ./web
-      dockerfile: Dockerfile
-      target: builder
-    container_name: hivenode-migrate
-    environment:
-      - DATABASE_URL=postgresql://hivenode_user:hivenode_dev_2026@postgres:5432/hivenode?schema=public
-    command: ["sh", "-c", "npx prisma db push --accept-data-loss && (npx tsx src/lib/seed.ts || echo 'seed skipped') && (npx tsx prisma/seed-plans.ts || echo 'seed-plans skipped')"]
-    networks:
-      - hivenode-net
-    depends_on:
-      postgres:
-        condition: service_healthy
-    restart: "no"
-
-
-  # ----------------------------------------------------------------------------
   # Web: Next.js (Frontend + API)
   # ----------------------------------------------------------------------------
   web:
@@ -101,8 +81,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      migrate:
-        condition: service_completed_successfully
       broker:
         condition: service_started
 
@@ -138,8 +116,6 @@ services:
     depends_on:
       redis:
         condition: service_healthy
-      migrate:
-        condition: service_completed_successfully
 
 volumes:
   postgres_data:
@@ -151,3 +127,4 @@ networks:
   hivenode-net:
     driver: bridge
     name: hivenode-net
+
