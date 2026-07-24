@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Pickaxe, Server, Activity, Plus, Smartphone, Terminal, Copy, CheckCircle2 } from "lucide-react";
+import { Pickaxe, Server, Activity, Plus, Smartphone, Copy, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -13,9 +13,8 @@ import QRCode from "react-qr-code";
 export default function MinerDashboard() {
   const [points, setPoints] = useState(0);
   const [copied, setCopied] = useState(false);
-  const [miners, setMiners] = useState<any[]>([]);
+  const [miners, setMiners] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(true);
-  const [userData, setUserData] = useState<any>(null);
   const [qrPayload, setQrPayload] = useState("");
   const [isQrOpen, setIsQrOpen] = useState(false);
   const [cliCode, setCliCode] = useState("");
@@ -28,8 +27,8 @@ export default function MinerDashboard() {
       if (!res.ok) throw new Error(data.error);
       setQrPayload(`hiveminer|${data.data.linkToken}`);
       setIsQrOpen(true);
-    } catch (e: any) {
-      alert(e.message);
+    } catch (e: unknown) {
+      if (e instanceof Error) alert(e.message);
     }
   };
 
@@ -47,8 +46,8 @@ export default function MinerDashboard() {
       alert("Aparelho vinculado com sucesso!");
       setIsQrOpen(false);
       setCliCode("");
-    } catch (e: any) {
-      alert(e.message);
+    } catch (e: unknown) {
+      if (e instanceof Error) alert(e.message);
     }
     setApproving(false);
   };
@@ -64,9 +63,8 @@ export default function MinerDashboard() {
         const data = await res.json();
         if (data.success) {
           // Filtrar apenas nodes do tipo PUBLIC (que são os miners que ganham pontos)
-          const publicNodes = data.data.nodes.filter((n: any) => n.visibility === "PUBLIC");
+          const publicNodes = data.data.nodes.filter((n: Record<string, unknown>) => n.visibility === "PUBLIC");
           setMiners(publicNodes);
-          setUserData(data.data.user);
           // Set real points if available from backend, assuming hivePoints exists
           if (data.data.user && data.data.user.hivePoints !== undefined) {
              setPoints(Number(data.data.user.hivePoints));
@@ -150,7 +148,7 @@ export default function MinerDashboard() {
         </h2>
         
           <Dialog open={isQrOpen} onOpenChange={setIsQrOpen}>
-            {/* @ts-ignore */}
+            {/* @ts-expect-error - DialogTrigger typing issue */}
           <DialogTrigger asChild>
             <Button onClick={handleGenerateQr} className="bg-emerald-600 hover:bg-emerald-500 text-white gap-2 font-bold border-none">
               <Plus className="w-4 h-4" /> Conectar Aparelho
@@ -230,7 +228,7 @@ export default function MinerDashboard() {
               </div>
             </div>
             <DialogFooter>
-              {/* @ts-ignore */}
+              {/* @ts-expect-error - DialogClose typing issue */}
               <DialogClose asChild>
                 <Button variant="outline" className="w-full border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/10">Pronto</Button>
               </DialogClose>
@@ -266,15 +264,15 @@ export default function MinerDashboard() {
                   <div className="flex flex-col items-center justify-center gap-3">
                     <Smartphone className="w-12 h-12 text-muted-foreground/30" />
                     <p>Você não tem nenhum aparelho conectado ao HiveMiner.</p>
-                    <p className="text-sm">Clique em "Conectar Aparelho" para vincular seu celular ou PC.</p>
+                    <p className="text-sm">Clique em &quot;Conectar Aparelho&quot; para vincular seu celular ou PC.</p>
                   </div>
                 </TableCell>
               </TableRow>
             ) : (
               miners.map((miner) => (
-                <TableRow key={miner.id} className="border-border">
-                  <TableCell className="font-medium text-white">{miner.deviceModel || "Dispositivo Genérico"}</TableCell>
-                  <TableCell className="font-mono text-xs text-muted-foreground">{miner.id}</TableCell>
+                <TableRow key={String(miner.id)} className="border-border">
+                  <TableCell className="font-medium text-white">{String(miner.deviceModel || "Dispositivo Genérico")}</TableCell>
+                  <TableCell className="font-mono text-xs text-muted-foreground">{String(miner.id)}</TableCell>
                   <TableCell>
                     {miner.status === "ONLINE" ? (
                       <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/30">ONLINE</Badge>

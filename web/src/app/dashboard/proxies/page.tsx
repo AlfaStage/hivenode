@@ -91,6 +91,7 @@ export default function ProxiesPage() {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchData();
 
     // Conecta no WebSocket do Go Broker usando o mesmo IP que o usuário digitou na URL
@@ -507,7 +508,7 @@ export default function ProxiesPage() {
           <div className="p-12 text-center text-[#8e8e99]">Carregando tráfego do servidor...</div>
         ) : proxies.length === 0 ? (
           <div className="p-12 text-center text-[#8e8e99]">
-            Você ainda não possui Proxies criados. Clique em "Novo Proxy SOCKS5" acima.
+            Você ainda não possui Proxies criados. Clique em &quot;Novo Proxy SOCKS5&quot; acima.
           </div>
         ) : (
           <div className="overflow-visible pb-20">

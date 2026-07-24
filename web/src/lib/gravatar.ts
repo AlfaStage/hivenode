@@ -43,7 +43,7 @@ export async function getGravatarProfile(email?: string | null): Promise<Gravata
         };
       }
     }
-  } catch (e) {
+  } catch {
     // Graceful fallback if Gravatar REST API is unavailable
   }
 

@@ -1,7 +1,6 @@
 "use client";
 
 import { LogOut } from "lucide-react";
-import Image from "next/image";
 
 export function Header({ userRole, avatarUrl, name }: { userRole: string, avatarUrl: string, name: string }) {
   return (
