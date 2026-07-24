@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     const deviceCode = crypto.randomBytes(32).toString("hex");
     const userCode = generateShortCode();
     const expiresAt = Date.now() + 5 * 60 * 1000; // 5 min expiry
-    const verificationUri = `https://${request.headers.get("host") || "hivenode.alfastage.com.br"}/dashboard/${type === 'miner' ? 'miner' : 'proxies'}`;
+    const verificationUri = `https://${request.headers.get("host") || "hivenode.alfastage.com.br"}/dashboard/admin/device-approve`;
 
     const sessionData = {
       deviceCode,

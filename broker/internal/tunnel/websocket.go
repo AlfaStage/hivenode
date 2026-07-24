@@ -342,9 +342,13 @@ func (tm *TunnelManager) HandleWS(w http.ResponseWriter, r *http.Request) {
 	mac.Write([]byte(nodeID))
 	expectedMAC := hex.EncodeToString(mac.Sum(nil))
 
-	if sig != expectedMAC {
-		log.Printf("⚠️ FRAUDE DETECTADA: Assinatura HMAC inválida (IP: %s)", r.RemoteAddr)
-		http.Error(w, "Invalid HMAC Signature", http.StatusUnauthorized)
+	// Fallback para Expo Crypto (SHA256 simples concatenado)
+	simpleHash := sha256.Sum256([]byte(nodeID + ":" + string(tm.getTunnelSecret(nodeID))))
+	expectedSimple := hex.EncodeToString(simpleHash[:])
+
+	if sig != expectedMAC && sig != expectedSimple {
+		log.Printf("⚠️ FRAUDE DETECTADA: Assinatura HMAC/SHA256 inválida (IP: %s)", r.RemoteAddr)
+		http.Error(w, "Invalid Signature", http.StatusUnauthorized)
 		return
 	}
 
@@ -397,6 +401,33 @@ func (tm *TunnelManager) HandleWS(w http.ResponseWriter, r *http.Request) {
 		tm.nodeStats[nodeID] = &NodeStats{}
 	}
 	tm.mu.Unlock()
+
+	const (
+		pingInterval = 30 * time.Second
+		pongWait     = 45 * time.Second
+	)
+
+	_ = conn.SetReadDeadline(time.Now().Add(pongWait))
+	conn.SetPongHandler(func(string) error {
+		_ = conn.SetReadDeadline(time.Now().Add(pongWait))
+		return nil
+	})
+
+	go func() {
+		ticker := time.NewTicker(pingInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				tm.mu.Lock()
+				err := conn.WriteMessage(websocket.PingMessage, nil)
+				tm.mu.Unlock()
+				if err != nil {
+					return
+				}
+			}
+		}
+	}()
 
 	// Sincronizar com Redis para leitura via GET /api/nodes
 	tm.redisClient.SAdd(context.Background(), "hivenode:online_nodes", nodeID)
@@ -491,6 +522,9 @@ func (tm *TunnelManager) HandleWS(w http.ResponseWriter, r *http.Request) {
 		if err := json.Unmarshal(msgBytes, &payload); err == nil {
 			msgType, ok := payload["type"].(string)
 			if ok {
+				if msgType == "PING" {
+					continue
+				}
 				// Se o celular enviou um pacote de Telemetria (LOG)
 				if msgType == "LOG" {
 					tm.broadcast(BroadcastEvent{
