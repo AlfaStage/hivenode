@@ -86,4 +86,60 @@ errorWorker.on("failed", (job, err) => {
   console.error(`[BullMQ] Error Alert Job ${job?.id} falhou com erro: ${err.message}`);
 });
 
-export { worker, errorWorker };
+const subscriptionWorker = new Worker(
+  "subscription-check",
+  async () => {
+    const now = new Date();
+    
+    // Find expired subscriptions that are still active
+    const expiredSubs = await prisma.subscription.findMany({
+      where: {
+        status: "ACTIVE",
+        currentPeriodEnd: { lt: now }
+      },
+      select: { id: true, userId: true }
+    });
+
+    if (expiredSubs.length > 0) {
+      console.log(`[BullMQ] Encontradas ${expiredSubs.length} assinaturas vencidas. Processando bloqueio...`);
+      
+      for (const sub of expiredSubs) {
+        // Update subscription status
+        await prisma.subscription.update({
+          where: { id: sub.id },
+          data: { status: "PAST_DUE" }
+        });
+
+        // Block all nodes
+        await prisma.node.updateMany({
+          where: { userId: sub.userId },
+          data: { status: "BLOCKED" }
+        });
+
+        // Emit disconnect to broker for this user
+        await redis.publish("broker:disconnect", JSON.stringify({ userId: sub.userId }));
+        
+        console.log(`[BullMQ] Assinatura ${sub.id} vencida. Usuário ${sub.userId} bloqueado.`);
+      }
+    }
+  },
+  { connection: redis as unknown as import('bullmq').ConnectionOptions }
+);
+
+subscriptionWorker.on("failed", (job, err) => {
+  console.error(`[BullMQ] Subscription Check Job falhou com erro: ${err.message}`);
+});
+
+import { Queue } from "bullmq";
+const subscriptionQueue = new Queue("subscription-check", { connection: redis as unknown as import('bullmq').ConnectionOptions });
+
+// Enfileira o job de checagem a cada 5 minutos
+subscriptionQueue.add("check-expired-subs", {}, {
+  repeat: {
+    every: 5 * 60 * 1000
+  },
+  removeOnComplete: true,
+  removeOnFail: true,
+}).catch(console.error);
+
+export { worker, errorWorker, subscriptionWorker, subscriptionQueue };

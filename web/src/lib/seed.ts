@@ -11,17 +11,18 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import pg from "pg";
 import bcryptjs from "bcryptjs";
 
+const dbUrl = process.env.DATABASE_URL || "postgresql://hivenode_user:hivenode_dev_2026@localhost:5432/hivenode";
+const cleanUrl = dbUrl.split("?")[0]; // Remove ?schema=public
+
 const pool = new pg.Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: cleanUrl,
 });
 const adapter = new PrismaPg(pool);
-const prisma = new PrismaClient({ adapter });
-
+const prisma = new PrismaClient({ adapter, log: ["error"] });
 const ADMIN_EMAIL = "admin@alfastage.com.br";
 const ADMIN_PASSWORD = "admin123456";
 
 async function main() {
-  console.log("🌱 Seeding database...\n");
 
   // Verificar se admin já existe
   const existingAdmin = await prisma.user.findUnique({
@@ -60,6 +61,5 @@ main()
     process.exit(1);
   })
   .finally(async () => {
-    await pool.end();
     await prisma.$disconnect();
   });

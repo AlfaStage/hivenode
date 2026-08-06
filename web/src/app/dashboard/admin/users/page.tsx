@@ -24,6 +24,16 @@ export default function AdminUsersPage() {
   });
   const [saving, setSaving] = useState(false);
 
+  const [plans, setPlans] = useState<any[]>([]);
+  const [grantSubUser, setGrantSubUser] = useState<any>(null);
+  const [grantForm, setGrantForm] = useState({
+    planId: "",
+    currentPeriodEnd: "",
+    isFree: true,
+    customPriceCents: 0,
+  });
+  const [granting, setGranting] = useState(false);
+
   const fetchUsers = async () => {
     try {
       const res = await fetch("/api/admin");
@@ -40,7 +50,20 @@ export default function AdminUsersPage() {
 
   useEffect(() => {
     fetchUsers();
+    fetchPlans();
   }, []);
+
+  const fetchPlans = async () => {
+    try {
+      const res = await fetch("/api/admin/plans");
+      const data = await res.json();
+      if (data.success) {
+        setPlans(data.data.plans || []);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const handleEditClick = (user: any) => {
     setEditingUser(user);
@@ -80,6 +103,42 @@ export default function AdminUsersPage() {
     } catch (e) {
       console.error(e);
     }
+  };
+
+  const handleGrantClick = (user: any) => {
+    setGrantSubUser(user);
+    const in30Days = new Date();
+    in30Days.setDate(in30Days.getDate() + 30);
+    setGrantForm({
+      planId: plans[0]?.id || "",
+      currentPeriodEnd: in30Days.toISOString().slice(0, 16), // YYYY-MM-DDTHH:mm
+      isFree: true,
+      customPriceCents: 0,
+    });
+  };
+
+  const handleGrantSave = async () => {
+    if (!grantSubUser) return;
+    setGranting(true);
+    try {
+      const res = await fetch(`/api/admin/users/${grantSubUser.id}/subscription`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(grantForm),
+      });
+      if (res.ok) {
+        setGrantSubUser(null);
+        alert("Assinatura concedida com sucesso!");
+        fetchUsers();
+      } else {
+        const err = await res.json();
+        alert(err.error || "Erro ao conceder assinatura");
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Erro de conexão");
+    }
+    setGranting(false);
   };
 
   const filteredUsers = users.filter((u) =>
@@ -160,6 +219,9 @@ export default function AdminUsersPage() {
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-2">
+                    <Button variant="outline" size="sm" onClick={() => handleGrantClick(user)} className="border-border text-emerald-400 hover:bg-emerald-500/10">
+                      <ShieldCheck className="w-4 h-4" />
+                    </Button>
                     <Button variant="outline" size="sm" onClick={() => handleEditClick(user)} className="border-border">
                       <Edit className="w-4 h-4 text-muted-foreground" />
                     </Button>
@@ -274,6 +336,83 @@ export default function AdminUsersPage() {
             <Button variant="outline" onClick={() => setEditingUser(null)}>Cancelar</Button>
             <Button onClick={handleSave} disabled={saving} className="bg-primary text-primary-foreground font-bold">
               {saving ? "Salvando..." : "Salvar Alterações"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Grant Subscription Modal */}
+      <Dialog open={!!grantSubUser} onOpenChange={(open) => !open && setGrantSubUser(null)}>
+        <DialogContent className="bg-card border-border text-foreground sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-emerald-400" />
+              Conceder Assinatura
+            </DialogTitle>
+          </DialogHeader>
+
+          {grantSubUser && (
+            <div className="grid gap-4 py-2">
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/40 border border-border">
+                <p className="text-sm font-bold text-foreground">Usuário: {grantSubUser.email}</p>
+              </div>
+
+              <div className="grid gap-2">
+                <label className="text-xs font-semibold text-muted-foreground">Plano</label>
+                <select
+                  className="flex h-11 w-full rounded-xl border border-border bg-muted px-4 text-sm font-medium text-foreground outline-none"
+                  value={grantForm.planId}
+                  onChange={(e) => setGrantForm({ ...grantForm, planId: e.target.value })}
+                >
+                  {plans.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name} - {(p.priceInCents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid gap-2">
+                <label className="text-xs font-semibold text-muted-foreground">Data e Hora de Expiração (Fim do Acesso)</label>
+                <Input
+                  type="datetime-local"
+                  value={grantForm.currentPeriodEnd}
+                  onChange={(e) => setGrantForm({ ...grantForm, currentPeriodEnd: e.target.value })}
+                  className="bg-muted border-border font-mono text-sm"
+                />
+              </div>
+
+              <div className="grid gap-2 mt-2">
+                <label className="text-xs font-semibold text-muted-foreground">Forma de Cobrança (Uso Manual)</label>
+                <button
+                  type="button"
+                  onClick={() => setGrantForm({ ...grantForm, isFree: !grantForm.isFree })}
+                  className={`h-11 px-4 rounded-xl text-xs font-bold transition-all border flex items-center justify-center ${
+                    grantForm.isFree
+                      ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40"
+                      : "bg-muted text-muted-foreground border-border"
+                  }`}
+                >
+                  {grantForm.isFree ? "Assinatura Gratuita (Bolsa/Teste)" : "Assinatura Paga (Definir Preço)"}
+                </button>
+              </div>
+
+              {!grantForm.isFree && (
+                <div className="grid gap-2">
+                  <label className="text-xs font-semibold text-muted-foreground">Preço Customizado (em Centavos, ex: 1000 = R$ 10,00)</label>
+                  <Input
+                    type="number"
+                    value={grantForm.customPriceCents}
+                    onChange={(e) => setGrantForm({ ...grantForm, customPriceCents: parseInt(e.target.value) || 0 })}
+                    className="bg-muted border-border font-mono font-bold text-amber-400"
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setGrantSubUser(null)}>Cancelar</Button>
+            <Button onClick={handleGrantSave} disabled={granting} className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold">
+              {granting ? "Aplicando..." : "Conceder Acesso"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -14,8 +14,11 @@ const globalForPrisma = globalThis as unknown as {
 };
 
 function createPrismaClient(): PrismaClient {
+  const dbUrl = process.env.DATABASE_URL || "postgresql://hivenode_user:hivenode_dev_2026@localhost:5432/hivenode";
+  const cleanUrl = dbUrl.split("?")[0]; // Remove query params to avoid pg-pool SCRAM issue
+
   const pool = new pg.Pool({
-    connectionString: process.env.DATABASE_URL,
+    connectionString: cleanUrl,
   });
 
   const adapter = new PrismaPg(pool);
@@ -28,6 +31,7 @@ function createPrismaClient(): PrismaClient {
         : ["error"],
   });
 }
+
 
 export const prisma = globalForPrisma.prisma ?? createPrismaClient();
 
