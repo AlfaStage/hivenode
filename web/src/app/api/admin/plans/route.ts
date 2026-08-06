@@ -11,9 +11,46 @@ import { prisma } from "@/lib/prisma";
 export async function GET() {
   try {
     await requireAdmin();
-    const plans = await prisma.plan.findMany({
+    let plans = await prisma.plan.findMany({
       orderBy: [{ category: "asc" }, { priceInCents: "asc" }],
     });
+
+    if (plans.length === 0) {
+      await prisma.plan.createMany({
+        data: [
+          {
+            slug: "plano-cortesia",
+            name: "Plano Cortesia / Admin",
+            category: "PROXIES",
+            priceInCents: 0,
+            gbIncluded: 100,
+            isPublic: false,
+            isAdminOnly: true,
+          },
+          {
+            slug: "plano-starter",
+            name: "Plano Starter",
+            category: "PROXIES",
+            priceInCents: 2990,
+            gbIncluded: 20,
+            isPublic: true,
+          },
+          {
+            slug: "plano-pro",
+            name: "Plano Pro",
+            category: "PROXIES",
+            priceInCents: 8990,
+            gbIncluded: 100,
+            isPublic: true,
+          },
+        ],
+      });
+
+      plans = await prisma.plan.findMany({
+        orderBy: [{ category: "asc" }, { priceInCents: "asc" }],
+      });
+    }
+
     return apiSuccess({ plans });
   } catch (error: unknown) {
     if (error instanceof Error && error.message === "Unauthorized") return apiError("Não autorizado", 401);
