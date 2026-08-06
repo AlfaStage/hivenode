@@ -30,7 +30,7 @@ model User {
   referredById     String?
   
   // Segurança / 2FA
-  tunnelSecret     String         @default(uuid())
+  tunnelSecret     String?        @default(uuid())
   twoFactorSecret  String?
   twoFactorEnabled Boolean        @default(false)
 

@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Gerar JWT e setar cookie
-    const token = await generateToken(user.id, user.role, user.tunnelSecret);
+    const token = await generateToken(user.id, user.role, user.tunnelSecret ?? undefined);
     await setAuthCookie(token);
 
     // Disparar e-mail de boas vindas

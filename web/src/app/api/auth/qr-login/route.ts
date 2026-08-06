@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
     const user = await prisma.user.findUnique({ where: { id: payload.userId } });
     if (!user) return apiError("Usuário não encontrado", 404);
 
-    const token = await generateToken(user.id, user.role, user.tunnelSecret);
+    const token = await generateToken(user.id, user.role, user.tunnelSecret ?? undefined);
     return apiSuccess({ token, user: { id: user.id, email: user.email, tunnelSecret: user.tunnelSecret } });
   } catch {
     return apiError("Token expirado ou inválido", 401);
