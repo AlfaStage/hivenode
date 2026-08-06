@@ -8,9 +8,9 @@ import { removeAuthCookie } from "@/lib/auth";
 export async function POST(request: NextRequest) {
   try {
     await removeAuthCookie();
-    return NextResponse.redirect(new URL("/login", request.url));
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error("[API] Logout error:", error);
-    return NextResponse.redirect(new URL("/login", request.url));
+    return NextResponse.json({ success: false }, { status: 500 });
   }
 }
