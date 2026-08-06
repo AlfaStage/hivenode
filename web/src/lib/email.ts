@@ -123,3 +123,34 @@ export async function sendAdminErrorAlert(errorMessage: string) {
     console.error(`[Email Error] Falha ao enviar admin alert para ${adminEmail}`, error);
   }
 }
+
+export async function sendPasswordResetEmail(to: string, resetUrl: string) {
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #000; color: #fff; padding: 24px; border-radius: 12px; border: 1px solid #333;">
+      <h2 style="color: #3b82f6; text-align: center; margin-bottom: 20px;">Recuperação de Senha — HiveNode 🔑</h2>
+      <p style="font-size: 16px; color: #ccc;">Olá,</p>
+      <p style="font-size: 16px; color: #ccc; line-height: 1.5;">Recebemos uma solicitação para redefinir a senha da sua conta no HiveNode.</p>
+      <p style="font-size: 16px; color: #ccc; line-height: 1.5;">Clique no botão abaixo para escolher uma nova senha (este link expira em 15 minutos):</p>
+      <div style="text-align: center; margin: 32px 0;">
+        <a href="${resetUrl}" style="background-color: #2563eb; color: #ffffff; padding: 14px 28px; text-decoration: none; font-weight: bold; border-radius: 8px; display: inline-block; font-size: 16px;">Redefinir Minha Senha</a>
+      </div>
+      <p style="font-size: 14px; color: #888; border-top: 1px solid #222; padding-top: 16px;">Se você não solicitou a alteração de senha, ignore este e-mail.</p>
+    </div>
+  `;
+
+  try {
+    if (!process.env.SMTP_USER) {
+      console.log(`[Email Mock] Link de redefinição para ${to}: ${resetUrl}`);
+      return;
+    }
+    await transporter.sendMail({
+      from: fromAddress,
+      to,
+      subject: 'Recuperação de Senha — HiveNode',
+      html,
+    });
+    console.log(`[Email] Password reset enviado para ${to}`);
+  } catch (error) {
+    console.error(`[Email Error] Falha ao enviar password reset para ${to}`, error);
+  }
+}

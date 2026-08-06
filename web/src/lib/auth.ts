@@ -71,6 +71,28 @@ export async function generateQrLinkToken(userId: string): Promise<string> {
   return token;
 }
 
+export async function generatePasswordResetToken(userId: string): Promise<string> {
+  const token = await new SignJWT({ userId, type: "password_reset" })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime("15m") // Expira em 15 minutos
+    .sign(getJwtSecret());
+
+  return token;
+}
+
+export async function verifyPasswordResetToken(token: string): Promise<{ userId: string } | null> {
+  try {
+    const { payload } = await jwtVerify(token, getJwtSecret());
+    if (payload.type !== "password_reset" || typeof payload.userId !== "string") {
+      return null;
+    }
+    return { userId: payload.userId };
+  } catch {
+    return null;
+  }
+}
+
 export async function verifyToken(token: string): Promise<TokenPayload> {
   const { payload } = await jwtVerify(token, getJwtSecret());
   return payload as TokenPayload;
