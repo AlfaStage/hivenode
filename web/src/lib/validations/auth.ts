@@ -22,11 +22,11 @@ export const registerSchema = z.object({
   password: z
     .string()
     .min(8, "Senha deve ter no mínimo 8 caracteres")
-    .max(128, "Senha deve ter no máximo 128 caracteres"),
+    .max(72, "Senha deve ter no máximo 72 caracteres"),
   confirmPassword: z
     .string()
-    .min(1, "Confirmação de senha é obrigatória"),
-}).refine((data) => data.password === data.confirmPassword, {
+    .min(1, "Confirmação de senha é obrigatória").optional(),
+}).refine((data) => data.confirmPassword === undefined || data.password === data.confirmPassword, {
   message: "As senhas não coincidem",
   path: ["confirmPassword"],
 });

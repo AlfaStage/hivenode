@@ -1,142 +1,112 @@
 package tunnel
 
 import (
-	"context"
-	"fmt"
-	"log"
-	"net"
-	"time"
+ "context"
+ "encoding/binary"
+ "fmt"
+ "io"
+ "log"
+ "net"
+ "strconv"
+ "time"
 
-	"github.com/gorilla/websocket"
-
-	socks5 "github.com/armon/go-socks5"
-	"github.com/hivenode/broker/internal/redis"
+ "github.com/hivenode/broker/internal/redis"
 )
 
-// HiveAuth implementa a interface socks5.CredentialStore
-type HiveAuth struct {
-	redisClient   *redis.Client
-	tunnelManager *TunnelManager
+// SOCKS5 CONNECT only. The destination name is preserved for DNS at the device.
+func StartSocks5Server(port string, _ *redis.Client, tm *TunnelManager) {
+ listener, err := net.Listen("tcp", ":"+port)
+ if err != nil { log.Fatal(err) }
+ if err := tm.ServeSOCKS(listener); err != nil { log.Print(err) }
 }
 
-func (h *HiveAuth) Valid(user, password string) bool {
-	nodeID, nodeType, err := h.redisClient.ValidateSOCKS5User(context.Background(), user, password)
-	if err != nil || nodeID == "" {
-		return false
-	}
-	
-	// Se for nó privado, ele DEVE estar online.
-	// Se for nó público, o Broker fará o failover/round-robin na hora do Dial.
-	if nodeType == "PRIVATE" {
-		conn := h.tunnelManager.GetDeviceConn(nodeID)
-		if conn == nil {
-			log.Printf("⚠️  Acesso negado: Nó Privado %s está offline", nodeID)
-			return false
-		}
-	}
-	return true
+func (tm *TunnelManager) ServeSOCKS(listener net.Listener) error {
+ slots := make(chan struct{}, 512)
+ for {
+  conn, err := listener.Accept()
+  if err != nil { return err }
+  select {
+  case slots <- struct{}{}:
+   go func() { defer func(){ <-slots }(); tm.handleSOCKS(conn) }()
+  default: conn.Close()
+  }
+ }
 }
 
-// StartSocks5Server inicia o servidor na porta especificada.
-func StartSocks5Server(port string, redisClient *redis.Client, tm *TunnelManager) {
-	auth := socks5.UserPassAuthenticator{
-		Credentials: &HiveAuth{
-			redisClient:   redisClient,
-			tunnelManager: tm,
-		},
-	}
+func readSized(c net.Conn) (string, error) {
+ var length [1]byte
+ if _, err := io.ReadFull(c, length[:]); err != nil { return "", err }
+ if length[0] == 0 { return "", fmt.Errorf("empty value") }
+ data := make([]byte, int(length[0]))
+ _, err := io.ReadFull(c, data)
+ return string(data), err
+}
 
-	conf := &socks5.Config{
-		AuthMethods: []socks5.Authenticator{auth},
-		Logger:      log.New(log.Writer(), "[SOCKS5] ", log.LstdFlags),
-		Dial: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			host, _, err := net.SplitHostPort(addr)
-			if err != nil {
-				return nil, fmt.Errorf("invalid address format")
-			}
-			ip := net.ParseIP(host)
-			if ip != nil {
-				if ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsUnspecified() {
-					log.Printf("⚠️ Tentativa de SSRF bloqueada pelo Broker para o host: %s", addr)
-					return nil, fmt.Errorf("acesso a IPs internos não permitido")
-				}
-			}
-
-			log.Printf("Interceptando TCP para %s. Preparando túnel VirtualConn...", addr)
-			// Gera um ID simples usando nanosegundos
-			connID := fmt.Sprintf("conn_%d", time.Now().UnixNano())
-			// Failover Inteligente: Pega qualquer nó online (Para a Persona 3 / Público)
-			// Em um sistema real, extrairíamos o Payload do ctx.
-			var conn *websocket.Conn
-			var nodeID string
-			tm.devices.Range(func(id string, ws *websocket.Conn) bool {
-				conn = ws
-				nodeID = id
-				return false // Break after first item for simple round-robin/failover
-			})
-
-			if conn == nil {
-				return nil, fmt.Errorf("rede global indisponível no momento")
-			}
-
-			vc := &VirtualConn{
-				ConnID:     connID,
-				NodeID:     nodeID,
-				TM:         tm,
-				ReadCh:     make(chan []byte, 1024),
-				DialRespCh: make(chan bool, 1),
-				CloseCh:    make(chan struct{}),
-				buffer:     make([]byte, 0),
-			}
-			tm.AddVirtualConn(vc)
-
-			// Envia o comando para o celular abrir a porta local com a internet
-			msg := map[string]interface{}{
-				"type":   "DIAL",
-				"connId": connID,
-				"host":   addr,
-			}
-			
-			tm.mu.Lock()
-			err = conn.WriteJSON(msg)
-			tm.mu.Unlock()
-			
-			if err != nil {
-				vc.Close()
-				return nil, err
-			}
-
-			// Aguarda a confirmação do celular (DIAL_OK ou DIAL_ERR)
-			timeout := 10 * time.Second
-			if network := tm.GetNodeNetwork(nodeID); network == "4G/5G" {
-				timeout = 20 * time.Second
-			} else if network == "Wi-Fi" {
-				timeout = 8 * time.Second
-			}
-
-			select {
-			case success := <-vc.DialRespCh:
-				if !success {
-					vc.Close()
-					return nil, fmt.Errorf("celular recusou a conexao TCP para %s", addr)
-				}
-			case <-time.After(timeout):
-				vc.Close()
-				return nil, fmt.Errorf("timeout esperando celular conectar ao %s", addr)
-			}
-
-			log.Printf("Túnel TCP->WS criado para %s via celular %s (ConnID: %s)", addr, nodeID, connID)
-			return vc, nil
-		},
-	}
-
-	server, err := socks5.New(conf)
-	if err != nil {
-		log.Fatalf("Erro ao criar SOCKS5: %v", err)
-	}
-
-	log.Printf("🛡️  Servidor SOCKS5 escutando na porta %s...", port)
-	if err := server.ListenAndServe("tcp", "0.0.0.0:"+port); err != nil {
-		log.Fatalf("Erro SOCKS5 listen: %v", err)
-	}
+func (tm *TunnelManager) handleSOCKS(client net.Conn) {
+ defer client.Close()
+ client.SetDeadline(time.Now().Add(15*time.Second))
+ var hello [2]byte
+ if _, err := io.ReadFull(client, hello[:]); err != nil || hello[0] != 5 { return }
+ methods := make([]byte, int(hello[1]))
+ if _, err := io.ReadFull(client, methods); err != nil { return }
+ valid := false
+ for _, method := range methods { if method == 2 { valid = true } }
+ if !valid { client.Write([]byte{5,255}); return }
+ client.Write([]byte{5,2})
+ var version [1]byte
+ if _, err := io.ReadFull(client, version[:]); err != nil || version[0] != 1 { return }
+ username, err := readSized(client); if err != nil { return }
+ password, err := readSized(client); if err != nil { return }
+ var identity Identity
+ if err := tm.api(context.Background(), "/api/internal/proxy-auth", map[string]string{"username":username,"password":password}, &identity); err != nil {
+  client.Write([]byte{1,1}); return
+ }
+ device := tm.device(identity.NodeID)
+ if device == nil { client.Write([]byte{1,1}); return }
+ client.Write([]byte{1,0})
+ var request [4]byte
+ if _, err := io.ReadFull(client, request[:]); err != nil || request[0] != 5 || request[1] != 1 || request[2] != 0 { return }
+ var host string
+ switch request[3] {
+ case 1:
+  ip := make([]byte,4); if _, err := io.ReadFull(client,ip); err != nil { return }; host = net.IP(ip).String()
+ case 4:
+  ip := make([]byte,16); if _, err := io.ReadFull(client,ip); err != nil { return }; host = net.IP(ip).String()
+ case 3:
+  host, err = readSized(client); if err != nil { return }
+ default: return
+ }
+ var port [2]byte
+ if _, err := io.ReadFull(client,port[:]); err != nil { return }
+ targetPort := binary.BigEndian.Uint16(port[:]); if targetPort == 0 { return }
+ if ip := net.ParseIP(host); ip != nil && !PublicIP(ip) && !tm.allowPrivate { return }
+ stream, err := tm.openStream(device, identity, net.JoinHostPort(host,strconv.Itoa(int(targetPort))))
+ if err != nil { client.Write([]byte{5,4,0,1,0,0,0,0,0,0}); return }
+ defer stream.close()
+ client.Write([]byte{5,0,0,1,0,0,0,0,0,0})
+ client.SetDeadline(time.Time{})
+ done := make(chan struct{})
+ go func() {
+  defer close(done)
+  buffer := make([]byte, 32*1024)
+  for {
+   client.SetReadDeadline(time.Now().Add(2*time.Minute))
+   n, err := client.Read(buffer)
+   if n > 0 {
+    if tm.charge(stream, n, 0) != nil || device.binary(stream.id, buffer[:n]) != nil { break }
+   }
+   if err != nil { break }
+  }
+  stream.close(); client.Close()
+ }()
+ for {
+  select {
+  case data := <-stream.data:
+   if tm.charge(stream, 0, len(data)) != nil { return }
+   client.SetWriteDeadline(time.Now().Add(15*time.Second))
+   if _, err := client.Write(data); err != nil { return }
+  case <-stream.done: return
+  case <-done: return
+  }
+ }
 }

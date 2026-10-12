@@ -56,19 +56,15 @@ export default function MinerDashboard() {
     // Buscar nodes (miners) reais do usuário
     const fetchNodes = async () => {
       try {
-        const token = localStorage.getItem("token");
-        const res = await fetch("/api/nodes", {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        const res = await fetch("/api/nodes");
         const data = await res.json();
         if (data.success) {
           // Filtrar apenas nodes do tipo PUBLIC (que são os miners que ganham pontos)
           const publicNodes = data.data.nodes.filter((n: Record<string, unknown>) => n.visibility === "PUBLIC");
           setMiners(publicNodes);
           // Set real points if available from backend, assuming hivePoints exists
-          if (data.data.user && data.data.user.hivePoints !== undefined) {
-             setPoints(Number(data.data.user.hivePoints));
-          }
+          const me = await fetch("/api/auth/me").then(r => r.json());
+          if (me.success) setPoints(Number(me.data.hivePoints));
         }
       } catch (err) {
         console.error("Erro ao buscar miners:", err);
@@ -80,7 +76,7 @@ export default function MinerDashboard() {
   }, []);
 
   const handleCopyCode = () => {
-    navigator.clipboard.writeText("REF-HIVE-992X");
+    navigator.clipboard.writeText(window.location.origin);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -118,8 +114,8 @@ export default function MinerDashboard() {
             </motion.p>
           </CardContent>
           <CardFooter>
-            <Button className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold h-12 text-lg">
-              Resgatar Recompensas (Em breve)
+            <Button onClick={() => window.location.assign("/dashboard/billing")} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold h-12 text-lg">
+              Converter pontos em GB
             </Button>
           </CardFooter>
         </Card>
@@ -127,12 +123,12 @@ export default function MinerDashboard() {
         {/* Indique e Ganhe */}
         <Card className="border-border bg-card/40">
           <CardHeader>
-            <CardTitle className="text-lg">Indique e Ganhe</CardTitle>
-            <CardDescription>Ganhe 10% de todos os pontos minerados pelos seus indicados.</CardDescription>
+            <CardTitle className="text-lg">Compartilhe o HiveNode</CardTitle>
+            <CardDescription>Convide pessoas para conhecer a plataforma.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="bg-black/50 p-4 rounded-xl border border-border flex justify-between items-center">
-              <span className="font-mono text-sm text-emerald-400 font-bold">REF-HIVE-992X</span>
+              <span className="font-mono text-sm text-emerald-400 font-bold">Link da plataforma</span>
               <Button variant="ghost" size="sm" onClick={handleCopyCode} className="text-muted-foreground hover:text-white">
                 {copied ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
               </Button>

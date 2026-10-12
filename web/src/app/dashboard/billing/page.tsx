@@ -68,7 +68,7 @@ export default function BillingPage() {
     const fetchData = async () => {
       try {
         const [plansRes, meRes] = await Promise.all([
-          fetch("/api/admin/plans").then((r) => r.json()).catch(() => ({ data: { plans: [] } })),
+          fetch("/api/plans").then((r) => r.json()),
           fetch("/api/auth/me").then((r) => r.json()),
         ]);
 

@@ -1,5 +1,4 @@
-import fs from "fs";
-import path from "path";
+import { prisma } from "./prisma";
 
 export interface SystemSettings {
   pricing: {
@@ -33,54 +32,38 @@ const DEFAULT_SETTINGS: SystemSettings = {
     minDepositGb: 10,
   },
   crypto: {
-    pointsToHiveRate: 100,
+    pointsToHiveRate: 500,
     stakingRewardRate: 5.5,
     network: "Polygon Mainnet",
-    tokenAddress: "0x7a77...hivenode",
+    tokenAddress: "",
     minWithdrawalPoints: 500,
-    contractStatus: "ACTIVE",
+    contractStatus: "NOT_CONFIGURED",
   },
   general: {
     maintenanceMode: false,
     smtpHost: "smtp-relay.brevo.com",
     smtpSender: "hivenode@alfastage.com.br",
-    smtpStatus: "CONNECTED",
+    smtpStatus: "NOT_CONFIGURED",
     lgpdAuditEnabled: true,
   },
 };
 
-const SETTINGS_FILE_PATH = path.join(process.cwd(), ".temp", "system_settings.json");
-
-export function getSystemSettings(): SystemSettings {
-  try {
-    if (fs.existsSync(SETTINGS_FILE_PATH)) {
-      const content = fs.readFileSync(SETTINGS_FILE_PATH, "utf-8");
-      return { ...DEFAULT_SETTINGS, ...JSON.parse(content) };
-    }
-  } catch (error) {
-    console.error("[Settings] Erro ao ler configurações persistidas:", error);
-  }
-  return DEFAULT_SETTINGS;
+export async function getSystemSettings(): Promise<SystemSettings> {
+  const row = await prisma.systemConfig.findUnique({ where: { key: "system_settings" } });
+  const saved = row ? JSON.parse(row.value) : {};
+  return { pricing: { ...DEFAULT_SETTINGS.pricing, ...saved.pricing },
+    crypto: { ...DEFAULT_SETTINGS.crypto, ...saved.crypto }, general: { ...DEFAULT_SETTINGS.general, ...saved.general } };
 }
 
-export function updateSystemSettings(partialSettings: Partial<SystemSettings>): SystemSettings {
-  try {
-    const current = getSystemSettings();
-    const updated: SystemSettings = {
-      pricing: { ...current.pricing, ...partialSettings.pricing },
-      crypto: { ...current.crypto, ...partialSettings.crypto },
-      general: { ...current.general, ...partialSettings.general },
-    };
-
-    const dir = path.dirname(SETTINGS_FILE_PATH);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-
-    fs.writeFileSync(SETTINGS_FILE_PATH, JSON.stringify(updated, null, 2), "utf-8");
-    return updated;
-  } catch (error) {
-    console.error("[Settings] Erro ao salvar configurações persistidas:", error);
-    throw error;
+export async function updateSystemSettings(partial: Partial<SystemSettings>): Promise<SystemSettings> {
+  const current = await getSystemSettings();
+  const updated = { pricing: { ...current.pricing, ...partial.pricing },
+    crypto: { ...current.crypto, ...partial.crypto }, general: { ...current.general, ...partial.general } };
+  if (!Number.isFinite(updated.crypto.pointsToHiveRate) || updated.crypto.pointsToHiveRate < 100 ||
+      Object.values(updated.pricing).some(v => typeof v !== "number" || !Number.isFinite(v) || v < 0)) {
+    throw new Error("Invalid settings");
   }
+  await prisma.systemConfig.upsert({ where: { key: "system_settings" },
+    create: { key: "system_settings", value: JSON.stringify(updated) }, update: { value: JSON.stringify(updated) } });
+  return updated;
 }

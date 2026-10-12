@@ -22,6 +22,8 @@ model User {
   passwordHash     String
   role             Role           @default(CUSTOMER)
   balanceGB        Float          @default(0.0)
+  sessionVersion   Int            @default(0)
+  disabled         Boolean        @default(false)
   
   // Integração Web3 & Tokenomics
   walletAddress    String?
@@ -58,6 +60,8 @@ model Node {
   deviceModel  String?
   ipAddress    String?
   tags         String[]   @default([])
+  installationId String?
+  tunnelSecret String? // Independent credential; encrypted at rest.
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
@@ -65,6 +69,7 @@ model Node {
   shares       NodeShare[]
 
   @@index([userId])
+  @@unique([userId, installationId])
   @@index([status])
   @@index([type])
   @@index([visibility])
@@ -79,6 +84,7 @@ model ProxyCredential {
   user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   proxyUser    String     @unique
   proxyPass    String
+  passwordEncrypted String?
   totalBytesRx BigInt     @default(0)
   totalBytesTx BigInt     @default(0)
   status       NodeStatus @default(ONLINE)
@@ -95,6 +101,7 @@ model Subscription {
   userId           String
   user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   planId           String?
+  plan             Plan?     @relation(fields: [planId], references: [id], onDelete: Restrict)
   planType         PlanType
   planCategory     PlanCategory?
   status           SubStatus @default(ACTIVE)
@@ -111,6 +118,7 @@ model Subscription {
 }
 
 model Plan {
+  subscriptions    Subscription[]
   id               String       @id @default(uuid())
   slug             String       @unique
   name             String
@@ -144,7 +152,8 @@ model Payment {
   amountCents       Int
   status            PaymentStatus @default(PENDING)
   abacateCheckoutId String?       @unique
-  abacateSubId      String?       @unique
+  abacateSubId      String?
+  externalPaymentId String?      @unique
   metadata          Json?
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
@@ -205,7 +214,42 @@ model NodeShare {
 
   @@index([ownerId])
   @@index([nodeId])
+  @@unique([nodeId, sharedWithEmail])
   @@map("node_shares")
+}
+
+model UsageEvent {
+  id String @id
+  userId String
+  proxyId String
+  nodeId String
+  bytesRx BigInt
+  bytesTx BigInt
+  chargedGB Float @default(0)
+  createdAt DateTime @default(now())
+  @@index([userId, createdAt])
+  @@map("usage_events")
+}
+
+model AuditLog {
+  id String @id @default(uuid())
+  actorId String
+  action String
+  targetId String
+  metadata Json?
+  createdAt DateTime @default(now())
+  @@index([actorId, createdAt])
+  @@map("audit_logs")
+}
+
+model OneTimeToken {
+  id String @id
+  userId String
+  type String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  @@index([expiresAt])
+  @@map("one_time_tokens")
 }
 
 // ==============================================================================

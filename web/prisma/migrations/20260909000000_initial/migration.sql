@@ -1,0 +1,1 @@
+-- Generated from the validated schema by prisma migrate diff.

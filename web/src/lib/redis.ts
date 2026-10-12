@@ -19,7 +19,9 @@ function createRedisClient(): Redis {
   }
 
   return new Redis(redisUrl, {
-    maxRetriesPerRequest: null, // Necessário para BullMQ
+    maxRetriesPerRequest: 2,
+    lazyConnect: true,
+    connectTimeout: 5000,
     retryStrategy(times: number) {
       const delay = Math.min(times * 200, 5000);
       return delay;

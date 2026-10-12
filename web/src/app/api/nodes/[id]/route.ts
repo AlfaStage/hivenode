@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
 import { apiSuccess, apiError } from "@/lib/api-utils";
+import { brokerCommand } from "@/lib/broker";
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -20,7 +21,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     // Informa ao Broker Go interno para derrubar o aparelho da memória
     try {
       // Aciona o webhook do Broker na porta 10001 para derrubar o WS se estiver online
-      await fetch(`http://broker:10001/kick?nodeId=${resolvedParams.id}`);
+      await brokerCommand("/internal/revoke", { nodeId: resolvedParams.id });
     } catch (e) {
       console.log("Aviso: Broker inatingível ou aparelho já offline.");
     }
@@ -63,11 +64,7 @@ export async function PATCH(
 
     // Avisa o Go Broker pra espalhar o novo nome (PC e Celular)
     try {
-      await fetch("http://broker:10001/internal/rename-node", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nodeId: node.id, newName })
-      });
+      if (typeof newName === "string") await brokerCommand("/internal/rename-node", { nodeId: node.id, newName });
     } catch (e) {
       console.log("Aviso: Broker inatingível para webhook de rename.");
     }

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
 import { apiError, apiSuccess } from "@/lib/api-utils";
 import { NodeStatus } from "@prisma/client";
+import { brokerCommand } from "@/lib/broker";
 
 export async function PUT(
   request: NextRequest,
@@ -12,6 +13,7 @@ export async function PUT(
     await requireAdmin();
     const { id } = await params;
     const body = await request.json();
+    if (!["ONLINE", "OFFLINE", "BLOCKED"].includes(body.status)) return apiError("Status inválido", 400);
 
     const node = await prisma.node.update({
       where: { id },
@@ -20,7 +22,8 @@ export async function PUT(
       },
     });
 
-    return apiSuccess({ node });
+    if (body.status === "BLOCKED") await brokerCommand("/internal/revoke", { nodeId: id }).catch(console.error);
+    return apiSuccess({ node: { ...node, tunnelSecret: undefined } });
   } catch (error: any) {
     console.error("[API Admin Node Edit]", error);
     return apiError("Erro ao editar aparelho", 500);
@@ -38,6 +41,7 @@ export async function DELETE(
     await prisma.node.delete({
       where: { id },
     });
+    await brokerCommand("/internal/revoke", { nodeId: id }).catch(console.error);
 
     return apiSuccess({ message: "Aparelho excluído com sucesso." });
   } catch (error: any) {

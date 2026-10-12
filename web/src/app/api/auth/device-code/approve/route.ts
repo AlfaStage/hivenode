@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
     try {
       // Update session for the polling device to pick up
       await redis.set(`device_auth:device:${deviceCode}`, JSON.stringify(sessionData), "EX", 300);
-    } catch {}
+    } catch { return apiError("Serviço de vínculo indisponível", 503); }
 
     return apiSuccess({ message: "Aparelho vinculado com sucesso" });
   } catch (error: any) {

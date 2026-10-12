@@ -9,7 +9,7 @@ interface AdminProxiesTabProps {
 }
 
 export function AdminProxiesTab({ users, onUpdate }: AdminProxiesTabProps) {
-  const proxies = users.flatMap(u => 
+  const proxies: Record<string, unknown>[] = users.flatMap(u =>
     (u.nodes as Record<string, unknown>[]).flatMap((n) => 
       (n.proxies as Record<string, unknown>[]).map((p) => ({ ...p, nodeModel: n.deviceModel, ownerEmail: u.email }))
     )

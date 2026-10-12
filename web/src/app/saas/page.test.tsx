@@ -1,31 +1,22 @@
-import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import SaaSPage from './page';
-
-describe('SaaS Dashboard', () => {
-  it('Critério 1: Deve renderizar o título do painel corporativo', () => {
+afterEach(() => vi.unstubAllGlobals());
+describe('B2B sharing', () => {
+  it('loads real devices and submits a server-backed invitation', async () => {
+    const fetchMock = vi.fn(async (url: string, options?: RequestInit) => {
+      if (url === '/api/nodes') return { json: async () => ({ success: true, data: { nodes: [{ id: 'node-a', deviceName: 'Real device', visibility: 'PRIVATE', status: 'ONLINE' }] } }) };
+      if (url === '/api/auth/me') return { json: async () => ({ success: true, data: { id: 'owner' } }) };
+      if (options?.method === 'POST') return { ok: true };
+      return { json: async () => ({ success: true, data: { shares: [] } }) };
+    });
+    vi.stubGlobal('fetch', fetchMock);
     render(<SaaSPage />);
-    expect(screen.getByText('Painel Corporativo (SaaS)')).toBeInTheDocument();
-  });
-
-  it('Critério 2: Deve listar os nós privados do usuário', () => {
-    render(<SaaSPage />);
-    expect(screen.getByText('Seus Dispositivos (Nós Privados)')).toBeInTheDocument();
-    expect(screen.getByText('📱 Galaxy S23 (SP)')).toBeInTheDocument();
-  });
-
-  it('Critério 3: Deve permitir o compartilhamento de acesso (B2B)', () => {
-    const alertMock = vi.spyOn(window, 'alert').mockImplementation(() => {});
-    
-    render(<SaaSPage />);
-    const input = screen.getByPlaceholderText('Email do Gestor');
-    const button = screen.getByText('Convidar');
-    
-    fireEvent.change(input, { target: { value: 'gestor@agencia.com' } });
-    fireEvent.click(button);
-    
-    expect(alertMock).toHaveBeenCalledWith('Convite enviado para gestor@agencia.com');
-    
-    alertMock.mockRestore();
+    await screen.findByText('Real device — ONLINE');
+    fireEvent.change(screen.getByLabelText('Aparelho'), { target: { value: 'node-a' } });
+    fireEvent.change(screen.getByLabelText('Email do Gestor'), { target: { value: 'guest@example.com' } });
+    fireEvent.click(screen.getByText('Convidar'));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/shares', expect.objectContaining({ method: 'POST', body: JSON.stringify({ nodeId: 'node-a', email: 'guest@example.com', maxProxies: 1 }) })));
+    expect(await screen.findByText('Convite disponível para o destinatário')).toBeInTheDocument();
   });
 });

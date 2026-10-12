@@ -1,34 +1,17 @@
-import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAuth } from "@/lib/auth";
-import { apiError, apiSuccess } from "@/lib/api-utils";
+import { requireAdmin } from "@/lib/auth";
+import { apiSuccess, handleApiError } from "@/lib/api-utils";
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    const payload = await requireAuth();
-    
-    // Forçamos que o usuário seja o dono/Admin. (Comentado para facilitar seus testes).
-    // const user = await prisma.user.findUnique({ where: { id: payload.userId } });
-    // if (!user || user.role !== "ADMIN") return apiError("Acesso negado", 403);
-
-    const users = await prisma.user.findMany({
-      include: {
-        nodes: {
-          include: {
-            proxies: true
-          },
-          orderBy: { createdAt: "desc" }
-        },
-        subscriptions: {
-          orderBy: { createdAt: "desc" }
-        }
-      },
-      orderBy: { createdAt: "desc" }
-    });
-
+    await requireAdmin();
+    const users = await prisma.user.findMany({ select: {
+      id: true, email: true, role: true, disabled: true, balanceGB: true, hivePoints: true,
+      walletAddress: true, createdAt: true,
+      nodes: { select: { id: true, userId: true, deviceModel: true, visibility: true, status: true, type: true, createdAt: true, proxies: { select: { id: true, userId: true, nodeId: true, proxyUser: true,
+        status: true, totalBytesRx: true, totalBytesTx: true, createdAt: true } } } },
+      subscriptions: true,
+    }, orderBy: { createdAt: "desc" } });
     return apiSuccess({ users });
-  } catch (error) {
-    console.error("[API Admin] Erro:", error);
-    return apiError("Erro ao buscar dados do Admin", 500);
-  }
+  } catch (error) { return handleApiError(error); }
 }

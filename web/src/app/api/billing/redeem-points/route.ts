@@ -1,83 +1,26 @@
-// ==============================================================================
-// API Route: Billing - Redeem Points (Converter pontos miner → GB)
-// ==============================================================================
-
-import { NextRequest } from "next/server";
+import { z } from "zod";
 import { requireAuth } from "@/lib/auth";
-import { apiError, apiSuccess } from "@/lib/api-utils";
-import { prisma } from "@/lib/prisma";
+import { apiError, apiSuccess, handleApiError } from "@/lib/api-utils";
 import { getSystemSettings } from "@/lib/settings";
-
-export async function POST(request: NextRequest) {
+import { serializable } from "@/lib/transactions";
+export async function POST(request: Request) {
   try {
-    const authUser = await requireAuth();
-    const user = await prisma.user.findUnique({ where: { id: authUser.userId } });
-    if (!user) return apiError("Usuário não encontrado", 404);
-
-    const body = await request.json();
-    const { pointsToRedeem } = body;
-
-    if (!pointsToRedeem || pointsToRedeem <= 0) {
-      return apiError("Quantidade de pontos inválida", 400);
-    }
-
-    if (user.hivePoints < pointsToRedeem) {
-      return apiError(`Saldo insuficiente. Você tem ${user.hivePoints.toFixed(2)} pontos.`, 400);
-    }
-
-    // Buscar taxa de conversão das configurações do sistema
-    const settings = getSystemSettings();
-    const pointsPerGb = settings.crypto.pointsToHiveRate || 100; // padrão: 100 pontos = 1 GB
-
-    const gbToAdd = pointsToRedeem / pointsPerGb;
-
-    if (gbToAdd < 0.01) {
-      return apiError(`Mínimo de ${pointsPerGb} pontos para converter (= 1 GB).`, 400);
-    }
-
-    // Transação atômica: debitar pontos + creditar GB
-    await prisma.$transaction([
-      prisma.user.update({
-        where: { id: user.id },
-        data: {
-          hivePoints: { decrement: pointsToRedeem },
-          balanceGB: { increment: gbToAdd },
-        },
-      }),
-      prisma.pointsLedger.create({
-        data: {
-          userId: user.id,
-          amount: -pointsToRedeem,
-          type: "CLAIM",
-        },
-      }),
-      prisma.payment.create({
-        data: {
-          userId: user.id,
-          type: "PAY_PER_USE",
-          amountCents: 0, // gratuito, conversão de pontos
-          status: "PAID",
-          metadata: {
-            type: "points_redemption",
-            pointsRedeemed: pointsToRedeem,
-            gbAdded: gbToAdd,
-            rate: pointsPerGb,
-          },
-        },
-      }),
-    ]);
-
-    return apiSuccess({
-      pointsRedeemed: pointsToRedeem,
-      gbAdded: gbToAdd,
-      newBalance: {
-        points: user.hivePoints - pointsToRedeem,
-        gb: (user.balanceGB || 0) + gbToAdd,
-      },
+    const user = await requireAuth();
+    const parsed = z.object({ pointsToRedeem: z.number().finite().positive().max(1e12) }).safeParse(await request.json());
+    if (!parsed.success) return apiError("Quantidade inválida", 400);
+    const points = parsed.data.pointsToRedeem;
+    const settings = await getSystemSettings();
+    const gb = points / settings.crypto.pointsToHiveRate;
+    if (gb < 0.01) return apiError("Conversão mínima: 0,01 GB", 400);
+    const balance = await serializable(async tx => {
+      const debit = await tx.user.updateMany({ where: { id: user.userId, hivePoints: { gte: points } },
+        data: { hivePoints: { decrement: points }, balanceGB: { increment: gb } } });
+      if (!debit.count) throw new Error("Forbidden");
+      await tx.pointsLedger.create({ data: { userId: user.userId, amount: -points, type: "CLAIM" } });
+      await tx.payment.create({ data: { userId: user.userId, type: "PAY_PER_USE", status: "PAID", amountCents: 0,
+        metadata: { type: "points_redemption", pointsRedeemed: points, gbAdded: gb, rate: settings.crypto.pointsToHiveRate } } });
+      return tx.user.findUniqueOrThrow({ where: { id: user.userId }, select: { balanceGB: true, hivePoints: true } });
     });
-  } catch (error: unknown) {
-    console.error("[Billing/Redeem] Erro:", error);
-    if (error instanceof Error && error.message === "Unauthorized") return apiError("Não autorizado", 401);
-    return apiError("Erro ao converter pontos", 500);
-  }
+    return apiSuccess({ gbAdded: gb, pointsRedeemed: points, newBalance: { points: balance.hivePoints, gb: balance.balanceGB } });
+  } catch (error) { return handleApiError(error); }
 }

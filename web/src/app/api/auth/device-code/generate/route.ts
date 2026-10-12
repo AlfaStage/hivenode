@@ -10,7 +10,7 @@ function generateShortCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let result = "";
   for (let i = 0; i < 6; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
+    result += chars.charAt(crypto.randomInt(chars.length));
   }
   return result;
 }
@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     const deviceCode = crypto.randomBytes(32).toString("hex");
     const userCode = generateShortCode();
     const expiresAt = Date.now() + 5 * 60 * 1000; // 5 min expiry
-    const verificationUri = `https://${request.headers.get("host") || "hivenode.alfastage.com.br"}/dashboard/admin/device-approve`;
+    const verificationUri = `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/proxies`;
 
     const sessionData = {
       deviceCode,
@@ -37,8 +37,7 @@ export async function POST(request: NextRequest) {
       await redis.set(`device_auth:device:${deviceCode}`, JSON.stringify(sessionData), "EX", 300);
       await redis.set(`device_auth:user:${userCode}`, deviceCode, "EX", 300);
     } catch {
-      codeStore.set(deviceCode, sessionData);
-      codeStore.set(userCode, sessionData as any); // hacky map for memory fallback
+      return apiError("Serviço de vínculo indisponível", 503);
     }
 
     return apiSuccess({

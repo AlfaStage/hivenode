@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import QRCode from "react-qr-code";
+import { subscribeDashboard } from "@/lib/dashboard-client";
 import { 
   Shield, Plus, Activity, HardDrive, 
   Eye, EyeOff, TerminalSquare, QrCode, Trash2, Copy,
@@ -98,7 +99,8 @@ export default function ProxiesPage() {
     const isHttps = window.location.protocol === "https:";
     const wsProtocol = isHttps ? "wss://" : "ws://";
     const wsHost = isHttps ? "api.hivenode.alfastage.com.br" : `${window.location.hostname}:10001`;
-    const ws = new WebSocket(`${wsProtocol}${wsHost}/dashboard-stream`);
+    const ws = { onmessage: (_event: MessageEvent) => {} };
+    const unsubscribe = subscribeDashboard(event => ws.onmessage(event));
     
     ws.onmessage = (event) => {
       try {
@@ -131,7 +133,7 @@ export default function ProxiesPage() {
     }
     };
 
-    return () => ws.close();
+    return unsubscribe;
   }, [fetchData]);
 
   const handleGenerateQr = async () => {

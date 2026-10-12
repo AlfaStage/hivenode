@@ -6,6 +6,7 @@ import { NextRequest } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { apiError, apiSuccess } from "@/lib/api-utils";
 import { prisma } from "@/lib/prisma";
+import { encrypt, decrypt } from "@/lib/crypto";
 
 // GET: Verifica se existe uma key salva (NUNCA retorna a key)
 export async function GET() {
@@ -21,9 +22,9 @@ export async function GET() {
     });
 
     return apiSuccess({
-      hasApiKey: !!config?.value,
-      hasWebhookSecret: !!webhookConfig?.value,
-      apiKeyLastChars: config?.value ? `•••••${config.value.slice(-4)}` : null,
+      hasApiKey: !!config?.value || !!process.env.ABACATE_PAY_API_KEY,
+      hasWebhookSecret: !!webhookConfig?.value || !!process.env.ABACATE_PAY_WEBHOOK_SECRET,
+      apiKeyLastChars: config?.value ? `•••••${(decrypt(config.value) || config.value).slice(-4)}` : null,
       updatedAt: config?.updatedAt || null,
     });
   } catch (error: unknown) {
@@ -41,16 +42,16 @@ export async function POST(request: NextRequest) {
     if (body.apiKey) {
       await prisma.systemConfig.upsert({
         where: { key: "abacatepay_api_key" },
-        update: { value: body.apiKey },
-        create: { key: "abacatepay_api_key", value: body.apiKey },
+        update: { value: encrypt(body.apiKey) },
+        create: { key: "abacatepay_api_key", value: encrypt(body.apiKey) },
       });
     }
 
     if (body.webhookSecret) {
       await prisma.systemConfig.upsert({
         where: { key: "abacatepay_webhook_secret" },
-        update: { value: body.webhookSecret },
-        create: { key: "abacatepay_webhook_secret", value: body.webhookSecret },
+        update: { value: encrypt(body.webhookSecret) },
+        create: { key: "abacatepay_webhook_secret", value: encrypt(body.webhookSecret) },
       });
     }
 

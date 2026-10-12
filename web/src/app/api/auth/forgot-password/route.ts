@@ -23,7 +23,8 @@ export async function POST(request: NextRequest) {
 
     if (user) {
       const resetToken = await generatePasswordResetToken(user.id);
-      const origin = request.headers.get("origin") || request.nextUrl.origin || "https://hivenode.alfastage.com.br";
+      const origin = process.env.NEXT_PUBLIC_APP_URL;
+      if (!origin) throw new Error("NEXT_PUBLIC_APP_URL is required");
       const resetUrl = `${origin}/reset-password?token=${resetToken}`;
       await sendPasswordResetEmail(user.email, resetUrl);
     }

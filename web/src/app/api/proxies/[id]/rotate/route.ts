@@ -4,6 +4,7 @@ import { requireAuth } from "@/lib/auth";
 import { apiError, apiSuccess, generateSecureString } from "@/lib/api-utils";
 import { redis } from "@/lib/redis";
 import { bcryptHash, encrypt } from "@/lib/crypto";
+import { brokerCommand } from "@/lib/broker";
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -25,11 +26,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     
     await prisma.proxyCredential.update({
       where: { id },
-      data: { proxyPass: hashed }
+      data: { proxyPass: hashed, passwordEncrypted: encryptedRedis }
     });
     
     // Atualiza Redis atomicamente
-    await redis.set(`proxy:${proxy.proxyUser}`, `${proxy.node.id}:${encryptedRedis}`);
+    await redis.del(`proxy:${proxy.proxyUser}`);
+    await brokerCommand("/internal/revoke", { proxyId: id }).catch(console.error);
     
     return apiSuccess({
       proxyUser: proxy.proxyUser,

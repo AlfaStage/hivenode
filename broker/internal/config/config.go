@@ -23,9 +23,9 @@ func Load() *Config {
 		log.Println("Aviso: Arquivo .env não encontrado, usando variáveis de ambiente do sistema")
 	}
 
-	jwtSecret := os.Getenv("JWT_SECRET")
-	if jwtSecret == "" {
-		log.Fatalf("JWT_SECRET não configurada")
+	jwtSecret := os.Getenv("BROKER_INTERNAL_SECRET")
+	if len(jwtSecret) < 32 || os.Getenv("WEB_API_URL") == "" {
+		log.Fatalf("BROKER_INTERNAL_SECRET (32+ chars) and WEB_API_URL are required")
 	}
 
 	return &Config{

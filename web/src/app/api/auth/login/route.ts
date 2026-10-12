@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { verifyPassword, generateToken, setAuthCookie } from "@/lib/auth";
 import { loginSchema } from "@/lib/validations/auth";
 import { apiError, apiSuccess } from "@/lib/api-utils";
+import { rateLimit } from "@/lib/rate-limit";
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,6 +21,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { email, password } = parsed.data;
+    if (!await rateLimit("login", email.toLowerCase().trim())) return apiError("Muitas tentativas. Tente novamente mais tarde.", 429);
 
     // Buscar usuário
     const user = await prisma.user.findUnique({
@@ -32,10 +34,12 @@ export async function POST(request: NextRequest) {
         balanceGB: true,
         createdAt: true,
         tunnelSecret: true,
+        sessionVersion: true,
+        disabled: true,
       },
     });
 
-    if (!user) {
+    if (!user || user.disabled) {
       return apiError("E-mail ou senha incorretos", 401);
     }
 
@@ -46,7 +50,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Gerar JWT e setar cookie
-    const token = await generateToken(user.id, user.role, user.tunnelSecret ?? undefined);
+    const token = await generateToken(user.id, user.role, undefined, user.sessionVersion);
     await setAuthCookie(token);
 
     // Remover passwordHash do retorno

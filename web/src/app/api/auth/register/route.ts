@@ -31,10 +31,8 @@ export async function POST(request: NextRequest) {
       return apiError("Este e-mail já está cadastrado", 409);
     }
 
-    // Auto-promover para ADMIN se for domínio alfastage.com.br
-    const isAlfastageAdmin = email.toLowerCase().trim().endsWith("@alfastage.com.br");
-    const role = isAlfastageAdmin ? "ADMIN" : "CUSTOMER";
-    const balanceGB = isAlfastageAdmin ? 999999 : 0;
+    const role = "CUSTOMER";
+    const balanceGB = 0;
 
     // Criar o usuário
     const passwordHash = await hashPassword(password);

@@ -34,9 +34,14 @@ export async function POST(request: NextRequest) {
     }
 
     const newPasswordHash = await hashPassword(password);
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { passwordHash: newPasswordHash },
+    await prisma.$transaction(async tx => {
+      const consumed = await tx.oneTimeToken.deleteMany({ where: {
+        id: payload.id, userId: user.id, type: "password_reset", expiresAt: { gt: new Date() },
+      } });
+      if (consumed.count !== 1) throw new Error("Token já utilizado ou expirado");
+      await tx.user.update({ where: { id: user.id }, data: {
+        passwordHash: newPasswordHash, sessionVersion: { increment: 1 },
+      } });
     });
 
     return apiSuccess({

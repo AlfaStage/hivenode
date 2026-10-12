@@ -10,7 +10,7 @@ interface AdminNodesTabProps {
 }
 
 export function AdminNodesTab({ users, onUpdate }: AdminNodesTabProps) {
-  const nodes = users.flatMap(u => (u.nodes as Record<string, unknown>[]).map((n) => ({ ...n, ownerEmail: u.email })));
+  const nodes: Record<string, unknown>[] = users.flatMap(u => (u.nodes as Record<string, unknown>[]).map((n) => ({ ...n, ownerEmail: u.email })));
 
   const handleUpdateStatus = async (id: string, newStatus: string) => {
     try {
@@ -56,7 +56,7 @@ export function AdminNodesTab({ users, onUpdate }: AdminNodesTabProps) {
           </TableHeader>
           <TableBody>
             {nodes.map((node) => (
-              <TableRow key={node.id} className="border-[#27272e] hover:bg-[#1a1a20]/50">
+              <TableRow key={String(node.id)} className="border-[#27272e] hover:bg-[#1a1a20]/50">
                 <TableCell className="font-mono text-xs text-slate-500">{String(node.id).split("-")[0]}...</TableCell>
                 <TableCell className="text-slate-300">{String(node.ownerEmail)}</TableCell>
                 <TableCell className="text-slate-300">{String(node.deviceModel || "Desconhecido")}</TableCell>

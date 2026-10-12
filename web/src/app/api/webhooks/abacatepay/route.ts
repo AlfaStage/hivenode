@@ -1,165 +1,20 @@
-// ==============================================================================
-// API Route: Webhook AbacatePay v2 (Reescrito)
-// ==============================================================================
-
-import { NextRequest } from "next/server";
-import crypto from "crypto";
-import { prisma } from "@/lib/prisma";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { apiError, apiSuccess } from "@/lib/api-utils";
-
-function verifySignature(payload: string, signature: string, secret: string): boolean {
-  const expected = crypto.createHmac("sha256", secret).update(payload).digest("hex");
-  const a = Buffer.from(signature);
-  const b = Buffer.from(expected);
-  return a.length === b.length && crypto.timingSafeEqual(a, b);
-}
-
-export async function POST(request: NextRequest) {
+import { processPaymentEvent } from "@/lib/payment-events";
+import { prisma } from "@/lib/prisma";
+import { decrypt } from "@/lib/crypto";
+const publicKey = "t9dXRhHHo3yDEj5pVDYz0frf7q6bMKyMRmxxCPIPp3RCplBfXRxqlC6ZpiWmOqj4L63qEaeUOtrCI8P0VMUgo6iIga2ri9ogaHFs0WIIywSMg0q7RmBfybe1E5XJcfC4IW3alNqym0tXoAKkzvfEjZxV6bE0oG2zJrNNYmUCKZyV0KZ3JS8Votf9EAWWYdiDkMkpbMdPggfh1EqHlVkMiTady6jOR3hyzGEHrIz2Ret0xHKMbiqkr9HS1JhNHDX9";
+function equal(a: string, b: string) { return Buffer.byteLength(a) === Buffer.byteLength(b) && timingSafeEqual(Buffer.from(a), Buffer.from(b)); }
+export async function POST(request: Request) {
   try {
-    const rawBody = await request.text();
-    const signature = request.headers.get("x-abacate-signature") || "";
-
-    // Buscar secret do banco
-    let secret = "";
-    try {
-      const config = await prisma.systemConfig.findUnique({
-        where: { key: "abacatepay_webhook_secret" },
-      });
-      secret = config?.value || process.env.ABACATE_PAY_WEBHOOK_SECRET || "";
-    } catch {
-      secret = process.env.ABACATE_PAY_WEBHOOK_SECRET || "";
-    }
-
-    if (!secret) {
-      console.error("[Webhook] Erro: Webhook secret não configurado");
-      return apiError("Webhook secret not configured", 500);
-    }
-
-    if (!signature) {
-      console.warn("[Webhook] ⚠️ Assinatura ausente no request");
-      return apiError("Missing signature", 401);
-    }
-
-    // Validar HMAC
-    if (!verifySignature(rawBody, signature, secret)) {
-      console.warn("[Webhook] ⚠️ Assinatura HMAC inválida");
-      return apiError("Invalid signature", 401);
-    }
-
-    const event = JSON.parse(rawBody);
-
-    // FILTRO: Ignorar webhooks que NÃO são do sistema HiveNode
-    const metadata = event.data?.metadata || {};
-    if (metadata.system && metadata.system !== "hivenode") {
-      console.log(`[Webhook] Ignorado - sistema: ${metadata.system}`);
-      return apiSuccess({ received: true, ignored: true });
-    }
-
-    const eventType = event.type || event.event;
-    console.log(`[Webhook] Evento recebido: ${eventType}`);
-    const externalId = event.id || event.data?.id || crypto.randomUUID();
-
-    try {
-      await prisma.$transaction(async (tx) => {
-        // 1. Inserir idempotente
-        await tx.webhookEvent.create({
-          data: { externalId: `${externalId}:${eventType}`, eventType, payload: event }
-        });
-
-        // 2. Processamento real
-        switch (eventType) {
-          case "checkout.completed": {
-            const checkoutId = event.data?.id || event.data?.checkoutId;
-            const payment = await tx.payment.findUnique({ where: { abacateCheckoutId: checkoutId } });
-            if (payment) {
-              await tx.payment.update({ where: { id: payment.id }, data: { status: "PAID" } });
-              if (payment.planId) {
-                const plan = await tx.plan.findUnique({ where: { id: payment.planId } });
-                if (plan && plan.gbIncluded > 0) {
-                  await tx.user.update({
-                    where: { id: payment.userId },
-                    data: { balanceGB: { increment: plan.gbIncluded }, activePlanId: plan.id },
-                  });
-                }
-              }
-              await tx.node.updateMany({
-                where: { userId: payment.userId, status: "BLOCKED" },
-                data: { status: "OFFLINE" },
-              });
-            }
-            break;
-          }
-          case "checkout.refunded": {
-            const checkoutId = event.data?.id || event.data?.checkoutId;
-            const payment = await tx.payment.findUnique({ where: { abacateCheckoutId: checkoutId } });
-            if (payment) {
-              await tx.payment.update({ where: { id: payment.id }, data: { status: "REFUNDED" } });
-              if (payment.planId) {
-                const plan = await tx.plan.findUnique({ where: { id: payment.planId } });
-                if (plan && plan.gbIncluded > 0) {
-                  await tx.user.update({
-                    where: { id: payment.userId },
-                    data: { balanceGB: { decrement: plan.gbIncluded } },
-                  });
-                }
-              }
-            }
-            break;
-          }
-          case "subscription.completed":
-          case "subscription.renewed": {
-            const subId = event.data?.id || event.data?.subscriptionId;
-            const subscription = await tx.subscription.findUnique({ where: { abacatePaySubId: subId } });
-            if (subscription) {
-              const nextPeriod = new Date();
-              nextPeriod.setMonth(nextPeriod.getMonth() + 1);
-              await tx.subscription.update({
-                where: { id: subscription.id },
-                data: { status: "ACTIVE", currentPeriodEnd: nextPeriod },
-              });
-              if (subscription.planId) {
-                await tx.user.update({
-                  where: { id: subscription.userId },
-                  data: { activePlanId: subscription.planId },
-                });
-              }
-              await tx.payment.create({
-                data: {
-                  userId: subscription.userId,
-                  planId: subscription.planId,
-                  type: "SUBSCRIPTION",
-                  amountCents: event.data?.amount || 0,
-                  status: "PAID",
-                  abacateSubId: subId,
-                },
-              });
-            }
-            break;
-          }
-          case "subscription.cancelled": {
-            const subId = event.data?.id || event.data?.subscriptionId;
-            const subscription = await tx.subscription.findUnique({ where: { abacatePaySubId: subId } });
-            if (subscription) {
-              await tx.subscription.update({ where: { id: subscription.id }, data: { status: "CANCELED" } });
-            }
-            break;
-          }
-          default:
-            console.log(`[Webhook] Evento não tratado: ${eventType}`);
-        }
-      });
-    } catch (error: any) {
-      if (error.code === 'P2002') {
-        console.log(`[Webhook] Evento duplicado evitado: ${externalId}:${eventType}`);
-        return apiSuccess({ received: true, duplicate: true });
-      }
-      console.error("[Webhook] Erro processando transação:", error);
-      return apiError("Internal error", 500);
-    }
-
-    return apiSuccess({ received: true });
-  } catch (error) {
-    console.error("[Webhook] Erro crítico:", error);
-    return apiSuccess({ received: true }); // Retornar 200 para não re-enviar
-  }
+    const saved = await prisma.systemConfig.findUnique({ where: { key: "abacatepay_webhook_secret" } });
+    const secret = saved ? (decrypt(saved.value) || saved.value) : process.env.ABACATE_PAY_WEBHOOK_SECRET;
+    if (!secret) return apiError("Webhook not configured", 503);
+    if (!equal(new URL(request.url).searchParams.get("webhookSecret") || "", secret)) return apiError("Unauthorized", 401);
+    const raw = await request.text();
+    if (Buffer.byteLength(raw) > 1048576) return apiError("Payload too large", 413);
+    const expected = createHmac("sha256", publicKey).update(raw).digest("base64");
+    if (!equal(request.headers.get("x-webhook-signature") || "", expected)) return apiError("Invalid signature", 401);
+    return apiSuccess(await processPaymentEvent(JSON.parse(raw)));
+  } catch (error) { console.error("[Webhook] Processing failed", error); return apiError("Processing failed; retry required", 500); }
 }

@@ -2,9 +2,8 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
 import { apiError, apiSuccess } from "@/lib/api-utils";
-import Redis from "ioredis";
-
-const redis = new Redis(process.env.REDIS_URL || "redis://redis:6379");
+import { redis } from "@/lib/redis";
+import { brokerCommand } from "@/lib/broker";
 
 export async function DELETE(
   request: NextRequest,
@@ -30,6 +29,7 @@ export async function DELETE(
     // 2. Apaga da Memória RAM (Redis) para revogar acesso instantaneamente
     try {
       await redis.del(`proxy:${proxy.proxyUser}`);
+      await brokerCommand("/internal/revoke", { proxyId: proxy.id });
     } catch (e) {
       console.log("Falha ao apagar do Redis, acesso pode demorar alguns minutos para cair.");
     }

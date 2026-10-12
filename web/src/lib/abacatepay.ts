@@ -18,7 +18,7 @@ async function getApiKey(): Promise<string | null> {
     if (config?.value) {
       return decrypt(config.value) || config.value; // Fallback para não quebrar se estiver plaintext ainda
     }
-    return null;
+    return process.env.ABACATE_PAY_API_KEY || null;
   } catch {
     return process.env.ABACATE_PAY_API_KEY || null;
   }
@@ -36,6 +36,7 @@ async function abacateRequest(path: string, method: string = "GET", body?: unkno
       "Content-Type": "application/json",
     },
     body: body ? JSON.stringify(body) : undefined,
+    signal: AbortSignal.timeout(15000),
   });
 
   const data = await res.json();

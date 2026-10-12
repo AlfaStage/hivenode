@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { describe, it, expect, vi } from "vitest";
 import { hashPassword, verifyPassword, generateToken, verifyToken } from "@/lib/auth";
+import { SignJWT } from "jose";
 
 // Mock das variáveis de ambiente
 vi.stubEnv("JWT_SECRET", "super-secret-test-key-for-vitest-1234567890");
@@ -44,6 +45,12 @@ describe("Auth Library", () => {
 
     it("should throw an error for an invalid token", async () => {
       await expect(verifyToken("invalid.token.here")).rejects.toThrow();
+    });
+    it("rejects signed reset tokens as sessions", async () => {
+      const token = await new SignJWT({ userId: "victim", type: "password_reset" })
+        .setProtectedHeader({ alg: "HS256" }).setIssuer("hivenode").setAudience("password_reset")
+        .setExpirationTime("5m").sign(new TextEncoder().encode(process.env.JWT_SECRET));
+      await expect(verifyToken(token)).rejects.toThrow();
     });
   });
 });

@@ -22,6 +22,8 @@ export async function POST(request: NextRequest) {
     // Buscar plano
     const plan = await prisma.plan.findUnique({ where: { id: planId } });
     if (!plan) return apiError("Plano não encontrado", 404);
+    if (!plan.isPublic) return apiError("Plano indisponível", 403);
+    if (couponCode) return apiError("Cupons ainda não habilitados", 400);
     if (!plan.isRecurring) return apiError("Use /api/billing/checkout para compras únicas", 400);
     if (!plan.abacateProductId) return apiError("Plano não configurado no gateway de pagamento", 400);
     if (plan.isAdminOnly) return apiError("Este plano não está disponível para compra", 403);
@@ -62,8 +64,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const host = request.headers.get("host") || "hivenode.alfastage.com.br";
-    const returnUrl = `https://${host}/dashboard/billing`;
+    const returnUrl = `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/billing`;
 
     // Criar assinatura no AbacatePay
     const subRes = await createSubscription({

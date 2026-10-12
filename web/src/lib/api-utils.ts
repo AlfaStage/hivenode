@@ -1,17 +1,21 @@
-import { Queue } from "bullmq";
-import { redis } from "./redis";
-
-const errorQueue = new Queue("error-alerts", { connection: redis });
-
 export function apiError(message: string, status: number = 400) {
   if (status === 500) {
-    errorQueue.add("error-alert", { message }).catch(console.error);
+    console.error(JSON.stringify({ level: "error", message }));
   }
   return Response.json({ error: message, success: false }, { status });
 }
 
 export function apiSuccess<T>(data: T, status: number = 200) {
-  return Response.json({ data, success: true, error: null }, { status });
+  return new Response(JSON.stringify({ data, success: true, error: null }, (_key, value) =>
+    typeof value === "bigint" ? value.toString() : value), {
+    status, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
+  });
+}
+
+export function handleApiError(error: unknown) {
+  const message = error instanceof Error ? error.message : "Erro interno";
+  const status = message === "Unauthorized" ? 401 : message === "Forbidden" ? 403 : 500;
+  return apiError(status === 500 ? "Erro interno do servidor" : message, status);
 }
 
 export function generateSecureString(length: number = 16): string {

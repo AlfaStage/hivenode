@@ -14,11 +14,13 @@ const globalForPrisma = globalThis as unknown as {
 };
 
 function createPrismaClient(): PrismaClient {
-  const dbUrl = process.env.DATABASE_URL || "postgresql://hivenode_user:hivenode_dev_2026@localhost:5432/hivenode";
-  const cleanUrl = dbUrl.split("?")[0]; // Remove query params to avoid pg-pool SCRAM issue
+  const dbUrl = process.env.DATABASE_URL;
+  if (!dbUrl) throw new Error("DATABASE_URL is required");
 
   const pool = new pg.Pool({
-    connectionString: cleanUrl,
+    connectionString: dbUrl,
+    max: 10,
+    connectionTimeoutMillis: 5000,
   });
 
   const adapter = new PrismaPg(pool);
@@ -26,7 +28,7 @@ function createPrismaClient(): PrismaClient {
   return new PrismaClient({
     adapter,
     log:
-      process.env.NODE_ENV === "development"
+      process.env.PRISMA_QUERY_LOG === "true"
         ? ["query", "error", "warn"]
         : ["error"],
   });

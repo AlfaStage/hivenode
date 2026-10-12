@@ -1,162 +1,89 @@
-// ==============================================================================
-// Auth Helpers — JWT + Bcrypt
-// ==============================================================================
-// Funções utilitárias para autenticação: hashing de senhas e tokens JWT.
-// ==============================================================================
-
+import { randomUUID } from "node:crypto";
 import { SignJWT, jwtVerify, type JWTPayload } from "jose";
-import bcryptjs from "bcryptjs";
+import bcrypt from "bcryptjs";
 import { cookies, headers } from "next/headers";
-
-// ==============================================================================
-// Tipos
-// ==============================================================================
 
 export interface TokenPayload extends JWTPayload {
   userId: string;
   role: string;
-  tunnelSecret?: string;
+  version: number;
+  type: string;
 }
 
-// ==============================================================================
-// Password Hashing (bcrypt)
-// ==============================================================================
-
-const SALT_ROUNDS = 12;
-
-export async function hashPassword(password: string): Promise<string> {
-  return bcryptjs.hash(password, SALT_ROUNDS);
+const issuer = "hivenode";
+const cookieName = "hivenode-token";
+function secret() {
+  const value = process.env.JWT_SECRET;
+  if (!value || value.length < 32) throw new Error("JWT_SECRET must contain at least 32 characters");
+  return new TextEncoder().encode(value);
 }
 
-export async function verifyPassword(
-  password: string,
-  hash: string
-): Promise<boolean> {
-  return bcryptjs.compare(password, hash);
-}
+export const hashPassword = (password: string) => bcrypt.hash(password, 12);
+export const verifyPassword = (password: string, hash: string) => bcrypt.compare(password, hash);
 
-// ==============================================================================
-// JWT Token Management
-// ==============================================================================
-
-function getJwtSecret(): Uint8Array {
-  const secret = process.env.JWT_SECRET;
-  if (!secret) {
-    throw new Error("JWT_SECRET environment variable is not set");
-  }
-  return new TextEncoder().encode(secret);
-}
-
-export async function generateToken(
-  userId: string,
-  role: string,
-  tunnelSecret?: string
-): Promise<string> {
-  const token = await new SignJWT({ userId, role, tunnelSecret })
-    .setProtectedHeader({ alg: "HS256" })
-    .setIssuedAt()
-    .setExpirationTime("7d")
-    .sign(getJwtSecret());
-
-  return token;
-}
-
-export async function generateQrLinkToken(userId: string): Promise<string> {
-  const token = await new SignJWT({ userId, type: "qr_link" })
-    .setProtectedHeader({ alg: "HS256" })
-    .setIssuedAt()
-    .setExpirationTime("5m") // Expira super rápido
-    .sign(getJwtSecret());
-
-  return token;
-}
-
-export async function generatePasswordResetToken(userId: string): Promise<string> {
-  const token = await new SignJWT({ userId, type: "password_reset" })
-    .setProtectedHeader({ alg: "HS256" })
-    .setIssuedAt()
-    .setExpirationTime("15m") // Expira em 15 minutos
-    .sign(getJwtSecret());
-
-  return token;
-}
-
-export async function verifyPasswordResetToken(token: string): Promise<{ userId: string } | null> {
-  try {
-    const { payload } = await jwtVerify(token, getJwtSecret());
-    if (payload.type !== "password_reset" || typeof payload.userId !== "string") {
-      return null;
-    }
-    return { userId: payload.userId };
-  } catch {
-    return null;
-  }
+export async function generateToken(userId: string, role: string, _legacySecret?: string, version = 0, scope = "web") {
+  return new SignJWT({ userId, role, version, type: "session", scope })
+    .setProtectedHeader({ alg: "HS256" }).setIssuer(issuer).setAudience("web")
+    .setJti(randomUUID()).setIssuedAt().setExpirationTime("7d").sign(secret());
 }
 
 export async function verifyToken(token: string): Promise<TokenPayload> {
-  const { payload } = await jwtVerify(token, getJwtSecret());
+  const { payload } = await jwtVerify(token, secret(), { algorithms: ["HS256"], issuer, audience: "web" });
+  if (payload.type !== "session" || typeof payload.userId !== "string" ||
+      !["ADMIN", "CUSTOMER"].includes(String(payload.role)) || !Number.isInteger(payload.version)) {
+    throw new Error("Unauthorized");
+  }
   return payload as TokenPayload;
 }
 
-// ==============================================================================
-// Cookie Management (Server-side)
-// ==============================================================================
+async function issueOneTime(userId: string, type: string, seconds: number) {
+  const { prisma } = await import("./prisma");
+  const id = randomUUID();
+  await prisma.oneTimeToken.create({ data: { id, userId, type, expiresAt: new Date(Date.now() + seconds * 1000) } });
+  return new SignJWT({ userId, type }).setProtectedHeader({ alg: "HS256" })
+    .setIssuer(issuer).setAudience(type).setJti(id).setIssuedAt()
+    .setExpirationTime(`${seconds}s`).sign(secret());
+}
+export const generateQrLinkToken = (userId: string) => issueOneTime(userId, "qr_link", 300);
+export const generatePasswordResetToken = (userId: string) => issueOneTime(userId, "password_reset", 900);
 
-const TOKEN_COOKIE_NAME = "hivenode-token";
-
-export async function setAuthCookie(token: string): Promise<void> {
-  const cookieStore = await cookies();
-  cookieStore.set(TOKEN_COOKIE_NAME, token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: 60 * 60 * 24 * 7, // 7 dias
-    path: "/",
-  });
+export async function verifyOneTimeToken(token: string, type: string) {
+  const { payload } = await jwtVerify(token, secret(), { algorithms: ["HS256"], issuer, audience: type });
+  if (payload.type !== type || typeof payload.userId !== "string" || !payload.jti) throw new Error("Unauthorized");
+  return { userId: payload.userId, id: payload.jti };
 }
 
-export async function getAuthCookie(): Promise<string | undefined> {
-  const cookieStore = await cookies();
-  return cookieStore.get(TOKEN_COOKIE_NAME)?.value;
+export async function verifyPasswordResetToken(token: string) {
+  try { return await verifyOneTimeToken(token, "password_reset"); } catch { return null; }
 }
 
-export async function removeAuthCookie(): Promise<void> {
-  const cookieStore = await cookies();
-  cookieStore.delete(TOKEN_COOKIE_NAME);
+export async function setAuthCookie(token: string) {
+  (await cookies()).set(cookieName, token, { httpOnly: true, secure: process.env.NODE_ENV === "production",
+    sameSite: "lax", maxAge: 604800, path: "/" });
 }
-
-// ==============================================================================
-// Auth Middleware Helper
-// ==============================================================================
+export async function getAuthCookie() { return (await cookies()).get(cookieName)?.value; }
+export async function removeAuthCookie() { (await cookies()).delete(cookieName); }
 
 export async function getAuthenticatedUser(): Promise<TokenPayload | null> {
   try {
-    const headersList = await headers();
-    const authHeader = headersList.get("authorization");
-    if (authHeader && authHeader.startsWith("Bearer ")) {
-      return await verifyToken(authHeader.split(" ")[1]);
-    }
-
-    const token = await getAuthCookie();
+    const bearer = (await headers()).get("authorization");
+    const token = bearer?.startsWith("Bearer ") ? bearer.slice(7) : await getAuthCookie();
     if (!token) return null;
-    return await verifyToken(token);
-  } catch {
-    return null;
-  }
+    const payload = await verifyToken(token);
+    const { prisma } = await import("./prisma");
+    const user = await prisma.user.findUnique({ where: { id: payload.userId },
+      select: { role: true, sessionVersion: true, disabled: true } });
+    if (!user || user.disabled || user.sessionVersion !== payload.version) return null;
+    return { ...payload, role: payload.scope === "device" ? "CUSTOMER" : user.role };
+  } catch { return null; }
 }
-
-export async function requireAuth(): Promise<TokenPayload> {
+export async function requireAuth() {
   const user = await getAuthenticatedUser();
-  if (!user) {
-    throw new Error("Unauthorized");
-  }
+  if (!user) throw new Error("Unauthorized");
   return user;
 }
-
-export async function requireAdmin(): Promise<TokenPayload> {
+export async function requireAdmin() {
   const user = await requireAuth();
-  if (user.role !== "ADMIN") {
-    throw new Error("Forbidden");
-  }
+  if (user.role !== "ADMIN") throw new Error("Forbidden");
   return user;
 }

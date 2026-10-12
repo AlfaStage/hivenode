@@ -6,7 +6,7 @@ import { getSystemSettings, updateSystemSettings } from "@/lib/settings";
 export async function GET() {
   try {
     await requireAdmin();
-    const settings = getSystemSettings();
+    const settings = await getSystemSettings();
     return apiSuccess({ settings });
   } catch (error) {
     return apiError("Erro ao carregar configurações do sistema", 500);
@@ -18,7 +18,7 @@ export async function PUT(request: NextRequest) {
     await requireAdmin();
     const body = await request.json();
 
-    const updated = updateSystemSettings(body);
+    const updated = await updateSystemSettings(body);
     return apiSuccess({ settings: updated, message: "Configurações salvas com sucesso!" });
   } catch (error) {
     return apiError("Erro ao atualizar configurações", 500);

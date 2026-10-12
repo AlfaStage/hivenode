@@ -21,7 +21,7 @@ export async function GET() {
           {
             slug: "plano-cortesia",
             name: "Plano Cortesia / Admin",
-            category: "PROXIES",
+            category: "PRIVATE_FLEET",
             priceInCents: 0,
             gbIncluded: 100,
             isPublic: false,
@@ -30,7 +30,7 @@ export async function GET() {
           {
             slug: "plano-starter",
             name: "Plano Starter",
-            category: "PROXIES",
+            category: "PRIVATE_FLEET",
             priceInCents: 2990,
             gbIncluded: 20,
             isPublic: true,
@@ -38,7 +38,7 @@ export async function GET() {
           {
             slug: "plano-pro",
             name: "Plano Pro",
-            category: "PROXIES",
+            category: "PRIVATE_FLEET",
             priceInCents: 8990,
             gbIncluded: 100,
             isPublic: true,
