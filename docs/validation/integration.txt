@@ -1,0 +1,22 @@
+
+> hivenode-web@1.1.0 test:integration
+> tsx scripts/local-integration.ts
+
+PASS 1: public registration never grants admin
+PASS 2: admin data and retired reset endpoint protected
+PASS 3: administrative mutation endpoints preserve HTTP authorization semantics
+PASS 4: device approval cannot be overwritten and concurrent polling consumes the code once
+PASS 5: customers can read commercial plans
+PASS 6: device registration is idempotent
+PASS 7: cross-tenant proxy creation rejected
+PASS 8: concurrent SOCKS5 streams route exclusively to authorized device; DNS name preserved
+PASS 9: copied proxy password is usable, not bcrypt hash
+PASS 10: rotation rejects old password and accepts new password
+PASS 11: administrative block stops real access
+PASS 12: password-reset JWT cannot act as session
+PASS 13: pairing token single use and device session cannot administer
+PASS 14: concurrent redemption never overspends points
+PASS 15: replayed metered traffic debits the consumer and rewards the supplier exactly once
+PASS 16: multiple renewals recorded once each
+PASS 17: proxy consumption persisted with exact per-credential byte totals
+LOCAL INTEGRATION: 17 checks passed

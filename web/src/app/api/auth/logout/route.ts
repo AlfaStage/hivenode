@@ -2,10 +2,10 @@
 // API Route: POST /api/auth/logout
 // ==============================================================================
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { removeAuthCookie } from "@/lib/auth";
 
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
     await removeAuthCookie();
     return NextResponse.json({ success: true });

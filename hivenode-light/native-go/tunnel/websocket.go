@@ -1,363 +1,323 @@
 package tunnel
 
 import (
-    "context"
-    "crypto/tls"
-    "encoding/json"
-    "errors"
-    "fmt"
-    "log"
-    "net"
-    "net/http"
-    "sync"
-    "time"
-    "math/rand"
-    "strconv"
-    "strings"
-
-    "github.com/gorilla/websocket"
-    "github.com/hivenode/light/auth"
-    "github.com/hivenode/light/stats"
+	"context"
+	"crypto/tls"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"github.com/gorilla/websocket"
+	"github.com/hivenode/light/auth"
+	"github.com/hivenode/light/stats"
+	"net"
+	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
 )
 
-// Client é o lado Android do túnel (apedars equidistante do broker).
 type Client struct {
-    brokerHost string       // ex: "broker.hivenode.alfastage.com.br"
-    nodeID     string
-    tunnelSecret []byte     // segredo HMAC
-    stats      *stats.Counter
-
-    mu        sync.Mutex
-    ws        *websocket.Conn
-    isClosed  bool
-    stopCh    chan struct{}
-    onDisconnect func(reason string)   // callback p/ Java (via gomobile)
-
-    // conexões TCP ativas (por connID)
-    connsMu sync.Mutex
-    conns   map[string]*activeConn
-    
-    dns       *DNSCache
-    disconnected chan struct{}
+	brokerHost, nodeID string
+	tunnelSecret       []byte
+	stats              *stats.Counter
+	mu                 sync.Mutex
+	session            *session
+	stopCh             chan struct{}
+	stopOnce           sync.Once
+	onDisconnect       func(string)
+	dns                *DNSCache
 }
 
+// Every pending dial and TCP stream belongs exclusively to one WebSocket session.
+type session struct {
+	ws      *websocket.Conn
+	ctx     context.Context
+	cancel  context.CancelFunc
+	writeMu sync.Mutex
+	connsMu sync.Mutex
+	conns   map[string]*activeConn
+	pending map[string]context.CancelFunc
+}
 type activeConn struct {
-    connID  string
-    tcpConn net.Conn
-    cancel  context.CancelFunc
+	connID  string
+	tcpConn net.Conn
+	session *session
 }
 
-// NewClient devolve um cliente WS.
-func NewClient(brokerHost, nodeID string, secret []byte, onDisconnect func(string)) *Client {
-    return &Client{
-        brokerHost:    brokerHost,
-        nodeID:        nodeID,
-        tunnelSecret:  secret,
-        stats:         stats.NewCounter(),
-        stopCh:        make(chan struct{}),
-        conns:         make(map[string]*activeConn),
-        onDisconnect:  onDisconnect,
-        dns:           NewDNSCache(),
-        disconnected: make(chan struct{}, 1),
-    }
+func NewClient(host, id string, secret []byte, onDisconnect func(string)) *Client {
+	return &Client{brokerHost: host, nodeID: id, tunnelSecret: secret, stats: stats.NewCounter(), stopCh: make(chan struct{}), onDisconnect: onDisconnect, dns: NewDNSCache()}
 }
-
-// connect dispara a conexão WS com retry exponencial.
-// Referência do broker endpoint: broker/cmd/broker/main.go:40 -- mux.HandleFunc("/tunnel", HandleWS).
-func (c *Client) connect(ctx context.Context) error {
-    timestamp := strconv.FormatInt(time.Now().Unix(), 10)
-    sig := auth.BuildSig(c.nodeID+":"+timestamp, c.tunnelSecret)
-    base := c.brokerHost
-    if !strings.Contains(base, "://") { base = "wss://"+base }
-    url := fmt.Sprintf("%s/tunnel?nodeId=%s&ts=%s&sig=%s", base, c.nodeID, timestamp, sig)
-
-    dialer := websocket.Dialer{
-        TLSClientConfig:  &tls.Config{MinVersion: tls.VersionTLS12},
-        HandshakeTimeout: 10 * time.Second,
-        ReadBufferSize:   32 * 1024, // == broker
-        WriteBufferSize:  32 * 1024,
-    }
-
-    conn, _, err := dialer.DialContext(ctx, url, http.Header{})
-    if err != nil {
-        return err
-    }
-
-    c.mu.Lock()
-    c.ws = conn
-    c.mu.Unlock()
-
-    go c.readLoop(ctx)
-    return nil
+func (c *Client) connect(ctx context.Context) (*session, error) {
+	base := strings.TrimRight(c.brokerHost, "/")
+	if !strings.Contains(base, "://") {
+		base = "wss://" + base
+	}
+	timestamp := strconv.FormatInt(time.Now().Unix(), 10)
+	address := base + "/tunnel?" + url.Values{"nodeId": {c.nodeID}, "ts": {timestamp}, "sig": {auth.BuildSig(c.nodeID+":"+timestamp, c.tunnelSecret)}}.Encode()
+	dialer := websocket.Dialer{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS12}, HandshakeTimeout: 10 * time.Second}
+	ws, response, err := dialer.DialContext(ctx, address, http.Header{})
+	if response != nil && response.Body != nil {
+		response.Body.Close()
+	}
+	if err != nil {
+		return nil, err
+	}
+	sessionCtx, cancel := context.WithCancel(ctx)
+	s := &session{ws: ws, ctx: sessionCtx, cancel: cancel, conns: make(map[string]*activeConn), pending: make(map[string]context.CancelFunc)}
+	ws.SetReadLimit(1048576)
+	ws.SetReadDeadline(time.Now().Add(75 * time.Second))
+	ws.SetPingHandler(func(payload string) error {
+		ws.SetReadDeadline(time.Now().Add(75 * time.Second))
+		return ws.WriteControl(websocket.PongMessage, []byte(payload), time.Now().Add(10*time.Second))
+	})
+	c.mu.Lock()
+	select {
+	case <-c.stopCh:
+		c.mu.Unlock()
+		s.close()
+		return nil, errors.New("stopped")
+	default:
+	}
+	c.session = s
+	c.mu.Unlock()
+	go func() { <-sessionCtx.Done(); ws.Close() }()
+	return s, nil
 }
-
-// Start entrada principal - tem retry com backoff.
-// O usuario (Java) chama via gomobile Start(host, nodeID, secret).
 func (c *Client) Start(ctx context.Context) error {
-    backoff := 1 * time.Second
-    for {
-        select {
-        case <-ctx.Done():
-            return ctx.Err()
-        case <-c.stopCh:
-            return errors.New("stopped")
-        default:
-        }
-
-        err := c.connect(ctx)
-        if err == nil {
-            log.Printf("ligado no broker %s como nodeId=%s", c.brokerHost, c.nodeID)
-            select {
-            case <-ctx.Done(): return ctx.Err()
-            case <-c.stopCh: return errors.New("stopped")
-            case <-c.disconnected:
-            }
-            backoff = 1 * time.Second
-            continue
-        }
-        log.Printf("erro connect: %v - retry em %v", err, backoff)
-        // jitter +/- 30%
-        jitter := time.Duration(rand.Int63n(int64(backoff) * 30 / 100))
-        select { case <-time.After(backoff + jitter): case <-ctx.Done(): return ctx.Err(); case <-c.stopCh: return errors.New("stopped") }
-        if backoff < 30*time.Second {
-            backoff *= 2
-        }
-    }
+	defer c.Stop()
+	backoff := time.Second
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-c.stopCh:
+			return errors.New("stopped")
+		default:
+		}
+		started := time.Now()
+		s, err := c.connect(ctx)
+		if err == nil {
+			err = c.readLoop(s)
+			c.mu.Lock()
+			if c.session == s {
+				c.session = nil
+			}
+			c.mu.Unlock()
+			s.close()
+			if c.onDisconnect != nil {
+				c.onDisconnect(err.Error())
+			}
+			var closeError *websocket.CloseError
+			if errors.As(err, &closeError) && closeError.Text == "KICKED" {
+				return err
+			}
+			if time.Since(started) > 30*time.Second {
+				backoff = time.Second
+			}
+		}
+		timer := time.NewTimer(backoff)
+		select {
+		case <-timer.C:
+		case <-ctx.Done():
+			timer.Stop()
+			return ctx.Err()
+		case <-c.stopCh:
+			timer.Stop()
+			return errors.New("stopped")
+		}
+		if backoff < 30*time.Second {
+			backoff *= 2
+			if backoff > 30*time.Second {
+				backoff = 30 * time.Second
+			}
+		}
+	}
 }
-
-// pingLoop envia ping 60s p/ detectar conexões mortas mesmo em 3G que caiu.
-func (c *Client) pingLoop(ctx context.Context) {
-    ticker := time.NewTicker(60 * time.Second)
-    defer ticker.Stop()
-    for {
-        select {
-        case <-ctx.Done():
-            return
-        case <-ticker.C:
-            c.mu.Lock()
-            if c.ws != nil {
-                _ = c.ws.WriteMessage(websocket.PingMessage, nil)
-            }
-            c.mu.Unlock()
-        }
-    }
+func (s *session) send(kind int, data []byte) error {
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
+	if s.ctx.Err() != nil {
+		return s.ctx.Err()
+	}
+	s.ws.SetWriteDeadline(time.Now().Add(10 * time.Second))
+	err := s.ws.WriteMessage(kind, data)
+	if err != nil {
+		s.cancel()
+	}
+	return err
 }
-
-// readLoop processa mensagens do broker.
-// 2 tipos:
-//   - BinaryMessage: [idLen][connId][payload] - dados TCP do SOCKS5 client.
-//   - TextMessage (JSON): DIAL, CLOSE, etc.
-// Referência: broker/internal/tunnel/websocket.go linhas 273-438 (lado server).
-func (c *Client) readLoop(ctx context.Context) {
-    for {
-        c.mu.Lock()
-        ws := c.ws
-        c.mu.Unlock()
-        if ws == nil {
-            return
-        }
-
-        msgType, msg, err := ws.ReadMessage()
-        if err != nil {
-            log.Printf("WS read erro: %v", err)
-            c.mu.Lock()
-            if c.ws == ws { c.ws = nil }
-            c.mu.Unlock()
-            ws.Close()
-            c.cleanupConns()
-            if c.onDisconnect != nil {
-                c.onDisconnect(err.Error())
-            }
-            select { case c.disconnected <- struct{}{}: default: }
-            return
-        }
-
-        switch msgType {
-        case websocket.BinaryMessage:
-            c.handleBinary(msg)
-        case websocket.TextMessage:
-            c.handleControl(msg)
-        }
-    }
+func (s *session) json(message interface{}) {
+	data, err := json.Marshal(message)
+	if err == nil {
+		s.send(websocket.TextMessage, data)
+	}
 }
-
-// handleBinary recebe [idLen][connId][payload] e escreve no TCP real.
-// Espelho de hivedocker/server.js linhas 56-66.
-func (c *Client) handleBinary(msg []byte) {
-    if len(msg) < headerIDLen {
-        return
-    }
-    idLen := int(msg[0])
-    if len(msg) < headerIDLen+idLen {
-        return
-    }
-    connID := string(msg[headerIDLen : headerIDLen+idLen])
-    payload := msg[headerIDLen+idLen:]
-
-    c.connsMu.Lock()
-    ac, ok := c.conns[connID]
-    c.connsMu.Unlock()
-    if !ok {
-        return // conn já fechada ou desconhecida
-    }
-
-    _, _ = ac.tcpConn.Write(payload)
-    c.stats.AddRx(len(payload))
+func (s *session) close() {
+	s.cancel()
+	s.ws.Close()
+	s.connsMu.Lock()
+	defer s.connsMu.Unlock()
+	for _, cancel := range s.pending {
+		cancel()
+	}
+	for id, conn := range s.conns {
+		conn.tcpConn.Close()
+		delete(s.conns, id)
+	}
 }
-
-// handleControl parse dos JSONs.
-// Referência: broker/internal/tunnel/websocket.go linhas 314-407.
-func (c *Client) handleControl(msg []byte) {
-    var ctrl map[string]interface{}
-    if err := json.Unmarshal(msg, &ctrl); err != nil {
-        return
-    }
-    t, _ := ctrl["type"].(string)
-    connID, _ := ctrl["connId"].(string)
-    switch t {
-    case MsgTypeDial:
-        dest, _ := ctrl["host"].(string)
-        go c.handleDial(connID, dest)
-    case MsgTypeClose:
-        c.closeConn(connID)
-    }
+func (c *Client) readLoop(s *session) error {
+	for {
+		kind, data, err := s.ws.ReadMessage()
+		if err != nil {
+			return err
+		}
+		s.ws.SetReadDeadline(time.Now().Add(75 * time.Second))
+		if kind == websocket.BinaryMessage {
+			if len(data) < 2 || data[0] == 0 || len(data) < 1+int(data[0]) {
+				continue
+			}
+			id := string(data[1 : 1+int(data[0])])
+			s.connsMu.Lock()
+			ac := s.conns[id]
+			s.connsMu.Unlock()
+			if ac != nil {
+				ac.tcpConn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+				n, err := ac.tcpConn.Write(data[1+int(data[0]):])
+				c.stats.AddRx(n)
+				if err != nil {
+					c.closeConn(ac)
+				}
+			}
+			continue
+		}
+		var message map[string]string
+		if json.Unmarshal(data, &message) != nil {
+			continue
+		}
+		id := message["connId"]
+		if message["type"] == MsgTypeClose {
+			s.connsMu.Lock()
+			ac := s.conns[id]
+			cancel := s.pending[id]
+			s.connsMu.Unlock()
+			if cancel != nil {
+				cancel()
+			}
+			if ac != nil {
+				c.closeConn(ac)
+			}
+		} else if message["type"] == MsgTypeDial {
+			if len(id) == 0 || len(id) > 64 {
+				continue
+			}
+			s.connsMu.Lock()
+			if s.conns[id] != nil || s.pending[id] != nil {
+				s.connsMu.Unlock()
+				continue
+			}
+			if len(s.conns)+len(s.pending) >= 64 {
+				s.connsMu.Unlock()
+				s.json(map[string]string{"type": MsgTypeDialErr, "connId": id})
+				continue
+			}
+			ctx, cancel := context.WithTimeout(s.ctx, 10*time.Second)
+			s.pending[id] = cancel
+			s.connsMu.Unlock()
+			go c.handleDial(ctx, s, id, message["host"])
+		}
+	}
 }
-
-// handleDial abre TCP destination, diz DIAL_OK/DIAL_ERR p/ broker.
-func (c *Client) handleDial(connID, dest string) {
-    if connID == "" || dest == "" {
-        return
-    }
-    
-    // DNS resolving usando nosso cache LRU
-    host, port, err := net.SplitHostPort(dest)
-    if err != nil {
-        host = dest
-        port = "80" // default port se erro split, só p/ não quebrar
-    }
-    
-    ips, err := c.dns.Resolve(host)
-    if err != nil || len(ips) == 0 {
-        c.sendJSON(map[string]interface{}{
-            "type":    MsgTypeDialErr,
-            "connId":  connID,
-            "reason":  "dns resolve error",
-        })
-        return
-    }
-    
-    ip := ips[rand.Intn(len(ips))]
-    if !ip.IsGlobalUnicast() || ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast() {
-        c.sendJSON(map[string]interface{}{"type": MsgTypeDialErr, "connId": connID, "reason": "private destination blocked"})
-        return
-    }
-    target := net.JoinHostPort(ip.String(), port)
-    
-    dialer := &net.Dialer{Timeout: 10 * time.Second}
-    tcp, err := dialer.Dial("tcp", target)
-    if err != nil {
-        c.sendJSON(map[string]interface{}{
-            "type":    MsgTypeDialErr,
-            "connId":  connID,
-            "reason":  err.Error(),
-        })
-        return
-    }
-
-    ctx, cancel := context.WithCancel(context.Background())
-    ac := &activeConn{connID: connID, tcpConn: tcp, cancel: cancel}
-
-    c.connsMu.Lock()
-    c.conns[connID] = ac
-    c.connsMu.Unlock()
-
-    c.sendJSON(map[string]interface{}{
-        "type":   MsgTypeDialOK,
-        "connId": connID,
-    })
-
-    go c.pump(ctx, ac)
+func publicIP(ip net.IP) bool {
+	return ip.IsGlobalUnicast() && !ip.IsPrivate() && !ip.IsLoopback() && !ip.IsLinkLocalUnicast() &&
+		!(ip.To4() != nil && (ip.To4()[0] == 0 || (ip.To4()[0] == 100 && ip.To4()[1] >= 64 && ip.To4()[1] <= 127)))
 }
-
-func (c *Client) sendJSON(m map[string]interface{}) {
-    c.mu.Lock()
-    defer c.mu.Unlock()
-    if c.ws != nil {
-        _ = c.ws.WriteJSON(m)
-    }
+func (c *Client) handleDial(ctx context.Context, s *session, id, dest string) {
+	defer func() {
+		s.connsMu.Lock()
+		if cancel := s.pending[id]; cancel != nil {
+			cancel()
+			delete(s.pending, id)
+		}
+		s.connsMu.Unlock()
+	}()
+	fail := func() { s.json(map[string]string{"type": MsgTypeDialErr, "connId": id}) }
+	host, port, err := net.SplitHostPort(dest)
+	number, portErr := strconv.Atoi(port)
+	if err != nil || portErr != nil || number < 1 || number > 65535 {
+		fail()
+		return
+	}
+	ips, err := c.dns.ResolveContext(ctx, host)
+	if err != nil || len(ips) == 0 {
+		fail()
+		return
+	}
+	for _, ip := range ips {
+		if !publicIP(ip) {
+			fail()
+			return
+		}
+	}
+	tcp, err := (&net.Dialer{Timeout: 10 * time.Second}).DialContext(ctx, "tcp", net.JoinHostPort(ips[0].String(), port))
+	if err != nil {
+		fail()
+		return
+	}
+	ac := &activeConn{connID: id, tcpConn: tcp, session: s}
+	s.connsMu.Lock()
+	if ctx.Err() != nil {
+		s.connsMu.Unlock()
+		tcp.Close()
+		return
+	}
+	s.conns[id] = ac
+	s.connsMu.Unlock()
+	s.json(map[string]string{"type": MsgTypeDialOK, "connId": id})
+	go c.pump(ac)
 }
-
-func (c *Client) closeConn(connID string) {
-    c.connsMu.Lock()
-    ac, ok := c.conns[connID]
-    if ok {
-        delete(c.conns, connID)
-    }
-    c.connsMu.Unlock()
-    if ok {
-        ac.cancel()
-        ac.tcpConn.Close()
-        // Informa broker
-        c.sendJSON(map[string]interface{}{
-            "type":   MsgTypeClose,
-            "connId": connID,
-        })
-    }
+func (c *Client) closeConn(ac *activeConn) {
+	s := ac.session
+	s.connsMu.Lock()
+	current := s.conns[ac.connID] == ac
+	if current {
+		delete(s.conns, ac.connID)
+	}
+	s.connsMu.Unlock()
+	ac.tcpConn.Close()
+	if current {
+		s.json(map[string]string{"type": MsgTypeClose, "connId": ac.connID})
+	}
 }
-
-func (c *Client) cleanupConns() {
-    c.connsMu.Lock()
-    defer c.connsMu.Unlock()
-    for id, ac := range c.conns {
-        ac.cancel()
-        ac.tcpConn.Close()
-        delete(c.conns, id)
-    }
-}
-
-// Stop encerra tudo.
 func (c *Client) Stop() {
-    select {
-    case <-c.stopCh:
-    default:
-        close(c.stopCh)
-    }
-    c.cleanupConns()
-    c.mu.Lock()
-    if c.ws != nil {
-        _ = c.ws.Close()
-        c.ws = nil
-    }
-    c.mu.Unlock()
+	c.stopOnce.Do(func() { close(c.stopCh) })
+	c.mu.Lock()
+	s := c.session
+	c.session = nil
+	c.mu.Unlock()
+	if s != nil {
+		s.close()
+	}
 }
-
-// Status retorna string legivel p/ Java chamar e mostrar na UI.
 func (c *Client) Status() string {
-    c.mu.Lock()
-    online := c.ws != nil
-    c.mu.Unlock()
-    if online {
-        return fmt.Sprintf("ONLINE rx=%d tx=%d conns=%d",
-            c.stats.Rx(), c.stats.Tx(), c.numConns())
-    }
-    return "OFFLINE"
+	c.mu.Lock()
+	s := c.session
+	c.mu.Unlock()
+	if s == nil || s.ctx.Err() != nil {
+		return "OFFLINE"
+	}
+	s.connsMu.Lock()
+	count := len(s.conns)
+	s.connsMu.Unlock()
+	return fmt.Sprintf("ONLINE rx=%d tx=%d conns=%d", c.stats.Rx(), c.stats.Tx(), count)
 }
-
-func (c *Client) numConns() int {
-    c.connsMu.Lock()
-    defer c.connsMu.Unlock()
-    return len(c.conns)
-}
-
 func (c *Client) Stats() *stats.Counter { return c.stats }
-
 func (c *Client) SendTelemetry(ip, network string) {
-    c.sendJSON(map[string]interface{}{
-        "type":    MsgTypeTelemetry,
-        "ip":      ip,
-        "network": network,
-        "rx":      c.stats.Rx(),
-        "tx":      c.stats.Tx(),
-        "ts":      time.Now().Format(time.RFC3339),
-    })
+	c.mu.Lock()
+	s := c.session
+	c.mu.Unlock()
+	if s != nil {
+		s.json(map[string]interface{}{"type": MsgTypeTelemetry, "ip": ip, "network": network, "rx": c.stats.Rx(), "tx": c.stats.Tx()})
+	}
 }

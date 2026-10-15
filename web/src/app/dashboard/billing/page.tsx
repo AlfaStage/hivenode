@@ -100,11 +100,11 @@ export default function BillingPage() {
       const data = await res.json();
 
       if (data.success && data.data?.checkoutUrl) {
-        window.location.href = data.data.checkoutUrl;
+        window.location.assign(data.data.checkoutUrl);
       } else {
         alert(data.error || "Erro ao processar. Verifique se o plano está configurado no gateway de pagamento.");
       }
-    } catch (_e) {
+    } catch {
       alert("Erro de conexão. Tente novamente.");
     }
     setPurchasing(null);

@@ -6,19 +6,11 @@ import { once } from "node:events";
 import path from "node:path";
 import { createRequire } from "node:module";
 
-Object.assign(process.env, {
-  DATABASE_URL: "postgresql://hivenode_test:local-test-only@127.0.0.1:55432/hivenode_test",
-  REDIS_URL: "redis://127.0.0.1:56379/0",
-  JWT_SECRET: "local-test-jwt-secret-at-least-32-characters",
-  ENCRYPTION_KEY: "local-test-encryption-key-at-least-32-characters",
-  BROKER_INTERNAL_SECRET: "local-test-internal-secret-at-least-32-characters",
-  NEXT_PUBLIC_APP_URL: "http://127.0.0.1:3100", NEXT_PUBLIC_BROKER_URL: "ws://127.0.0.1:11001",
-  BROKER_API_URL: "http://127.0.0.1:11001", WEB_API_URL: "http://127.0.0.1:3100",
-  WEB_ORIGIN: "http://127.0.0.1:3100", SOCKS5_PORT: "11000", TUNNEL_PORT: "11001",
-  APP_ENV: "test", ALLOW_PRIVATE_TARGETS: "true", NODE_ENV: "development",
-});
+import "./test-env";
+
 const base = "http://127.0.0.1:3100";
 const children: ChildProcess[] = [];
+const outputTail: string[] = [];
 const sockets: net.Socket[] = [];
 const require = createRequire(import.meta.url);
 const WebSocket = require("../../hivedocker/node_modules/ws");
@@ -29,6 +21,11 @@ function launch(command: string, args: string[], cwd: string) {
   const child = spawn(command, args, { cwd, env: process.env, stdio: ["ignore", "pipe", "pipe"] });
   child.stdout?.on("data", data => { if (process.env.TEST_VERBOSE) process.stdout.write(data); });
   child.stderr?.on("data", data => { if (process.env.TEST_VERBOSE) process.stderr.write(data); });
+  child.on("error", error => { outputTail.push(String(error)); });
+  child.on("exit", code => { if (code) outputTail.push(command + " exited with " + code); });
+  for (const stream of [child.stdout, child.stderr]) stream?.on("data", data => {
+    outputTail.push(data.toString()); if (outputTail.length > 100) outputTail.shift();
+  });
   children.push(child); return child;
 }
 async function waitHealth(url: string) {
@@ -36,7 +33,7 @@ async function waitHealth(url: string) {
     try { if ((await fetch(url, { signal: AbortSignal.timeout(2000) })).ok) return; } catch {}
     await new Promise(r => setTimeout(r, 1000));
   }
-  throw new Error(`Health timeout: ${url}`);
+  throw new Error(`Health timeout: ${url}\n${outputTail.join("")}`);
 }
 async function request(route: string, method = "GET", body?: unknown, token?: string, expected = 200) {
   const response = await fetch(base + route, { method, headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
@@ -101,10 +98,23 @@ async function main() {
     assert.equal(a.user.role, "CUSTOMER"); check("public registration never grants admin");
     const denied = await fetch(base + "/api/admin", { headers: { Authorization: `Bearer ${a.token}` } }); assert.equal(denied.status, 403);
     assert.equal((await fetch(base + "/api/clean")).status, 410); check("admin data and retired reset endpoint protected");
+    await request("/api/admin/settings", "GET", undefined, a.token, 403);
+    await request("/api/admin/nodes/" + randomUUID(), "PUT", { status: "BLOCKED" }, a.token, 403);
+    await request("/api/admin/users/" + randomUUID(), "DELETE", undefined, a.token, 403);
+    check("administrative mutation endpoints preserve HTTP authorization semantics");
     const admin = await prisma.user.create({ data: { email: `${run}-admin@example.com`, passwordHash: await hashPassword(password), role: "ADMIN" } });
     const login = await request("/api/auth/login", "POST", { email: admin.email, password });
     const plan = await prisma.plan.create({ data: { slug: `${run}-private`, name: "Local test fleet", category: "PRIVATE_FLEET", maxDevices: 2, maxProxies: 4, priceInCents: 1000, isRecurring: true } });
     for (const user of [a.user, b.user]) await prisma.subscription.create({ data: { userId: user.id, planId: plan.id, planType: "STARTER", planCategory: "PRIVATE_FLEET", currentPeriodEnd: new Date(Date.now() + 86400000) } });
+    const pairing = await request("/api/auth/device-code/generate", "POST", { type: "miner" });
+    await request("/api/auth/device-code/poll", "POST", { deviceCode: pairing.deviceCode });
+    await request("/api/auth/device-code/approve", "POST", { userCode: pairing.userCode }, a.token);
+    await request("/api/auth/device-code/approve", "POST", { userCode: pairing.userCode }, b.token, 409);
+    const polls = await Promise.all(Array.from({ length: 4 }, () => fetch(base + "/api/auth/device-code/poll", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deviceCode: pairing.deviceCode }),
+    })));
+    assert.equal(polls.filter(response => response.ok).length, 1);
+    check("device approval cannot be overwritten and concurrent polling consumes the code once");
     const plans = await request("/api/plans"); assert(plans.plans.some((p: { id: string }) => p.id === plan.id)); check("customers can read commercial plans");
     const na = await request("/api/nodes", "POST", { deviceName: "A", visibility: "PRIVATE", installationId: `${run}-installation-a` }, a.token);
     const nb = await request("/api/nodes", "POST", { deviceName: "B", visibility: "PRIVATE", installationId: `${run}-installation-b` }, b.token);
@@ -135,13 +145,27 @@ async function main() {
     const redemptions = await Promise.all(Array.from({ length: 5 }, () => fetch(base + "/api/billing/redeem-points", { method: "POST", headers: { Authorization: `Bearer ${b.token}`, "Content-Type": "application/json" }, body: JSON.stringify({ pointsToRedeem: 500 }) })));
     assert.equal(redemptions.filter(r => r.ok).length, 1);
     const balance = await prisma.user.findUniqueOrThrow({ where: { id: b.user.id } }); assert.equal(balance.hivePoints, 0); assert.equal(balance.balanceGB, 1); check("concurrent redemption never overspends points");
+    const publicNode = await request("/api/nodes", "POST", { deviceName: "Public supplier", visibility: "PUBLIC", installationId: run + "-public" }, a.token);
+    const metered = await request("/api/proxies", "POST", { nodeId: publicNode.node.id, proxyUser: run + "-metered", proxyPass: password }, b.token, 201);
+    const usageEvent = { id: randomUUID(), proxyId: metered.proxy.id, nodeId: publicNode.node.id, bytesRx: 524288, bytesTx: 524288 };
+    await Promise.all(Array.from({ length: 4 }, () => request("/api/internal/usage", "POST", usageEvent, process.env.BROKER_INTERNAL_SECRET)));
+    const consumer = await prisma.user.findUniqueOrThrow({ where: { id: b.user.id } });
+    const supplier = await prisma.user.findUniqueOrThrow({ where: { id: a.user.id } });
+    assert.equal(consumer.balanceGB, 1 - 1 / 1024);
+    assert.equal(supplier.hivePoints, 100 / 1024);
+    assert.equal(await prisma.usageEvent.count({ where: { id: usageEvent.id } }), 1);
+    check("replayed metered traffic debits the consumer and rewards the supplier exactly once");
     const subscription = await prisma.subscription.create({ data: { userId: b.user.id, planId: plan.id, planType: "STARTER", status: "PENDING", currentPeriodEnd: new Date(), abacatePaySubId: `subs-${run}` } });
     for (const month of [1, 2]) {
       const event = { id: `evt-${run}-${month}`, event: "subscription.renewed", data: { subscription: { id: subscription.abacatePaySubId, amount: 1000 }, payment: { id: `charge-${run}-${month}`, paidAmount: 1000, updatedAt: `2026-0${month}-01T00:00:00Z` } } };
       await processPaymentEvent(event); await processPaymentEvent(event);
     }
     assert.equal(await prisma.payment.count({ where: { abacateSubId: subscription.abacatePaySubId } }), 2); check("multiple renewals recorded once each");
-    const usage = await prisma.usageEvent.findMany({ where: { proxyId: proxy.proxy.id } }); assert(usage.length > 0); check("proxy consumption persisted by credential");
+    const usage = await prisma.usageEvent.findMany({ where: { proxyId: proxy.proxy.id } }); assert(usage.length > 0);
+    const measured = await prisma.proxyCredential.findUniqueOrThrow({ where: { id: proxy.proxy.id } });
+    assert.equal(measured.totalBytesRx, BigInt(22));
+    assert.equal(measured.totalBytesTx, BigInt(32));
+    check("proxy consumption persisted with exact per-credential byte totals");
     console.log(`LOCAL INTEGRATION: ${checks} checks passed`);
   } finally {
     for (const ws of devices) ws.terminate(); for (const socket of sockets) socket.destroy();

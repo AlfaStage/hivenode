@@ -1,3 +1,4 @@
+import { nextBillingPeriod } from "./billing-period";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { serializable } from "./transactions";
@@ -47,9 +48,7 @@ export async function processPaymentEvent(input: unknown) {
           const paidAt = new Date(event.data.payment?.updatedAt || checkout?.updatedAt || subscription.updatedAt || "");
           if (!Number.isFinite(paidAt.getTime())) throw new Error("Missing valid payment date");
           const start = local.status === "ACTIVE" && local.currentPeriodEnd > paidAt ? local.currentPeriodEnd : paidAt;
-          const end = new Date(start);
-          if (local.plan.billingCycle === "YEARLY") end.setUTCFullYear(end.getUTCFullYear() + 1);
-          else end.setUTCMonth(end.getUTCMonth() + 1);
+          const end = nextBillingPeriod(start, local.plan.billingCycle === "YEARLY");
           await tx.subscription.update({ where: { id: local.id }, data: { status: "ACTIVE", currentPeriodEnd: end } });
           await tx.payment.create({ data: { userId: local.userId, planId: local.planId, type: "SUBSCRIPTION", amountCents: amount,
             status: "PAID", abacateSubId: subscription.id, externalPaymentId: chargeId } });

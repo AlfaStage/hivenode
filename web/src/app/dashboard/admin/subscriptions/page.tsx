@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { CreditCard, Activity, Search, ShieldCheck, CheckCircle2, XCircle, Clock } from "lucide-react";
+import { useState } from "react";
+import { useAdminUsers } from "@/hooks/use-admin-users";
+import { CreditCard, Activity, Search } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,27 +10,10 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 
 export default function AdminSubscriptionsPage() {
-  const [users, setUsers] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { users, loading, error, reload: fetchData } = useAdminUsers();
   const [search, setSearch] = useState("");
 
-  const fetchData = async () => {
-    try {
-      const res = await fetch("/api/admin");
-      const data = await res.json();
-      if (data.success) {
-        setUsers(data.data.users || []);
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  useEffect(() => {
-    fetchData();
-  }, []);
 
   const handleUpdateStatus = async (subId: string, newStatus: string) => {
     try {
@@ -56,7 +40,7 @@ export default function AdminSubscriptionsPage() {
 
   // Flatten subscriptions from all users
   const subscriptions = users.flatMap((u) =>
-    (u.subscriptions || []).map((sub: any) => ({
+    (u.subscriptions || []).map((sub) => ({
       ...sub,
       userEmail: u.email,
     }))
@@ -66,6 +50,8 @@ export default function AdminSubscriptionsPage() {
     sub.userEmail.toLowerCase().includes(search.toLowerCase()) ||
     sub.planType.toLowerCase().includes(search.toLowerCase())
   );
+
+  if (error) return <p role="alert">{error}</p>;
 
   if (loading) {
     return (

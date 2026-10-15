@@ -30,7 +30,7 @@ export async function DELETE(
     try {
       await redis.del(`proxy:${proxy.proxyUser}`);
       await brokerCommand("/internal/revoke", { proxyId: proxy.id });
-    } catch (e) {
+    } catch {
       console.log("Falha ao apagar do Redis, acesso pode demorar alguns minutos para cair.");
     }
 

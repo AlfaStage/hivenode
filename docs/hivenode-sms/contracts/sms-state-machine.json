@@ -1,0 +1,104 @@
+{
+  "version": "1.0.0",
+  "status": "PROPOSED_NOT_IMPLEMENTED",
+  "states": [
+    "QUEUED",
+    "LEASED",
+    "AUTHORIZED",
+    "SENDING",
+    "SENT",
+    "DELIVERED",
+    "PARTIAL",
+    "FAILED",
+    "UNKNOWN",
+    "SUSPENDED",
+    "CANCELED",
+    "EXPIRED",
+    "SUPPRESSED"
+  ],
+  "transitions": {
+    "QUEUED": [
+      "LEASED",
+      "CANCELED",
+      "EXPIRED",
+      "SUPPRESSED",
+      "SUSPENDED"
+    ],
+    "LEASED": [
+      "AUTHORIZED",
+      "QUEUED",
+      "SUSPENDED",
+      "CANCELED",
+      "EXPIRED",
+      "FAILED"
+    ],
+    "AUTHORIZED": [
+      "SENDING",
+      "UNKNOWN",
+      "FAILED"
+    ],
+    "SENDING": [
+      "SENT",
+      "PARTIAL",
+      "FAILED",
+      "UNKNOWN"
+    ],
+    "SENT": [
+      "DELIVERED"
+    ],
+    "DELIVERED": [],
+    "PARTIAL": [
+      "UNKNOWN",
+      "SENT",
+      "DELIVERED",
+      "FAILED"
+    ],
+    "FAILED": [
+      "QUEUED"
+    ],
+    "UNKNOWN": [
+      "SENT",
+      "DELIVERED",
+      "PARTIAL",
+      "FAILED"
+    ],
+    "SUSPENDED": [
+      "QUEUED",
+      "EXPIRED",
+      "CANCELED"
+    ],
+    "CANCELED": [],
+    "EXPIRED": [],
+    "SUPPRESSED": []
+  },
+  "guards": {
+    "FAILED->QUEUED": "retrySafe=true; zero segments accepted confirmed; attemptCount<3; permissions/policy/entitlement/expiry revalidated",
+    "PARTIAL->SENT": "new evidence confirms every segment sent; no new physical invocation",
+    "PARTIAL->DELIVERED": "new evidence confirms every segment delivered; no new physical invocation",
+    "PARTIAL->FAILED": "correction by evidence proving zero segments accepted; reviewed and audited; no automatic retry",
+    "UNKNOWN->FAILED": "evidence proving zero segments accepted; retrySafe evaluated separately",
+    "LEASED->QUEUED": "grant never issued and native INVOKING never happened",
+    "SUSPENDED->QUEUED": "explicit authorized review; message not expired; actor/resource valid",
+    "SENT->DELIVERED": "delivery success confirmed for every segment"
+  },
+  "limits": {
+    "leaseSeconds": 120,
+    "grantSeconds": 30,
+    "maxPhysicalAttempts": 3,
+    "retryDelaysSeconds": [
+      30,
+      120
+    ],
+    "maxSegments": 8,
+    "maxBatchRecipients": 100,
+    "deliveryWaitHours": 24,
+    "idempotencyRetentionDays": 180
+  },
+  "invariants": [
+    "No automatic retry from PARTIAL or UNKNOWN",
+    "No cancel/expiry transition after grant",
+    "One active dispatch per node",
+    "SMS send and delivery are distinct",
+    "Replaying events/webhooks never sends SMS again"
+  ]
+}

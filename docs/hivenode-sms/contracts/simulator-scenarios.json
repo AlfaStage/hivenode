@@ -1,0 +1,199 @@
+{
+  "version": "1.0.0",
+  "implementationStatus": "PROPOSED_NOT_IMPLEMENTED",
+  "scenarios": [
+    {
+      "id": "success",
+      "fault": "none",
+      "expectedState": "DELIVERED",
+      "expectedFakeModemCalls": 1,
+      "tests": [
+        "T25",
+        "T29"
+      ],
+      "realSendAllowed": false
+    },
+    {
+      "id": "offline_before_claim",
+      "fault": "device disconnected",
+      "expectedState": "QUEUED",
+      "expectedFakeModemCalls": 0,
+      "tests": [
+        "T22"
+      ],
+      "realSendAllowed": false
+    },
+    {
+      "id": "fail_before_grant",
+      "fault": "permission unavailable before physical grant",
+      "expectedState": "SUSPENDED",
+      "expectedFakeModemCalls": 0,
+      "tests": [
+        "T19"
+      ],
+      "realSendAllowed": false
+    },
+    {
+      "id": "grant_response_lost",
+      "fault": "response lost then recovered by attemptId",
+      "expectedState": "DELIVERED",
+      "expectedFakeModemCalls": 1,
+      "tests": [
+        "T23"
+      ],
+      "realSendAllowed": false
+    },
+    {
+      "id": "crash_before_modem",
+      "fault": "native INVOKING persisted, crash before call",
+      "expectedState": "UNKNOWN",
+      "expectedFakeModemCalls": 0,
+      "tests": [
+        "T24"
+      ],
+      "realSendAllowed": false
+    },
+    {
+      "id": "crash_after_modem",
+      "fault": "native crash after modem call before callback",
+      "expectedState": "UNKNOWN",
+      "expectedFakeModemCalls": 1,
+      "tests": [
+        "T24"
+      ],
+      "realSendAllowed": false
+    },
+    {
+      "id": "callback_ack_lost",
+      "fault": "event persists on server, ACK lost, device replays",
+      "expectedState": "DELIVERED",
+      "expectedFakeModemCalls": 1,
+      "tests": [
+        "T25"
+      ],
+      "realSendAllowed": false
+    },
+    {
+      "id": "multipart_partial",
+      "fault": "one segment succeeds, next fails ambiguously",
+      "expectedState": "PARTIAL",
+      "expectedFakeModemCalls": 1,
+      "tests": [
+        "T27"
+      ],
+      "realSendAllowed": false
+    },
+    {
+      "id": "delayed_delivery",
+      "fault": "receipt arrives late after SENT",
+      "expectedState": "DELIVERED",
+      "expectedFakeModemCalls": 1,
+      "tests": [
+        "T29"
+      ],
+      "realSendAllowed": false
+    },
+    {
+      "id": "no_delivery_receipt",
+      "fault": "all sent; no receipt after24h",
+      "expectedState": "SENT",
+      "expectedFakeModemCalls": 1,
+      "tests": [
+        "T28"
+      ],
+      "realSendAllowed": false
+    },
+    {
+      "id": "sim_removed",
+      "fault": "binding removed before grant",
+      "expectedState": "SUSPENDED",
+      "expectedFakeModemCalls": 0,
+      "tests": [
+        "T30"
+      ],
+      "realSendAllowed": false
+    },
+    {
+      "id": "permission_revoked",
+      "fault": "permission revoked before grant",
+      "expectedState": "SUSPENDED",
+      "expectedFakeModemCalls": 0,
+      "tests": [
+        "T19"
+      ],
+      "realSendAllowed": false
+    },
+    {
+      "id": "stale_epoch",
+      "fault": "command targets previous installation",
+      "expectedState": "SUSPENDED",
+      "expectedFakeModemCalls": 0,
+      "tests": [
+        "T21"
+      ],
+      "realSendAllowed": false
+    },
+    {
+      "id": "duplicate_event",
+      "fault": "device event replayed",
+      "expectedState": "DELIVERED",
+      "expectedFakeModemCalls": 1,
+      "tests": [
+        "T25",
+        "T29"
+      ],
+      "realSendAllowed": false
+    },
+    {
+      "id": "reordered_events",
+      "fault": "delivery precedes sent callback on server",
+      "expectedState": "DELIVERED",
+      "expectedFakeModemCalls": 1,
+      "tests": [
+        "T27",
+        "T29"
+      ],
+      "realSendAllowed": false
+    },
+    {
+      "id": "redis_outage",
+      "fault": "outbox commit then Redis outage, recovered",
+      "expectedState": "DELIVERED",
+      "expectedFakeModemCalls": 1,
+      "tests": [
+        "T42"
+      ],
+      "realSendAllowed": false
+    },
+    {
+      "id": "revoked_actor",
+      "fault": "membership removed before grant",
+      "expectedState": "SUSPENDED",
+      "expectedFakeModemCalls": 0,
+      "tests": [
+        "T06"
+      ],
+      "realSendAllowed": false
+    },
+    {
+      "id": "expired_subscription",
+      "fault": "paid period ends before grant",
+      "expectedState": "SUSPENDED",
+      "expectedFakeModemCalls": 0,
+      "tests": [
+        "T11"
+      ],
+      "realSendAllowed": false
+    },
+    {
+      "id": "safe_retry",
+      "fault": "confirmed no segments accepted on first two attempts, third succeeds",
+      "expectedState": "DELIVERED",
+      "expectedFakeModemCalls": 3,
+      "tests": [
+        "T26"
+      ],
+      "realSendAllowed": false
+    }
+  ]
+}

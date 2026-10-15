@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import QRCode from "react-qr-code";
 
 export default function MinerDashboard() {
@@ -144,12 +144,11 @@ export default function MinerDashboard() {
         </h2>
         
           <Dialog open={isQrOpen} onOpenChange={setIsQrOpen}>
-            {/* @ts-expect-error - DialogTrigger typing issue */}
-          <DialogTrigger asChild>
+
             <Button onClick={handleGenerateQr} className="bg-emerald-600 hover:bg-emerald-500 text-white gap-2 font-bold border-none">
               <Plus className="w-4 h-4" /> Conectar Aparelho
             </Button>
-          </DialogTrigger>
+
           <DialogContent className="sm:max-w-2xl border-emerald-500/30 bg-[#0a0a0c] overflow-y-auto max-h-[90vh]">
             <DialogHeader>
               <DialogTitle className="text-emerald-500 text-xl font-bold flex items-center gap-2">
@@ -224,10 +223,7 @@ export default function MinerDashboard() {
               </div>
             </div>
             <DialogFooter>
-              {/* @ts-expect-error - DialogClose typing issue */}
-              <DialogClose asChild>
-                <Button variant="outline" className="w-full border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/10">Pronto</Button>
-              </DialogClose>
+              <DialogClose render={<Button variant="outline" className="w-full border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/10">Pronto</Button>} />
             </DialogFooter>
           </DialogContent>
         </Dialog>

@@ -18,7 +18,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e:ui": "playwright test --ui",
+    "test:browser": "cross-env TEST_PRODUCTION_BUILD=true tsx scripts/browser-integration.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",

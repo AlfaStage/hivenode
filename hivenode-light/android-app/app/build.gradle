@@ -22,6 +22,15 @@ android {
         }
     }
 
+    signingConfigs {
+        release {
+            storeFile file(System.env.light_KEYSTORE ?: '../../signing/light.keystore')
+            storePassword System.env.light_KEYSTORE_PASS ?: 'hivenode'
+            keyAlias System.env.light_KEY_ALIAS ?: 'hivenode-light'
+            keyPassword System.env.light_KEY_PASS ?: 'hivenode'
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
@@ -48,11 +57,4 @@ repositories {
 dependencies {
     implementation(name: 'libhivenode', ext: 'aar')
     implementation 'com.android.support:support-v4:22.0.0'
-}
-
-android.signingConfigs.release {
-    storeFile file(System.env.light_KEYSTORE ?: '../../signing/light.keystore')
-    storePassword System.env.light_KEYSTORE_PASS ?: 'hivenode'
-    keyAlias System.env.light_KEY_ALIAS ?: 'hivenode-light'
-    keyPassword System.env.light_KEY_PASS ?: 'hivenode'
 }

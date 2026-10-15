@@ -1,0 +1,48 @@
+
+> hivenode-web@1.1.0 test:browser
+> cross-env TEST_PRODUCTION_BUILD=true tsx scripts/browser-integration.ts
+
+▲ Next.js 16.2.10
+- Local:         http://127.0.0.1:3100
+- Network:       http://127.0.0.1:3100
+✓ Ready in 0ms
+prisma:error Connection terminated due to connection timeout
+[HealthCheck] Falha na conexão com BD: Error: Connection terminated due to connection timeout
+    at async U.performIO (C:\Users\theja\HiveNode\web\.next\standalone\.next\server\chunks\_0trbmpe._.js:1:11381)
+    at async U.queryRaw (C:\Users\theja\HiveNode\web\.next\standalone\.next\server\chunks\_0trbmpe._.js:1:8163) {
+  clientVersion: '7.8.0',
+  [cause]: Error: Connection terminated unexpectedly
+      at ignore-listed frames
+}
+Browser: login page ready
+Browser scripts: [
+  'http://127.0.0.1:3100/_next/static/chunks/27jktro2p5rq9.js',
+  'http://127.0.0.1:3100/_next/static/chunks/3rxl-jt3pdxgx.js',
+  'http://127.0.0.1:3100/_next/static/chunks/3sqnxhmnblly7.js',
+  'http://127.0.0.1:3100/_next/static/chunks/turbopack-3cuuhte1eeoa6.js',
+  'http://127.0.0.1:3100/_next/static/chunks/2ljp852zi__ug.js',
+  'http://127.0.0.1:3100/_next/static/chunks/14mrh2-p_w84d.js',
+  'http://127.0.0.1:3100/_next/static/chunks/0g46luo5htx8h.js',
+  'http://127.0.0.1:3100/_next/static/chunks/0acmbhmj8j_ch.js',
+  'http://127.0.0.1:3100/_next/static/chunks/1rxncug86bump.js',
+  'http://127.0.0.1:3100/_next/static/chunks/1rdti79u1360h.js',
+  'http://127.0.0.1:3100/_next/static/chunks/0cz1d0mv5g_q7.js',
+  'http://127.0.0.1:3100/_next/static/chunks/0_8y92xg60ach.js'
+]
+Browser: submitting login
+Browser network: http://127.0.0.1:3100/dashboard?_rsc=qYT2Wy2QR8kXuUU6 { errorText: 'net::ERR_ABORTED' }
+Browser: dashboard rendered
+Browser network: http://127.0.0.1:3100/dashboard/billing?_rsc=j79Vj4yH5aoiafxS { errorText: 'net::ERR_ABORTED' }
+Browser network: http://127.0.0.1:3100/dashboard/proxies?_rsc=j79Vj4yH5aoiafxS { errorText: 'net::ERR_ABORTED' }
+Browser network: http://127.0.0.1:3100/dashboard/miner?_rsc=j79Vj4yH5aoiafxS { errorText: 'net::ERR_ABORTED' }
+Browser network: http://127.0.0.1:3100/dashboard/billing?_rsc=IOe_mmh6jQxP6_Ru { errorText: 'net::ERR_ABORTED' }
+Browser network: http://127.0.0.1:3100/dashboard/proxies?_rsc=IOe_mmh6jQxP6_Ru { errorText: 'net::ERR_ABORTED' }
+Browser network: http://127.0.0.1:3100/dashboard/miner?_rsc=IOe_mmh6jQxP6_Ru { errorText: 'net::ERR_ABORTED' }
+Browser network: http://127.0.0.1:3100/dashboard/billing?_rsc=AzqktVtCilA2ZEqR { errorText: 'net::ERR_ABORTED' }
+Browser network: http://127.0.0.1:3100/dashboard/proxies?_rsc=AzqktVtCilA2ZEqR { errorText: 'net::ERR_ABORTED' }
+Browser network: http://127.0.0.1:3100/dashboard?_rsc=AzqktVtCilA2ZEqR { errorText: 'net::ERR_ABORTED' }
+Browser network: http://127.0.0.1:3100/dashboard/proxies?_rsc=_-rT2HhGwHk8F_V0 { errorText: 'net::ERR_ABORTED' }
+Browser network: http://127.0.0.1:3100/dashboard?_rsc=_-rT2HhGwHk8F_V0 { errorText: 'net::ERR_ABORTED' }
+Browser network: http://127.0.0.1:3100/dashboard/billing?_rsc=_-rT2HhGwHk8F_V0 { errorText: 'net::ERR_ABORTED' }
+Browser: Miner dialog rendered
+BROWSER INTEGRATION: passed

@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Users, Edit, Trash2, ShieldCheck, Search, Wallet, KeyRound, ExternalLink } from "lucide-react";
+import { useAdminUsers } from "@/hooks/use-admin-users";
+import type { AdminUser, AdminPlan } from "@/lib/admin-types";
+import { Users, Edit, Trash2, ShieldCheck, Search, Wallet } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -11,21 +13,19 @@ import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function AdminUsersPage() {
-  const [users, setUsers] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { users, loading, error, reload: fetchUsers } = useAdminUsers();
   const [search, setSearch] = useState("");
-  const [editingUser, setEditingUser] = useState<any>(null);
+  const [editingUser, setEditingUser] = useState<AdminUser | null>(null);
   const [editForm, setEditForm] = useState({
     role: "",
     balanceGB: 0,
     hivePoints: 0,
     walletAddress: "",
-    twoFactorEnabled: false,
-  });
+      });
   const [saving, setSaving] = useState(false);
 
-  const [plans, setPlans] = useState<any[]>([]);
-  const [grantSubUser, setGrantSubUser] = useState<any>(null);
+  const [plans, setPlans] = useState<AdminPlan[]>([]);
+  const [grantSubUser, setGrantSubUser] = useState<AdminUser | null>(null);
   const [grantForm, setGrantForm] = useState({
     planId: "",
     currentPeriodEnd: "",
@@ -34,46 +34,24 @@ export default function AdminUsersPage() {
   });
   const [granting, setGranting] = useState(false);
 
-  const fetchUsers = async () => {
-    try {
-      const res = await fetch("/api/admin");
-      const data = await res.json();
-      if (data.success) {
-        setUsers(data.data.users || []);
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  useEffect(() => {
-    fetchUsers();
-    fetchPlans();
-  }, []);
 
-  const fetchPlans = async () => {
-    try {
-      const res = await fetch("/api/admin/plans");
-      const data = await res.json();
-      if (data.success) {
-        setPlans(data.data.plans || []);
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  };
+  function fetchPlans() {
+    return fetch("/api/admin/plans").then(res => res.json()).then(data => {
+      if (data.success) setPlans(data.data.plans || []);
+    }).catch(console.error);
+  }
 
-  const handleEditClick = (user: any) => {
+  useEffect(() => { void fetchPlans(); }, []);
+
+  const handleEditClick = (user: AdminUser) => {
     setEditingUser(user);
     setEditForm({
       role: user.role,
       balanceGB: user.balanceGB || 0,
       hivePoints: user.hivePoints || 0,
       walletAddress: user.walletAddress || "",
-      twoFactorEnabled: Boolean(user.twoFactorEnabled),
-    });
+          });
   };
 
   const handleSave = async () => {
@@ -105,7 +83,7 @@ export default function AdminUsersPage() {
     }
   };
 
-  const handleGrantClick = (user: any) => {
+  const handleGrantClick = (user: AdminUser) => {
     setGrantSubUser(user);
     const in30Days = new Date();
     in30Days.setDate(in30Days.getDate() + 30);
@@ -144,6 +122,8 @@ export default function AdminUsersPage() {
   const filteredUsers = users.filter((u) =>
     u.email.toLowerCase().includes(search.toLowerCase())
   );
+
+  if (error) return <p role="alert">{error}</p>;
 
   if (loading) {
     return (
@@ -211,11 +191,7 @@ export default function AdminUsersPage() {
                 <TableCell className="text-emerald-400 font-mono font-bold">{user.balanceGB} GB</TableCell>
                 <TableCell className="text-amber-400 font-mono font-bold">{user.hivePoints} PTS</TableCell>
                 <TableCell>
-                  {user.twoFactorEnabled ? (
-                    <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30">2FA ATIVO</Badge>
-                  ) : (
-                    <Badge variant="outline" className="text-muted-foreground border-border">2FA DESATIVADO</Badge>
-                  )}
+                  <Badge variant="secondary">2FA indisponível</Badge>
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-2">
@@ -279,17 +255,7 @@ export default function AdminUsersPage() {
 
                 <div className="grid gap-2">
                   <label className="text-xs font-semibold text-muted-foreground">Segurança 2FA</label>
-                  <button
-                    type="button"
-                    onClick={() => setEditForm({ ...editForm, twoFactorEnabled: !editForm.twoFactorEnabled })}
-                    className={`h-11 px-4 rounded-xl text-xs font-bold transition-all border ${
-                      editForm.twoFactorEnabled
-                        ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40"
-                        : "bg-muted text-muted-foreground border-border"
-                    }`}
-                  >
-                    {editForm.twoFactorEnabled ? "2FA Habilitado" : "2FA Desabilitado"}
-                  </button>
+                  <Button type="button" disabled variant="outline">2FA indisponível</Button>
                 </div>
               </div>
 

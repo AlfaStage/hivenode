@@ -33,7 +33,6 @@ export async function POST(request: NextRequest) {
         passwordHash: true,
         balanceGB: true,
         createdAt: true,
-        tunnelSecret: true,
         sessionVersion: true,
         disabled: true,
       },
@@ -54,7 +53,7 @@ export async function POST(request: NextRequest) {
     await setAuthCookie(token);
 
     // Remover passwordHash do retorno
-    const { passwordHash: removedHash, ...userWithoutPassword } = user;
+    const userWithoutPassword = { id: user.id, email: user.email, role: user.role, balanceGB: user.balanceGB, createdAt: user.createdAt };
 
     return apiSuccess({
       user: userWithoutPassword,

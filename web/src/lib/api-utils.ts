@@ -1,3 +1,5 @@
+import { ZodError } from "zod";
+
 export function apiError(message: string, status: number = 400) {
   if (status === 500) {
     console.error(JSON.stringify({ level: "error", message }));
@@ -13,6 +15,11 @@ export function apiSuccess<T>(data: T, status: number = 200) {
 }
 
 export function handleApiError(error: unknown) {
+  if (error instanceof ZodError || error instanceof SyntaxError) return apiError("Dados inválidos", 400);
+  if (error && typeof error === "object" && "code" in error) {
+    if (error.code === "P2025") return apiError("Registro não encontrado", 404);
+    if (error.code === "P2002") return apiError("Registro já existe", 409);
+  }
   const message = error instanceof Error ? error.message : "Erro interno";
   const status = message === "Unauthorized" ? 401 : message === "Forbidden" ? 403 : 500;
   return apiError(status === 500 ? "Erro interno do servidor" : message, status);

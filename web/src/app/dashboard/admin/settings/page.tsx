@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Settings, Activity, Save, CheckCircle2, Mail, ShieldCheck, AlertTriangle, CreditCard, Key, Eye, EyeOff } from "lucide-react";
+import { Settings, Activity, Save, CheckCircle2, Mail, ShieldCheck, AlertTriangle, CreditCard, Key } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";

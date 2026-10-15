@@ -1,51 +1,27 @@
-import { NextRequest } from "next/server";
-import { apiSuccess, apiError } from "@/lib/api-utils";
+import { z } from "zod";
+import { apiSuccess, apiError, handleApiError } from "@/lib/api-utils";
 import { redis } from "@/lib/redis";
-
-// Fallback in-memory store
-const codeStore = new Map<string, any>();
-
-export async function POST(request: NextRequest) {
+import { deviceSessionSchema } from "@/lib/device-code";
+const consume = `
+local raw = redis.call('GET', KEYS[1])
+if not raw then return nil end
+local session = cjson.decode(raw)
+if session.status == 'approved' and session.linkToken then
+  redis.call('DEL', KEYS[1])
+  redis.call('DEL', 'device_auth:user:' .. session.userCode)
+end
+return raw
+`;
+export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { deviceCode } = body;
-
-    if (!deviceCode) return apiError("deviceCode é obrigatório", 400);
-
-    let sessionDataStr: string | null = null;
-    let sessionData: any = null;
-
-    try {
-      sessionDataStr = await redis.get(`device_auth:device:${deviceCode}`);
-      if (sessionDataStr) sessionData = JSON.parse(sessionDataStr);
-    } catch {
-      // Usar a variável do módulo globalmente (precisa ser injetada ou simulada em dev)
-    }
-
-    // Since codeStore is isolated per file in dev, we rely on Redis. 
-    // If Redis fails, this polling might not work seamlessly across different Next.js hot reloads, but it's fine for production.
-
-    if (!sessionData) {
-      return apiError("Sessão expirada ou não encontrada", 404);
-    }
-
-    if (sessionData.status === "approved" && sessionData.linkToken) {
-      // Limpa a sessão para não ser reutilizada
-      try {
-        await redis.del(`device_auth:device:${deviceCode}`);
-        await redis.del(`device_auth:user:${sessionData.userCode}`);
-      } catch {}
-
-      return apiSuccess({
-        status: "success",
-        token: sessionData.linkToken
-      });
-    }
-
-    return apiSuccess({
-      status: "pending"
-    });
-  } catch (error) {
-    return apiError("Erro ao checar status do código", 500);
-  }
+    const { deviceCode } = z.object({ deviceCode: z.string().regex(/^[a-f0-9]{64}$/) }).parse(await request.json());
+    let raw;
+    try { raw = await redis.eval(consume, 1, "device_auth:device:" + deviceCode); }
+    catch { return apiError("Serviço de vínculo indisponível", 503); }
+    if (typeof raw !== "string") return apiError("Sessão expirada ou não encontrada", 404);
+    const session = deviceSessionSchema.parse(JSON.parse(raw));
+    if (session.expiresAt <= Date.now()) return apiError("Sessão expirada", 404);
+    return apiSuccess(session.status === "approved" && session.linkToken
+      ? { status: "success", token: session.linkToken } : { status: "pending" });
+  } catch (error) { return handleApiError(error); }
 }

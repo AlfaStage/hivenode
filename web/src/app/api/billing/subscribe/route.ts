@@ -2,6 +2,7 @@
 // API Route: Billing - Subscribe (Assinatura recorrente)
 // ==============================================================================
 
+import type { PlanType } from "@prisma/client";
 import { NextRequest } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { apiError, apiSuccess } from "@/lib/api-utils";
@@ -85,7 +86,7 @@ export async function POST(request: NextRequest) {
     nextPeriod.setMonth(nextPeriod.getMonth() + 1);
 
     // Mapear slug para PlanType
-    const planTypeMap: Record<string, string> = {
+    const planTypeMap: Record<string, PlanType> = {
       starter: "STARTER",
       pro: "PRO",
       enterprise: "ENTERPRISE",
@@ -96,8 +97,8 @@ export async function POST(request: NextRequest) {
       data: {
         userId: user.id,
         planId: plan.id,
-        planType: (planTypeMap[plan.slug] || "STARTER") as any,
-        planCategory: plan.category as any,
+        planType: (planTypeMap[plan.slug] || "STARTER"),
+        planCategory: plan.category,
         status: "PENDING",
         abacatePaySubId: subRes.data?.id,
         currentPeriodEnd: nextPeriod,

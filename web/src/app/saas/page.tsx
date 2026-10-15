@@ -9,12 +9,13 @@ export default function SaaSPage() {
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
   const [userId, setUserId] = useState("");
-  async function load() {
-    const [n, s, me] = await Promise.all([fetch("/api/nodes").then(r => r.json()), fetch("/api/shares").then(r => r.json()), fetch("/api/auth/me").then(r => r.json())]);
+  function load() {
+    return Promise.all([fetch("/api/nodes").then(r => r.json()), fetch("/api/shares").then(r => r.json()), fetch("/api/auth/me").then(r => r.json())]).then(([n, s, me]) => {
     if (!n.success || !s.success || !me.success) { setMessage("Entre na sua conta para gerenciar compartilhamentos."); return; }
     setNodes(n.data.nodes.filter((node: Node) => node.visibility === "PRIVATE")); setShares(s.data.shares); setUserId(me.data.id);
+    });
   }
-  useEffect(() => { void load(); }, []);
+  useEffect(() => { void load().catch(() => setMessage("Não foi possível carregar os compartilhamentos.")); }, []);
   async function update(id: string, action: string) {
     const res = await fetch("/api/shares", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, action }) });
     setMessage(res.ok ? "Compartilhamento atualizado" : "Não foi possível atualizar"); await load();

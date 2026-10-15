@@ -1,8 +1,9 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
-import { apiError, apiSuccess } from "@/lib/api-utils";
-import { SubStatus } from "@prisma/client";
+import { apiSuccess, handleApiError } from "@/lib/api-utils";
+import { z } from "zod";
+import { SubStatus, PlanType } from "@prisma/client";
 
 export async function PUT(
   request: NextRequest,
@@ -11,7 +12,7 @@ export async function PUT(
   try {
     await requireAdmin();
     const { id } = await params;
-    const body = await request.json();
+    const body = z.object({ status: z.enum(SubStatus), planType: z.enum(PlanType).optional() }).parse(await request.json());
 
     const subscription = await prisma.subscription.update({
       where: { id },
@@ -22,9 +23,9 @@ export async function PUT(
     });
 
     return apiSuccess({ subscription });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[API Admin Subscription Edit]", error);
-    return apiError("Erro ao editar assinatura", 500);
+    return handleApiError(error);
   }
 }
 
@@ -41,8 +42,8 @@ export async function DELETE(
     });
 
     return apiSuccess({ message: "Assinatura removida com sucesso." });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[API Admin Subscription Delete]", error);
-    return apiError("Erro ao remover assinatura", 500);
+    return handleApiError(error);
   }
 }

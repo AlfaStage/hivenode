@@ -21,11 +21,10 @@
 
     <!-- Wake on Boot - older Android 4.x supports parciais -->
     <application
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:icon="@drawable/ic_notification"
         android:label="@string/app_name"
-        android:theme="@android:style/Theme.Holo.Light"
-        android:persistent="true">
+        android:theme="@android:style/Theme.Holo.Light">
 
         <activity
             android:name=".MainActivity"
@@ -39,8 +38,7 @@
 
         <service
             android:name=".TunnelService"
-            android:exported="false"
-            android:process=":tunnel" />
+            android:exported="false" />
 
         <receiver
             android:name=".BootReceiver"

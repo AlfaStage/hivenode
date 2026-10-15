@@ -5,6 +5,7 @@
 import { getAuthenticatedUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { apiError, apiSuccess } from "@/lib/api-utils";
+import { getSystemSettings } from "@/lib/settings";
 
 export async function GET() {
   try {
@@ -62,7 +63,8 @@ export async function GET() {
       return apiError("Usuário não encontrado", 404);
     }
 
-    return apiSuccess(user);
+    const settings = await getSystemSettings();
+    return apiSuccess({ ...user, pointsToGbRate: settings.crypto.pointsToHiveRate });
   } catch (error) {
     console.error("[API] Me error:", error);
     return apiError("Erro interno do servidor", 500);

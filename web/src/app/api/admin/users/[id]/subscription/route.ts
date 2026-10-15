@@ -6,7 +6,7 @@ import { NextRequest } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { apiError, apiSuccess } from "@/lib/api-utils";
 import { prisma } from "@/lib/prisma";
-import { PlanType, PlanCategory, SubStatus } from "@prisma/client";
+
 
 export async function POST(
   request: NextRequest,

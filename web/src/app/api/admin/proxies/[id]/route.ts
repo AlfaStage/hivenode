@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
-import { apiError, apiSuccess } from "@/lib/api-utils";
+import { apiError, apiSuccess, handleApiError } from "@/lib/api-utils";
 import { NodeStatus } from "@prisma/client";
 import { brokerCommand } from "@/lib/broker";
 
@@ -24,9 +24,9 @@ export async function PUT(
 
     if (body.status === "BLOCKED") await brokerCommand("/internal/revoke", { proxyId: id }).catch(console.error);
     return apiSuccess({ proxy: { ...proxy, proxyPass: undefined, passwordEncrypted: undefined } });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[API Admin Proxy Edit]", error);
-    return apiError("Erro ao editar proxy", 500);
+    return handleApiError(error);
   }
 }
 
@@ -44,8 +44,8 @@ export async function DELETE(
     await brokerCommand("/internal/revoke", { proxyId: id }).catch(console.error);
 
     return apiSuccess({ message: "Proxy excluído com sucesso." });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[API Admin Proxy Delete]", error);
-    return apiError("Erro ao excluir proxy", 500);
+    return handleApiError(error);
   }
 }

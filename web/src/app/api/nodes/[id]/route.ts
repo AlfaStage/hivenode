@@ -1,7 +1,9 @@
+import { z } from "zod";
+import type { Prisma } from "@prisma/client";
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
-import { apiSuccess, apiError } from "@/lib/api-utils";
+import { apiSuccess, apiError, handleApiError } from "@/lib/api-utils";
 import { brokerCommand } from "@/lib/broker";
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -22,14 +24,14 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     try {
       // Aciona o webhook do Broker na porta 10001 para derrubar o WS se estiver online
       await brokerCommand("/internal/revoke", { nodeId: resolvedParams.id });
-    } catch (e) {
+    } catch {
       console.log("Aviso: Broker inatingível ou aparelho já offline.");
     }
 
     return apiSuccess({ deleted: true });
   } catch (error) {
     console.error("Erro ao deletar node:", error);
-    return apiError("Erro ao remover aparelho", 500);
+    return handleApiError(error);
   }
 }
 
@@ -41,7 +43,7 @@ export async function PATCH(
     const payload = await requireAuth();
     const resolvedParams = await params;
     
-    const body = await request.json();
+    const body = z.object({ deviceName: z.string().trim().min(1).max(100).optional(), tags: z.array(z.string().trim().min(1).max(50)).max(20).optional() }).parse(await request.json());
     const newName = body.deviceName;
     const newTags = body.tags;
     
@@ -52,7 +54,7 @@ export async function PATCH(
       return apiError("Aparelho não encontrado", 404);
     }
 
-    const dataToUpdate: any = {};
+    const dataToUpdate: Prisma.NodeUpdateInput = {};
     if (newName !== undefined) dataToUpdate.deviceModel = newName;
     if (newTags !== undefined) dataToUpdate.tags = newTags;
 
@@ -65,13 +67,13 @@ export async function PATCH(
     // Avisa o Go Broker pra espalhar o novo nome (PC e Celular)
     try {
       if (typeof newName === "string") await brokerCommand("/internal/rename-node", { nodeId: node.id, newName });
-    } catch (e) {
+    } catch {
       console.log("Aviso: Broker inatingível para webhook de rename.");
     }
 
     return apiSuccess({ updated: true });
   } catch (error) {
     console.error("Erro ao renomear node:", error);
-    return apiError("Erro ao renomear aparelho", 500);
+    return handleApiError(error);
   }
 }

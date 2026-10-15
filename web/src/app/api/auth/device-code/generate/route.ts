@@ -1,10 +1,9 @@
 import { NextRequest } from "next/server";
-import { apiSuccess, apiError } from "@/lib/api-utils";
+import { apiSuccess, apiError, handleApiError } from "@/lib/api-utils";
 import { redis } from "@/lib/redis";
 import crypto from "crypto";
+import { z } from "zod";
 
-// Fallback in-memory store if Redis is unavailable
-const codeStore = new Map<string, { deviceCode: string; userCode: string; expiresAt: number; status: string; linkToken: string | null }>();
 
 function generateShortCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -18,12 +17,12 @@ function generateShortCode(): string {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const type = body.type || "miner"; // miner or proxy
+    const { type } = z.object({ type: z.enum(["miner", "proxy", "node"]).default("miner") }).parse(body);
 
     const deviceCode = crypto.randomBytes(32).toString("hex");
     const userCode = generateShortCode();
     const expiresAt = Date.now() + 5 * 60 * 1000; // 5 min expiry
-    const verificationUri = `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/proxies`;
+    const verificationUri = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/dashboard/${type === "miner" ? "miner" : "proxies"}`;
 
     const sessionData = {
       deviceCode,
@@ -47,6 +46,6 @@ export async function POST(request: NextRequest) {
       expiresIn: 300
     });
   } catch (error) {
-    return apiError("Erro ao gerar código do dispositivo", 500);
+    return handleApiError(error);
   }
 }

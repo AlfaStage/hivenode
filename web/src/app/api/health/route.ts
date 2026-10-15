@@ -4,11 +4,12 @@
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { redis } from "@/lib/redis";
 
 export async function GET() {
   try {
     // Tenta fazer um count básico para validar conexão com o DB
-    await prisma.user.count();
+    await Promise.all([prisma.user.count(), redis.ping()]);
     
     return NextResponse.json(
       { status: "ok", service: "hivenode-web" },
@@ -17,7 +18,7 @@ export async function GET() {
   } catch (error) {
     console.error("[HealthCheck] Falha na conexão com BD:", error);
     return NextResponse.json(
-      { status: "error", message: "Database connection failed" },
+      { status: "error", message: "Dependency connection failed" },
       { status: 500 }
     );
   }

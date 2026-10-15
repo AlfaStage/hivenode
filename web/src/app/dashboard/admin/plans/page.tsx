@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Zap, Activity, Save, CheckCircle2, DollarSign, ShieldCheck, Crown, Rocket, Building2, Package, Gauge, Edit3, X, ToggleLeft, ToggleRight, RefreshCw } from "lucide-react";
+import { Zap, Save, CheckCircle2, ShieldCheck, Crown, Rocket, Building2, Package, Gauge, Edit3, X, ToggleLeft, ToggleRight, RefreshCw } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -51,21 +51,14 @@ export default function AdminPlansPage() {
   const [applyToExisting, setApplyToExisting] = useState(false);
   const [syncing, setSyncing] = useState(false);
 
-  useEffect(() => {
-    fetchPlans();
-  }, []);
 
-  const fetchPlans = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/admin/plans");
-      const data = await res.json();
-      if (data.success) setPlans(data.data.plans);
-    } catch (e) {
-      console.error(e);
-    }
-    setLoading(false);
-  };
+  function fetchPlans() {
+    return fetch("/api/admin/plans").then(res => res.json()).then(data => {
+      if (data.success) setPlans(data.data.plans || []);
+    }).catch(console.error).finally(() => setLoading(false));
+  }
+
+  useEffect(() => { void fetchPlans(); }, []);
 
   const handleSave = async () => {
     if (!editingPlan) return;

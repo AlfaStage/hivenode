@@ -1,28 +1,23 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Eye, EyeOff, LogIn, Loader2 } from "lucide-react";
+import { Eye, EyeOff, LogIn } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (localStorage.getItem("token")) {
-      router.push("/dashboard");
-    }
-  }, [router]);
 
-  const isFormValid = email.length > 0 && password.length >= 8;
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const email = String(formData.get("email") || "").trim();
+    const password = String(formData.get("password") || "");
     setError("");
     setLoading(true);
 
@@ -65,7 +60,7 @@ export default function LoginPage() {
 
       {/* Card do formulário */}
       <div className="glass rounded-2xl p-6 shadow-xl">
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form method="post" onSubmit={handleSubmit} className="space-y-5">
           {/* Error Alert */}
           {error && (
             <div className="flex items-center gap-2 p-3 rounded-xl bg-danger/10 border border-danger/20 text-danger text-sm animate-fade-in">
@@ -85,8 +80,7 @@ export default function LoginPage() {
             <input
               id="login-email"
               type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              name="email"
               placeholder="seu@email.com"
               autoComplete="email"
               required
@@ -106,8 +100,7 @@ export default function LoginPage() {
               <input
                 id="login-password"
                 type={showPassword ? "text" : "password"}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                name="password"
                 placeholder="Mínimo 8 caracteres"
                 autoComplete="current-password"
                 required
@@ -141,7 +134,7 @@ export default function LoginPage() {
           <button
             id="login-submit"
             type="submit"
-            disabled={!isFormValid || loading}
+            disabled={loading}
             className="w-full h-11 rounded-xl bg-primary text-primary-foreground font-semibold flex items-center justify-center gap-2 hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 cursor-pointer"
           >
             {loading ? (

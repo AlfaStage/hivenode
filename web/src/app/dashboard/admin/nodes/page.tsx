@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Server, Activity, Search, Ban, CheckCircle, Trash2, Smartphone, HardDrive } from "lucide-react";
+import { useState } from "react";
+import { useAdminUsers } from "@/hooks/use-admin-users";
+import { Server, Activity, Search, Ban, CheckCircle, Trash2, Smartphone } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,27 +10,10 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 
 export default function AdminNodesPage() {
-  const [users, setUsers] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { users, loading, error, reload: fetchData } = useAdminUsers();
   const [search, setSearch] = useState("");
 
-  const fetchData = async () => {
-    try {
-      const res = await fetch("/api/admin");
-      const data = await res.json();
-      if (data.success) {
-        setUsers(data.data.users || []);
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  useEffect(() => {
-    fetchData();
-  }, []);
 
   const handleUpdateStatus = async (id: string, newStatus: string) => {
     try {
@@ -55,7 +39,7 @@ export default function AdminNodesPage() {
   };
 
   const nodes = users.flatMap((u) =>
-    (u.nodes || []).map((n: any) => ({
+    (u.nodes || []).map((n) => ({
       ...n,
       ownerEmail: u.email,
     }))
@@ -67,6 +51,8 @@ export default function AdminNodesPage() {
       (n.deviceModel || "").toLowerCase().includes(search.toLowerCase()) ||
       (n.ipAddress || "").toLowerCase().includes(search.toLowerCase())
   );
+
+  if (error) return <p role="alert">{error}</p>;
 
   if (loading) {
     return (

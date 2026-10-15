@@ -1,0 +1,51 @@
+{
+  "version": "1.0.0",
+  "documentDate": "2026-10-13",
+  "timezone": "America/Sao_Paulo",
+  "productImplemented": false,
+  "gates": [
+    {
+      "id": "D",
+      "name": "Documentação e contratos locais",
+      "status": "PASSOU",
+      "evidence": "validation-report.md"
+    },
+    {
+      "id": "A",
+      "name": "Unitários, contratos e isolamento do produto",
+      "status": "NAO_EXECUTADO",
+      "reason": "Implementação nova ainda não executada"
+    },
+    {
+      "id": "B",
+      "name": "Integração com simulador",
+      "status": "NAO_EXECUTADO",
+      "reason": "Harness e serviço serão implementados pelas issues"
+    },
+    {
+      "id": "C",
+      "name": "Browser, MCP, proxy, migração e carga",
+      "status": "NAO_EXECUTADO",
+      "reason": "Testar após implementação"
+    },
+    {
+      "id": "N",
+      "name": "Build e testes nativos",
+      "status": "NAO_EXECUTADO",
+      "reason": "Testar após módulo/SDK/toolchain"
+    },
+    {
+      "id": "P",
+      "name": "Aparelhos e linhas reais",
+      "status": "NAO_EXECUTADO",
+      "reason": "Proprietário testará daqui a alguns dias; data não definida"
+    },
+    {
+      "id": "L",
+      "name": "Jurídico, custos, gateway e distribuição",
+      "status": "NAO_EXECUTADO",
+      "reason": "Validação pelos responsáveis antes de lançamento"
+    }
+  ],
+  "productionRealSendAllowed": false
+}

@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { LayoutDashboard, Users, Server, Shield, CreditCard, Activity, ArrowUpRight, TrendingUp, Pickaxe } from "lucide-react";
+import type { AdminUser } from "@/lib/admin-types";
+import { LayoutDashboard, Users, Server, Shield, CreditCard, Activity, ArrowUpRight, TrendingUp } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 
 export default function AdminOverviewPage() {
-  const [users, setUsers] = useState<any[]>([]);
+  const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -33,13 +34,12 @@ export default function AdminOverviewPage() {
   const totalUsers = users.length;
   const totalNodes = users.reduce((acc, u) => acc + (u.nodes?.length || 0), 0);
   const activeNodes = users.reduce((acc, u) => {
-    return acc + (u.nodes?.filter((n: any) => n.status === "ONLINE").length || 0);
+    return acc + (u.nodes?.filter((n) => n.status === "ONLINE").length || 0);
   }, 0);
   const totalProxies = users.reduce((acc, u) => {
-    return acc + (u.nodes?.reduce((a: number, n: any) => a + (n.proxies?.length || 0), 0) || 0);
+    return acc + (u.nodes?.reduce((a: number, n) => a + (n.proxies?.length || 0), 0) || 0);
   }, 0);
-  const totalSubscriptions = users.reduce((acc, u) => acc + (u.subscriptions?.length || 0), 0);
-  const totalPoints = users.reduce((acc, u) => acc + (u.hivePoints || 0), 0);
+  const totalSubscriptions = users.reduce((acc, u) => acc + (u.subscriptions?.filter(s => s.status === "ACTIVE" && new Date(s.currentPeriodEnd) > new Date()).length || 0), 0);
 
   return (
     <div className="space-y-8 animate-fade-in pb-10">

@@ -1,0 +1,100 @@
+
+> hivenode-web@1.1.0 build
+> npx prisma generate && cross-env NODE_OPTIONS="--max-old-space-size=1024" next build
+
+Loaded Prisma config from prisma.config.ts.
+
+Prisma schema loaded from prisma\schema.prisma.
+
+✔ Generated Prisma Client (v7.8.0) to .\node_modules\@prisma\client in 340ms
+
+Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
+
+
+▲ Next.js 16.2.10 (Turbopack)
+- Environments: .env
+- Experiments (use with caution):
+  · cpus: 1
+  ✓ memoryBasedWorkersCount
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 9.9s
+  Running TypeScript ...
+  Finished TypeScript in 17.8s ...
+  Collecting page data using 1 worker ...
+  Generating static pages using 1 worker (0/42) ...
+  Generating static pages using 1 worker (10/42) 
+  Generating static pages using 1 worker (20/42) 
+  Generating static pages using 1 worker (31/42) 
+✓ Generating static pages using 1 worker (42/42) in 629ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ƒ /
+├ ○ /_not-found
+├ ƒ /api/admin
+├ ƒ /api/admin/nodes/[id]
+├ ƒ /api/admin/payment-key
+├ ƒ /api/admin/plans
+├ ƒ /api/admin/proxies/[id]
+├ ƒ /api/admin/settings
+├ ƒ /api/admin/subscriptions/[id]
+├ ƒ /api/admin/users/[id]
+├ ƒ /api/admin/users/[id]/subscription
+├ ƒ /api/auth/device-code/approve
+├ ƒ /api/auth/device-code/generate
+├ ƒ /api/auth/device-code/poll
+├ ƒ /api/auth/forgot-password
+├ ƒ /api/auth/login
+├ ƒ /api/auth/logout
+├ ƒ /api/auth/me
+├ ƒ /api/auth/pair-code
+├ ƒ /api/auth/qr-link
+├ ƒ /api/auth/qr-login
+├ ƒ /api/auth/register
+├ ƒ /api/auth/reset-password
+├ ƒ /api/billing/checkout
+├ ƒ /api/billing/redeem-points
+├ ƒ /api/billing/subscribe
+├ ƒ /api/clean
+├ ƒ /api/dashboard-ticket
+├ ƒ /api/health
+├ ƒ /api/internal/node-auth
+├ ƒ /api/internal/proxy-auth
+├ ƒ /api/internal/usage
+├ ƒ /api/nodes
+├ ƒ /api/nodes/[id]
+├ ƒ /api/nodes/available
+├ ƒ /api/plans
+├ ƒ /api/proxies
+├ ƒ /api/proxies/[id]
+├ ƒ /api/proxies/[id]/rotate
+├ ƒ /api/shares
+├ ƒ /api/webhooks/abacatepay
+├ ƒ /cli.sh
+├ ƒ /dashboard
+├ ƒ /dashboard/admin
+├ ƒ /dashboard/admin/crypto
+├ ƒ /dashboard/admin/device-approve
+├ ƒ /dashboard/admin/nodes
+├ ƒ /dashboard/admin/plans
+├ ƒ /dashboard/admin/proxies
+├ ƒ /dashboard/admin/settings
+├ ƒ /dashboard/admin/subscriptions
+├ ƒ /dashboard/admin/users
+├ ƒ /dashboard/billing
+├ ƒ /dashboard/miner
+├ ƒ /dashboard/proxies
+├ ○ /forgot-password
+├ ƒ /install.sh
+├ ○ /login
+├ ○ /register
+├ ○ /reset-password
+└ ○ /saas
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

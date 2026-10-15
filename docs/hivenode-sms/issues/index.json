@@ -1,0 +1,1477 @@
+[
+  {
+    "id": "HNS-01",
+    "title": "Validar contratos do produto, preços e gates de lançamento",
+    "priority": "P0",
+    "status": "TODO",
+    "dependencies": [],
+    "requirements": [
+      "R04",
+      "R06",
+      "R17",
+      "R21"
+    ],
+    "specifications": [
+      "02-negocio-cobranca.md",
+      "10-seguranca-conformidade.md",
+      "13-decisoes-fontes.md"
+    ],
+    "paths": [
+      "docs/hivenode-sms",
+      "web/src/app/api/admin/plans/route.ts"
+    ],
+    "tasks": [
+      "Revisar baseline 1990/4990/9990 centavos e diferenciar benefício global de membros de aparelhos por serviço.",
+      "Identificar responsável jurídico/comercial; registrar como a elegibilidade de linha é comprovada sem tratar checkbox como autorização.",
+      "Definir custos de suporte/infra e limites públicos do piloto; confirmar ausência de cobrança por mensagem.",
+      "Criar ADR para qualquer mudança de escopo, catálogo ou benefício proxy; não publicar preços ainda."
+    ],
+    "acceptance": [
+      "Baseline e pendências têm dono, saída e gate; sem promessa de aprovação jurídica ou envio ilimitado da operadora.",
+      "Valores são snapshots por período; plano proxy antigo conserva benefício 1 até revisão.",
+      "Nada foi publicado nem cobrado nesta issue."
+    ],
+    "tests": [
+      "T19",
+      "T46",
+      "T52"
+    ],
+    "owner": "Produto/comercial com revisão jurídica; junior organiza evidências"
+  },
+  {
+    "id": "HNS-02",
+    "title": "Investigar Android, foreground service e canal de distribuição",
+    "priority": "P0",
+    "status": "TODO",
+    "dependencies": [],
+    "requirements": [
+      "R05",
+      "R18",
+      "R20"
+    ],
+    "specifications": [
+      "08-android.md",
+      "03-arquitetura.md"
+    ],
+    "paths": [
+      "hivenode-app/app.json",
+      "hivenode-app/plugins/withNotifeeForegroundServiceType.js",
+      "hivenode-light/android-app/app/build.gradle"
+    ],
+    "tasks": [
+      "Inspecionar SDK/target gerados no app principal e toolchain Light; registrar matriz API26/31/34/35/36.",
+      "Avaliar opções legítimas FGS, reconciliação WorkManager e wake-up opcional; medir protótipo sem linha real.",
+      "Verificar permissões SEND_SMS/READ_PHONE_STATE e elegibilidade de distribuição Play/empresarial.",
+      "Registrar ADR com limites de segundo plano, force-stop, reboot e necessidade de abrir app; definir como exibir pausa."
+    ],
+    "acceptance": [
+      "Não existe promessa 24/7 baseada só em dataSync/WakeLock.",
+      "Baseline SMS API>=26 é aplicado sem impedir proxy em aparelhos antigos.",
+      "ADR revisado por mobile experiente; físico ainda pendente."
+    ],
+    "tests": [
+      "T49",
+      "T50"
+    ],
+    "owner": "Mobile com revisão sênior"
+  },
+  {
+    "id": "HNS-03",
+    "title": "Preparar harness isolado, fixtures e simulador SMS",
+    "priority": "P0",
+    "status": "TODO",
+    "dependencies": [],
+    "requirements": [
+      "R20",
+      "R21"
+    ],
+    "specifications": [
+      "11-testes.md",
+      "07-fila-protocolo.md"
+    ],
+    "paths": [
+      "docker-compose.test.yml",
+      "web/scripts/test-env.ts",
+      "web/scripts/local-integration.ts",
+      "web/package.json"
+    ],
+    "tasks": [
+      "Criar scripts test:sms:* e fixtures A/B/members/nodes/SIMs com runId.",
+      "Implementar fake modem e agente que persistem tentativa/eventos entre reinícios; nunca chamar Telephony ou SMS externo.",
+      "Implementar cenários listados no plano de testes com clock/seed e contagem de invocações físicas fake.",
+      "Adicionar configuração Playwright/contratos onde ausente e eliminar dependência de ws de outra pasta no novo harness."
+    ],
+    "acceptance": [
+      "Simulador recusa APP_ENV=production e toda evidência é SIMULATED.",
+      "Execução repete sem contaminar outras fixtures; secrets locais não alcançam produção.",
+      "Scripts novos são documentados como existentes somente após commit."
+    ],
+    "tests": [
+      "T20",
+      "T24",
+      "T25",
+      "T27",
+      "T42"
+    ],
+    "owner": "Backend/QA"
+  },
+  {
+    "id": "HNS-04",
+    "title": "Adicionar schema de contas, memberships e billing por conta",
+    "priority": "P0",
+    "status": "TODO",
+    "dependencies": [
+      "HNS-01"
+    ],
+    "requirements": [
+      "R01",
+      "R02",
+      "R03",
+      "R04"
+    ],
+    "specifications": [
+      "04-dados-migracao.md",
+      "05-equipes-autorizacao.md"
+    ],
+    "paths": [
+      "web/prisma/schema.prisma",
+      "web/prisma/migrations"
+    ],
+    "tasks": [
+      "Criar Workspace/Membership/Invitation/Grant/BillingAccount/DeviceService com índices e FKs compostas.",
+      "Adicionar workspaceId nullable em recursos existentes, snapshots e versionamento sem remover userId.",
+      "Garantir OWNER único, constraints de capacidade e cascades que não apaguem empresa ao remover funcionário.",
+      "Gerar migração aditiva e revisão do SQL em banco limpo e cópia representativa."
+    ],
+    "acceptance": [
+      "Migração não exige reset ou db push.",
+      "FK entre contas é rejeitada; OWNER e campos financeiros têm integridade.",
+      "Cliente legado continua funcionando com código compatível."
+    ],
+    "tests": [
+      "T01",
+      "T03",
+      "T07",
+      "T48"
+    ],
+    "owner": "Backend; revisão de migração"
+  },
+  {
+    "id": "HNS-05",
+    "title": "Criar backfill idempotente e camada de compatibilidade legado",
+    "priority": "P0",
+    "status": "TODO",
+    "dependencies": [
+      "HNS-03",
+      "HNS-04"
+    ],
+    "requirements": [
+      "R01",
+      "R22"
+    ],
+    "specifications": [
+      "04-dados-migracao.md"
+    ],
+    "paths": [
+      "web/scripts",
+      "web/src/lib/transactions.ts",
+      "web/src/lib/payment-events.ts",
+      "web/src/lib/proxy-access.ts"
+    ],
+    "tasks": [
+      "Implementar backfill em lotes/checkpoints por migratedFromUserId; tratar SYSTEM e órfãos explicitamente.",
+      "Mapear recursos, shares, assinaturas e saldo para conta correta preservando IDs e valores.",
+      "Centralizar resolução user legado→conta padrão e dual-write financeiro transacional temporário.",
+      "Produzir relatório de contagens, divergências e retomada; testar execução simultânea/dupla."
+    ],
+    "acceptance": [
+      "Duas execuções mantêm os mesmos IDs/contagens/saldos.",
+      "Shares não fundem duas contas e não concedem SMS.",
+      "Sem cobranças, novos períodos ou atribuição arbitrária de órfãos."
+    ],
+    "tests": [
+      "T01",
+      "T44",
+      "T48"
+    ],
+    "owner": "Backend com revisão de dados"
+  },
+  {
+    "id": "HNS-06",
+    "title": "Implementar contexto de conta e autorização por serviço/recurso",
+    "priority": "P0",
+    "status": "TODO",
+    "dependencies": [
+      "HNS-04",
+      "HNS-05"
+    ],
+    "requirements": [
+      "R01",
+      "R03",
+      "R17"
+    ],
+    "specifications": [
+      "05-equipes-autorizacao.md",
+      "06-api-mcp.md"
+    ],
+    "paths": [
+      "web/src/lib/auth.ts",
+      "web/src/proxy.ts",
+      "web/src/lib/workspaces"
+    ],
+    "tasks": [
+      "Criar requireWorkspaceContext e verificação deny-by-default para pessoa/API/device.",
+      "Resolver membership/grants reais; separar ADMIN global de proprietário da conta.",
+      "Scoped queries por ID+workspace e erros 401/403/404; cache versionado com revogação.",
+      "Criar matriz de acesso e helpers reutilizáveis nos canais; revisar Origem/CSRF."
+    ],
+    "acceptance": [
+      "ID da conta não autentica acesso.",
+      "Membro SMS-only não acessa proxy, conteúdo ou faturamento sem grant.",
+      "Revogação bloqueia grant físico novo, mesmo com sessão/chave antiga."
+    ],
+    "tests": [
+      "T03",
+      "T06",
+      "T34",
+      "T43"
+    ],
+    "owner": "Backend/security"
+  },
+  {
+    "id": "HNS-07",
+    "title": "Criar convites, gerenciamento de membros e transferência de OWNER",
+    "priority": "P0",
+    "status": "TODO",
+    "dependencies": [
+      "HNS-06",
+      "HNS-08"
+    ],
+    "requirements": [
+      "R02",
+      "R03",
+      "R17"
+    ],
+    "specifications": [
+      "05-equipes-autorizacao.md",
+      "02-negocio-cobranca.md"
+    ],
+    "paths": [
+      "web/src/app/api/v1",
+      "web/src/lib/workspaces"
+    ],
+    "tasks": [
+      "Implementar list/invite/accept/revoke/role/grants/removal/owner-transfer conforme contrato.",
+      "Reservar vagas por 72h sob lock, normalizar email e armazenar só hash do convite.",
+      "Exigir email verificado, consumir convite uma vez e impedir escalada de grants pelo admin delegado.",
+      "Remoção mantém recursos e revoga acesso/keys; transferência reautentica e conserva billing contact."
+    ],
+    "acceptance": [
+      "Concorrência na última vaga libera um único convite.",
+      "OWNER nunca é removido por downgrade ou DELETE simples.",
+      "Pessoa em outra conta conserva sessão daquela conta."
+    ],
+    "tests": [
+      "T05",
+      "T06",
+      "T07",
+      "T08"
+    ],
+    "owner": "Backend"
+  },
+  {
+    "id": "HNS-08",
+    "title": "Calcular entitlements independentes e capacidade global de equipe",
+    "priority": "P0",
+    "status": "TODO",
+    "dependencies": [
+      "HNS-04",
+      "HNS-06"
+    ],
+    "requirements": [
+      "R02",
+      "R04",
+      "R22"
+    ],
+    "specifications": [
+      "02-negocio-cobranca.md",
+      "05-equipes-autorizacao.md"
+    ],
+    "paths": [
+      "web/src/lib/entitlements",
+      "web/src/lib/worker.ts",
+      "web/src/lib/proxy-access.ts"
+    ],
+    "tasks": [
+      "Criar resolver elegível por período pago, cancelAtPeriodEnd, suspensão e trial.",
+      "Calcular max(1,benefícios), sem soma; planos proxy legados têm benefício 1.",
+      "Separar limite de aparelhos SMS/proxy e presença offline; locks na habilitação.",
+      "Aplicar downgrade selecionado ou fallback auditado sem apagar dados; revisões invalidam cache."
+    ],
+    "acceptance": [
+      "SMS cancelado não derruba proxy elegível.",
+      "Mais membros não aumenta limite de aparelhos ou GB.",
+      "Downgrade preserva OWNER e explica seleção/suspensão de excedentes."
+    ],
+    "tests": [
+      "T08",
+      "T09",
+      "T11",
+      "T13"
+    ],
+    "owner": "Backend"
+  },
+  {
+    "id": "HNS-09",
+    "title": "Migrar autorização proxy, broker, realtime e clients legados",
+    "priority": "P0",
+    "status": "TODO",
+    "dependencies": [
+      "HNS-05",
+      "HNS-06",
+      "HNS-08"
+    ],
+    "requirements": [
+      "R03",
+      "R22"
+    ],
+    "specifications": [
+      "03-arquitetura.md",
+      "04-dados-migracao.md",
+      "05-equipes-autorizacao.md"
+    ],
+    "paths": [
+      "web/src/lib/proxy-access.ts",
+      "web/src/app/api/internal",
+      "web/src/app/api/dashboard-ticket",
+      "broker/internal/tunnel",
+      "hivedocker",
+      "hiveminer-app"
+    ],
+    "tasks": [
+      "Migrar resolver proxy para conta/beneficiário com compatibilidade de credenciais e shares.",
+      "Atualizar tickets realtime single-use com conta/ator/resources/revisão; filtrar antes do broadcast.",
+      "Preservar DIAL/TCP binário, cobrança de bytes e frota pública; não condicionar SMS ao proxy.",
+      "Regredir pareamento/login/admin/CLI/HiveDocker/Miner; registrar commits de repos próprios."
+    ],
+    "acceptance": [
+      "Permissões da equipe valem proxy sem confundir dono com funcionário.",
+      "Shares/público/saldo continuam corretos e jamais autorizam SMS.",
+      "Eventos e credenciais de outra conta não vazam."
+    ],
+    "tests": [
+      "T04",
+      "T32",
+      "T43",
+      "T44",
+      "T45"
+    ],
+    "owner": "Go/backend; revisão de compatibilidade"
+  },
+  {
+    "id": "HNS-10",
+    "title": "Criar API keys por conta, scopes e revogação",
+    "priority": "P0",
+    "status": "TODO",
+    "dependencies": [
+      "HNS-06",
+      "HNS-07"
+    ],
+    "requirements": [
+      "R13",
+      "R17"
+    ],
+    "specifications": [
+      "05-equipes-autorizacao.md",
+      "06-api-mcp.md"
+    ],
+    "paths": [
+      "web/src/lib/workspaces",
+      "web/src/app/api/v1"
+    ],
+    "tasks": [
+      "Gerar segredo forte, persistir hash/prefix e exibir uma vez.",
+      "Aplicar scopes/resources intersectados com grants vigentes do criador.",
+      "Implementar expiração/revogação/rotação e auditoria sem secrets.",
+      "Adicionar rate limits por chave+conta e contrato público de erros."
+    ],
+    "acceptance": [
+      "Chave A não pode apontar para conta B.",
+      "Remover criador bloqueia uso sem apagar histórico.",
+      "Read-only não envia; segredo não aparece em GET/log."
+    ],
+    "tests": [
+      "T06",
+      "T16",
+      "T34",
+      "T46",
+      "T51"
+    ],
+    "owner": "Backend/security"
+  },
+  {
+    "id": "HNS-11",
+    "title": "Adicionar catálogo SMS, habilitação por aparelho e trial transacional",
+    "priority": "P0",
+    "status": "TODO",
+    "dependencies": [
+      "HNS-01",
+      "HNS-08",
+      "HNS-10"
+    ],
+    "requirements": [
+      "R04",
+      "R06",
+      "R21"
+    ],
+    "specifications": [
+      "02-negocio-cobranca.md",
+      "04-dados-migracao.md"
+    ],
+    "paths": [
+      "web/prisma/schema.prisma",
+      "web/src/app/api/admin/plans",
+      "web/src/lib/entitlements"
+    ],
+    "tasks": [
+      "Adicionar categoria SMS e slugs/centavos/limites snapshot de catálogo.",
+      "Implementar habilitação SMS exclusiva BYOD PRIVATE com capacidade sob lock.",
+      "Criar trial 7 dias/1 aparelho/100 segmentos e reserva idempotente por tentativa.",
+      "Garantir que quota trial incerta fica reservada; paid não debita por mensagem/GB."
+    ],
+    "acceptance": [
+      "Dois chips não consomem duas vagas.",
+      "Nenhuma ativação SMS via NodeShare ou node PUBLIC.",
+      "Teste não converte automaticamente em assinatura paga."
+    ],
+    "tests": [
+      "T09",
+      "T10",
+      "T19",
+      "T45"
+    ],
+    "owner": "Backend"
+  },
+  {
+    "id": "HNS-12",
+    "title": "Investigar gateway e implementar ciclo financeiro SMS isolado",
+    "priority": "P0",
+    "status": "TODO",
+    "dependencies": [
+      "HNS-08",
+      "HNS-11"
+    ],
+    "requirements": [
+      "R04",
+      "R22"
+    ],
+    "specifications": [
+      "02-negocio-cobranca.md",
+      "12-entrega-operacao.md"
+    ],
+    "paths": [
+      "web/src/lib/abacatepay.ts",
+      "web/src/lib/payment-events.ts",
+      "web/src/lib/billing-period.ts",
+      "web/src/app/api/billing"
+    ],
+    "tasks": [
+      "Entregar matriz sandbox/real de recorrência/cancelamento/upgrade/proration/Pix; ADR de fallback explícito.",
+      "Implementar quote exp15min, delta em centavos e change idempotente liberado só por confirmação financeira.",
+      "Cancelar renovação preservando período pago e direitos; downgrade próximo ciclo.",
+      "Processar duplicados/fora de ordem/refund/chargeback sem somar período/GB SMS; reconciliar external payment identity."
+    ],
+    "acceptance": [
+      "Evento duplicado concede um período.",
+      "URL de retorno não libera assinatura.",
+      "Cancelamento SMS não afeta proxy; gateway sem feature não é simulado como sucesso."
+    ],
+    "tests": [
+      "T11",
+      "T12",
+      "T13",
+      "T14",
+      "T52"
+    ],
+    "owner": "Backend/financeiro"
+  },
+  {
+    "id": "HNS-13",
+    "title": "Criar termos versionados, inventário SIM e política elegível",
+    "priority": "P0",
+    "status": "TODO",
+    "dependencies": [
+      "HNS-02",
+      "HNS-06",
+      "HNS-11"
+    ],
+    "requirements": [
+      "R05",
+      "R06",
+      "R17"
+    ],
+    "specifications": [
+      "08-android.md",
+      "10-seguranca-conformidade.md"
+    ],
+    "paths": [
+      "web/src/lib/sms/policies",
+      "web/src/app/api/device/v1",
+      "web/src/app/api/v1"
+    ],
+    "tasks": [
+      "Gravar aceites por pessoa/conta/document hash sem exoneração total.",
+      "Receber capabilities/inventory autenticados e validar node/epoch/subscription/binding.",
+      "Versionar SimPolicy por finalidade/limites/roaming/evidência; checkbox não aprova contrato.",
+      "Invalidar bindings removidos/incertos e bloquear execução, sem trocar SIM automaticamente."
+    ],
+    "acceptance": [
+      "Inventário só contém linhas ativas acessíveis; número ausente é permitido.",
+      "Troca no mesmo slot pausa pendentes.",
+      "Sem confirmação local/linha elegível não existe grant."
+    ],
+    "tests": [
+      "T19",
+      "T30",
+      "T45",
+      "T51"
+    ],
+    "owner": "Backend/mobile com compliance"
+  },
+  {
+    "id": "HNS-14",
+    "title": "Implementar descadastro marketing e evidências de finalidade",
+    "priority": "P0",
+    "status": "TODO",
+    "dependencies": [
+      "HNS-06",
+      "HNS-13"
+    ],
+    "requirements": [
+      "R06",
+      "R16",
+      "R17"
+    ],
+    "specifications": [
+      "10-seguranca-conformidade.md",
+      "09-painel-jornadas.md"
+    ],
+    "paths": [
+      "web/src/lib/sms/policies",
+      "web/src/app/api/v1/sms/optout",
+      "web/src/app/sms/optout"
+    ],
+    "tasks": [
+      "Criar supressão por conta+hash de destino e token opaco de descadastro.",
+      "GET mostra confirmação; POST bloqueia marketing idempotentemente sem login.",
+      "Inserir link antes do preview final e revalidar supressão no grant.",
+      "Registrar origem/adesão/reinscrição; CSV não limpa supressão; não pedir READ_SMS na v1."
+    ],
+    "acceptance": [
+      "Descadastro bloqueia todos os chips/aparelhos da conta em marketing.",
+      "Scanner GET não descadastra involuntariamente.",
+      "Supressão não exige identidade/chave de envio nem expõe telefone em URL."
+    ],
+    "tests": [
+      "T18",
+      "T19",
+      "T40",
+      "T51"
+    ],
+    "owner": "Backend/web"
+  },
+  {
+    "id": "HNS-15",
+    "title": "Implementar serviço de mensagens, validação e idempotência",
+    "priority": "P0",
+    "status": "TODO",
+    "dependencies": [
+      "HNS-10",
+      "HNS-11",
+      "HNS-13",
+      "HNS-14"
+    ],
+    "requirements": [
+      "R06",
+      "R07",
+      "R08",
+      "R13",
+      "R17"
+    ],
+    "specifications": [
+      "06-api-mcp.md",
+      "07-fila-protocolo.md"
+    ],
+    "paths": [
+      "web/src/lib/sms/service",
+      "web/src/app/api/v1",
+      "web/prisma/schema.prisma"
+    ],
+    "tasks": [
+      "Validar corpo estrito, finalidade, E.164, conta/aparelho/linha e agenda.",
+      "Inserir mensagem+idempotência+outbox+audit atomicamente; lookup de key antes de defaults now.",
+      "Resolver corrida de unique e fingerprint igual/diferente; janela tombstone180d.",
+      "Criar list/get/cancel/resend conforme estados e escopos; resend novo ID com confirmação."
+    ],
+    "acceptance": [
+      "POST repetido não cria outra intenção.",
+      "409 para corpo diferente; ID de outra conta 404.",
+      "Cancelar AUTHORIZED não promete recall; body só aparece com grant de conteúdo."
+    ],
+    "tests": [
+      "T15",
+      "T16",
+      "T17",
+      "T19",
+      "T54"
+    ],
+    "owner": "Backend"
+  },
+  {
+    "id": "HNS-16",
+    "title": "Criar outbox, workers, agenda e recuperação Redis",
+    "priority": "P0",
+    "status": "TODO",
+    "dependencies": [
+      "HNS-03",
+      "HNS-15"
+    ],
+    "requirements": [
+      "R07",
+      "R08",
+      "R19"
+    ],
+    "specifications": [
+      "07-fila-protocolo.md",
+      "03-arquitetura.md"
+    ],
+    "paths": [
+      "web/src/lib/sms/jobs",
+      "web/src/workers",
+      "web/package.json"
+    ],
+    "tasks": [
+      "Criar publisher/worker separados do tick atual, jobs sem corpo e IDs sem dois-pontos.",
+      "Reconciliar intents persistidas após queda; atualizar disponibilidade no banco.",
+      "Implementar schedule/expiry e transações concorrentes com CAS/locks.",
+      "Adicionar DLQ e replay administrativo que não equivale a resend físico; graceful shutdown."
+    ],
+    "acceptance": [
+      "Redis offline após commit não perde a mensagem.",
+      "Repetir job não cria grant/modem novo por si só.",
+      "Expiração antes de grant vira EXPIRED."
+    ],
+    "tests": [
+      "T17",
+      "T22",
+      "T42",
+      "T53"
+    ],
+    "owner": "Backend/infra"
+  },
+  {
+    "id": "HNS-17",
+    "title": "Implementar API de aparelho, lease e grants assinados",
+    "priority": "P0",
+    "status": "TODO",
+    "dependencies": [
+      "HNS-13",
+      "HNS-15",
+      "HNS-16"
+    ],
+    "requirements": [
+      "R06",
+      "R07",
+      "R10",
+      "R13",
+      "R18"
+    ],
+    "specifications": [
+      "05-equipes-autorizacao.md",
+      "07-fila-protocolo.md",
+      "06-api-mcp.md"
+    ],
+    "paths": [
+      "web/src/lib/sms/device",
+      "web/src/app/api/device/v1"
+    ],
+    "tasks": [
+      "Implementar HMAC de request com método/path/body/nonce/timestamp e replay cache.",
+      "Claim pinned por node/epoch/SIM/version com lease120s e uma execução por aparelho.",
+      "Grant assimétrico30s, body/recipient fingerprints, segmentos/reserva trial e fencing persistido.",
+      "Revalidar membership/key/entitlement/política/supressão/expiry no grant; recuperar mesma autorização se resposta perder."
+    ],
+    "acceptance": [
+      "Nó não pede tentativa/grant de outro nó.",
+      "Lease vencido após grant gera UNKNOWN, não redispatch.",
+      "Kill switch e DB indisponível impedem novo grant; evento final continua aceito."
+    ],
+    "tests": [
+      "T20",
+      "T21",
+      "T23",
+      "T41",
+      "T54"
+    ],
+    "owner": "Backend/security; revisão obrigatória"
+  },
+  {
+    "id": "HNS-18",
+    "title": "Implementar eventos, state machine, diagnóstico e reconciliação",
+    "priority": "P0",
+    "status": "TODO",
+    "dependencies": [
+      "HNS-03",
+      "HNS-17"
+    ],
+    "requirements": [
+      "R09",
+      "R10",
+      "R11",
+      "R15"
+    ],
+    "specifications": [
+      "07-fila-protocolo.md",
+      "11-testes.md"
+    ],
+    "paths": [
+      "web/src/lib/sms/state-machine",
+      "web/src/lib/sms/diagnostics",
+      "web/src/workers"
+    ],
+    "tasks": [
+      "Persistir/deduplicar eventos por eventId e node+epoch+sequence; ACK após commit.",
+      "Agregar resultado por segmento sem regredir estados com eventos fora de ordem.",
+      "Mapear certeza/categoria/retrySafe; UNKNOWN/PARTIAL nunca retry integral cego.",
+      "Implementar até3 tentativas só quando zero segmentos aceitos é comprovado, e reconciliar receipts tardios."
+    ],
+    "acceptance": [
+      "SENT sem receipt continua enviado com entrega não confirmada.",
+      "Evento repetido não reconta trial nem invoca modem.",
+      "Generic failure não vira falta de crédito confirmada."
+    ],
+    "tests": [
+      "T24",
+      "T25",
+      "T26",
+      "T27",
+      "T28",
+      "T29",
+      "T31"
+    ],
+    "owner": "Backend com revisão de execução"
+  },
+  {
+    "id": "HNS-19",
+    "title": "Criar lotes, templates, agenda e preview",
+    "priority": "P1",
+    "status": "TODO",
+    "dependencies": [
+      "HNS-15",
+      "HNS-17",
+      "HNS-18"
+    ],
+    "requirements": [
+      "R08",
+      "R12"
+    ],
+    "specifications": [
+      "06-api-mcp.md",
+      "09-painel-jornadas.md"
+    ],
+    "paths": [
+      "web/src/lib/sms",
+      "web/src/app/api/v1"
+    ],
+    "tasks": [
+      "Criar templates versionados com variáveis validadas e rendering sem execução de expressão.",
+      "Lotes até100 com clientItemId único/destinos distintos; todo lote inválido não comita nada.",
+      "Agenda UTC/fuso e validade aplicadas por item; link optout no texto final.",
+      "Preview real do aparelho determina segmentos; estimativa web explicitamente indicativa."
+    ],
+    "acceptance": [
+      "Erro em um item devolve422 e nenhum item persiste.",
+      "Troca de modelo não modifica mensagem autorizada.",
+      "Cada destino tem ID/estado próprio e paginação."
+    ],
+    "tests": [
+      "T17",
+      "T18",
+      "T27",
+      "T46",
+      "T53"
+    ],
+    "owner": "Backend/web"
+  },
+  {
+    "id": "HNS-20",
+    "title": "Criar endpoints e entregas de webhook com SSRF e replay",
+    "priority": "P1",
+    "status": "TODO",
+    "dependencies": [
+      "HNS-10",
+      "HNS-18"
+    ],
+    "requirements": [
+      "R15",
+      "R16"
+    ],
+    "specifications": [
+      "06-api-mcp.md",
+      "10-seguranca-conformidade.md"
+    ],
+    "paths": [
+      "web/src/lib/sms/webhooks",
+      "web/src/workers",
+      "web/src/app/api/v1"
+    ],
+    "tasks": [
+      "Validar URL/DNS/IP na configuração e em cada conexão, incluindo IPv6/rebinding.",
+      "Assinar body exato com timestamp e evento; cifrar secret e exibir uma vez.",
+      "Implementar 8 tentativas, timeout10s,410 disable, DLQ/status e replay de evento.",
+      "Enviar payload redigido, escopado por conta e tipo; sem corpo de SMS por padrão."
+    ],
+    "acceptance": [
+      "Redirect não contorna bloqueio de rede interna.",
+      "Duplicação at-least-once documentada e eventId estável.",
+      "Replay webhook não cria mensagem nem tentativa SMS."
+    ],
+    "tests": [
+      "T37",
+      "T38",
+      "T40"
+    ],
+    "owner": "Backend/security"
+  },
+  {
+    "id": "HNS-21",
+    "title": "Implementar exportação, retenção e exclusão segura",
+    "priority": "P1",
+    "status": "TODO",
+    "dependencies": [
+      "HNS-10",
+      "HNS-18",
+      "HNS-20"
+    ],
+    "requirements": [
+      "R12",
+      "R16",
+      "R17"
+    ],
+    "specifications": [
+      "10-seguranca-conformidade.md",
+      "06-api-mcp.md"
+    ],
+    "paths": [
+      "web/src/lib/sms/jobs",
+      "web/src/app/api/v1",
+      "web/src/workers"
+    ],
+    "tasks": [
+      "Criar export job sem body por default, filtrar por escopos e prevenir CSV formula injection.",
+      "Revalidar conta/permissão no download, link5min/arquivo24h.",
+      "Implementar body purge7d pós-terminal/30d máximo, agenda necessária e retenção operacional por plano.",
+      "Redigir logs/caches/jobs e política de backups; não apagar supressões/financeiro por downgrade."
+    ],
+    "acceptance": [
+      "Conteúdo purgado não continua exportável.",
+      "Revogação bloqueia download antes de expiração do link.",
+      "Histórico180d não retém texto por180d."
+    ],
+    "tests": [
+      "T39",
+      "T40",
+      "T53"
+    ],
+    "owner": "Backend/infra com privacy"
+  },
+  {
+    "id": "HNS-22",
+    "title": "Entregar MCP stdio com mesma política da REST",
+    "priority": "P1",
+    "status": "TODO",
+    "dependencies": [
+      "HNS-10",
+      "HNS-15",
+      "HNS-19"
+    ],
+    "requirements": [
+      "R14",
+      "R13",
+      "R17"
+    ],
+    "specifications": [
+      "06-api-mcp.md"
+    ],
+    "paths": [
+      "mcp",
+      "web/src/lib/sms/service"
+    ],
+    "tasks": [
+      "Criar bridge local com versão SDK fixada, API key protegida e workspace fixo.",
+      "Expor tools/schema/list/get/send/batch/cancel/pause/resume conforme contrato.",
+      "Reusar REST/application layer; idempotencyKey obrigatória nos sends.",
+      "Annotations, errors/requestId e logs sem token; tratar texto como dado não confiável."
+    ],
+    "acceptance": [
+      "Chave read-only falha antes de mensagem persistir.",
+      "REST e MCP convergem em resultado/erro.",
+      "Nenhum endpoint remoto API-key-only é anunciado como OAuth interoperável."
+    ],
+    "tests": [
+      "T34",
+      "T35",
+      "T36",
+      "T51"
+    ],
+    "owner": "Integrações/backend"
+  },
+  {
+    "id": "HNS-23",
+    "title": "Criar módulo Android nativo, inbox e executor SMS",
+    "priority": "P0",
+    "status": "TODO",
+    "dependencies": [
+      "HNS-02",
+      "HNS-17",
+      "HNS-18"
+    ],
+    "requirements": [
+      "R05",
+      "R09",
+      "R10",
+      "R18"
+    ],
+    "specifications": [
+      "08-android.md",
+      "07-fila-protocolo.md"
+    ],
+    "paths": [
+      "hivenode-app/modules/hivenode-sms",
+      "hivenode-app/app.json"
+    ],
+    "tasks": [
+      "Criar módulo Expo local e persistência Room/SQLite cifrada com Keystore.",
+      "Consultar inventário por APIs públicas e selecionar subscription explicitamente.",
+      "Implementar preview/grant verificado e INVOKING antes de modem; callbacks persistidos por segmento sem JS.",
+      "Testar fake modem, replay/fencing/epoch/crashes/multipart; build próprio com SDK/JDK."
+    ],
+    "acceptance": [
+      "Método JS sem grant não consegue send físico.",
+      "Reinício INVOKING não invoca de novo.",
+      "Permissão negada/chip ausente não interrompe proxy; evidência nativa sem modem marcada."
+    ],
+    "tests": [
+      "T21",
+      "T24",
+      "T25",
+      "T27",
+      "T30",
+      "T49"
+    ],
+    "owner": "Mobile; revisão sênior necessária"
+  },
+  {
+    "id": "HNS-24",
+    "title": "Integrar agente e telas SMS no app principal",
+    "priority": "P0",
+    "status": "TODO",
+    "dependencies": [
+      "HNS-23",
+      "HNS-06",
+      "HNS-13"
+    ],
+    "requirements": [
+      "R05",
+      "R06",
+      "R12",
+      "R18"
+    ],
+    "specifications": [
+      "08-android.md",
+      "09-painel-jornadas.md"
+    ],
+    "paths": [
+      "hivenode-app/src/app/index.tsx",
+      "hivenode-app/src/app/_layout.tsx",
+      "hivenode-app/plugins"
+    ],
+    "tasks": [
+      "Extrair integração SMS em módulos sem ampliar monólito de index.tsx.",
+      "Mostrar conta/chips/custos/autorizações; ativar permissões apenas ao habilitar serviço.",
+      "Agente HTTPS claim/grant/events com persistência nativa e reconciliação.",
+      "Tratar timeout FGS/background/reboot/logout/force-stop e badges distintos de proxy/SMS."
+    ],
+    "acceptance": [
+      "SMS funciona sem assinatura proxy e sem sessão de túnel.",
+      "Revogação local pausa envio e mantém diagnóstico.",
+      "App build/bridge validado; rede real aguarda proprietário."
+    ],
+    "tests": [
+      "T19",
+      "T30",
+      "T32",
+      "T49",
+      "T50"
+    ],
+    "owner": "Mobile"
+  },
+  {
+    "id": "HNS-25",
+    "title": "Modernizar Light e integrar SMS compatível sem perder proxy antigo",
+    "priority": "P1",
+    "status": "TODO",
+    "dependencies": [
+      "HNS-02",
+      "HNS-17",
+      "HNS-18",
+      "HNS-23"
+    ],
+    "requirements": [
+      "R05",
+      "R18",
+      "R22"
+    ],
+    "specifications": [
+      "08-android.md",
+      "03-arquitetura.md"
+    ],
+    "paths": [
+      "hivenode-light/android-app",
+      "hivenode-light/native-go/mobile",
+      "hivenode-light/native-go/tunnel"
+    ],
+    "tasks": [
+      "Modernizar Gradle/SDK/wrapper/assinatura sem elevar mínimo proxy indevidamente; documentar JDK.",
+      "Implementar agente/executor Java com mesmos contratos/inbox/grants e feature guard API26.",
+      "Em API antiga anunciar smsSupported=false e evitar carregar classes inexistentes.",
+      "Preservar motor Go/Stop/KICKED/tunnel e testes; APK com hash e gate físico próprio."
+    ],
+    "acceptance": [
+      "Não usar hack private dual SIM para API antiga.",
+      "Principal e Light convergem em state/protocol.",
+      "Light não homologado mantém SMS flag desligada e proxy disponível."
+    ],
+    "tests": [
+      "T30",
+      "T44",
+      "T49",
+      "T50"
+    ],
+    "owner": "Mobile/Go"
+  },
+  {
+    "id": "HNS-26",
+    "title": "Criar painel SMS, jornada de envio e resultados",
+    "priority": "P1",
+    "status": "TODO",
+    "dependencies": [
+      "HNS-06",
+      "HNS-13",
+      "HNS-15",
+      "HNS-18",
+      "HNS-19",
+      "HNS-20",
+      "HNS-21"
+    ],
+    "requirements": [
+      "R12",
+      "R05",
+      "R09",
+      "R11"
+    ],
+    "specifications": [
+      "09-painel-jornadas.md",
+      "06-api-mcp.md"
+    ],
+    "paths": [
+      "web/src/app/dashboard/sms",
+      "web/src/hooks",
+      "web/src/components"
+    ],
+    "tasks": [
+      "Criar overview/devices/SIMs/compose/lote/templates/history/details/integrations.",
+      "Mostrar contagem/agenda/remetente/optout e confirmação antes de lote.",
+      "Distinguir SENT/DELIVERED/PARTIAL/UNKNOWN e ações de cancelamento/reenvio realistas.",
+      "Implementar acesso por grants, acessibilidade, cursor e states de carga/erro/purge."
+    ],
+    "acceptance": [
+      "Membro não vê aparelhos/dados da conta anterior.",
+      "Texto de diagnóstico expressa certeza e ação.",
+      "Sem uso de admin global como atalho no teste de cliente."
+    ],
+    "tests": [
+      "T02",
+      "T33",
+      "T39",
+      "T54"
+    ],
+    "owner": "Web"
+  },
+  {
+    "id": "HNS-27",
+    "title": "Criar seletor de conta, equipe e cobrança integrada",
+    "priority": "P1",
+    "status": "TODO",
+    "dependencies": [
+      "HNS-07",
+      "HNS-08",
+      "HNS-12"
+    ],
+    "requirements": [
+      "R01",
+      "R02",
+      "R04",
+      "R12"
+    ],
+    "specifications": [
+      "09-painel-jornadas.md",
+      "02-negocio-cobranca.md"
+    ],
+    "paths": [
+      "web/src/app/dashboard",
+      "web/src/app/dashboard/billing",
+      "web/src/app/dashboard/team"
+    ],
+    "tasks": [
+      "Adicionar seletor conta que limpa queries/tickets antes de navegar.",
+      "Criar equipe/invite/grants/vagas/owner transfer e máscara de secrets.",
+      "Exibir cartões SMS/proxy independentes, quote/upgrade/downgrade/cancelAtPeriodEnd.",
+      "Selecionar excedentes antes do downgrade e informar efeitos no benefício global."
+    ],
+    "acceptance": [
+      "Não cobrar membro duas vezes por serviços.",
+      "Capacidade mostra maior plano elegível e OWNER contado.",
+      "Cancelar SMS mantém proxy e prazo pago; invite races tratadas na UI."
+    ],
+    "tests": [
+      "T02",
+      "T05",
+      "T08",
+      "T11",
+      "T12",
+      "T33"
+    ],
+    "owner": "Web"
+  },
+  {
+    "id": "HNS-28",
+    "title": "Entregar MCP remoto OAuth como extensão condicionada",
+    "priority": "P2",
+    "status": "TODO",
+    "dependencies": [
+      "HNS-22",
+      "HNS-10"
+    ],
+    "requirements": [
+      "R14",
+      "R13"
+    ],
+    "specifications": [
+      "06-api-mcp.md",
+      "13-decisoes-fontes.md"
+    ],
+    "paths": [
+      "mcp"
+    ],
+    "tasks": [
+      "Fixar spec estável e SDK por ADR, serviço persistente Streamable HTTP.",
+      "Implementar resource metadata/OAuth, issuer/audience/PKCE e consentimento com conta/scopes.",
+      "Negar token passthrough e confusão de sessão/tenant; testar clientes reais.",
+      "Manter flag off e stdio funcional enquanto extensão não for homologada."
+    ],
+    "acceptance": [
+      "Endpoint remoto não depende de segredo colado em UI incompatível.",
+      "Troca de conta não reutiliza scope de outra.",
+      "Só anunciar remoto após testes de interoperabilidade."
+    ],
+    "tests": [
+      "T34",
+      "T35",
+      "T36"
+    ],
+    "owner": "Integrações/security; extensão opcional"
+  },
+  {
+    "id": "HNS-29",
+    "title": "Adicionar observabilidade, suporte e métricas de custo",
+    "priority": "P1",
+    "status": "TODO",
+    "dependencies": [
+      "HNS-12",
+      "HNS-18",
+      "HNS-20",
+      "HNS-21"
+    ],
+    "requirements": [
+      "R11",
+      "R19",
+      "R21"
+    ],
+    "specifications": [
+      "12-entrega-operacao.md",
+      "02-negocio-cobranca.md"
+    ],
+    "paths": [
+      "web/src/lib/sms",
+      "web/src/workers",
+      "docs"
+    ],
+    "tasks": [
+      "Criar métricas redigidas de estados/outbox/DLQ/latência/device/receita/custos.",
+      "Separar tráfego SIMULATED/real, evitar labels de conteúdo/destinatário.",
+      "Implementar alertas de piloto e runbooks com ações seguras.",
+      "Medir minutos de suporte e margem real; revisar plano barato antes de público."
+    ],
+    "acceptance": [
+      "Alertas contêm IDs técnicos sem secrets/PII.",
+      "Receita é confirmada, custo é medido e hipótese não vira margem comprovada.",
+      "Runbook UNKNOWN não orienta retry cego ou rotação de chip."
+    ],
+    "tests": [
+      "T31",
+      "T40",
+      "T41",
+      "T47"
+    ],
+    "owner": "Infra/produto"
+  },
+  {
+    "id": "HNS-30",
+    "title": "Automatizar matriz completa, contratos, carga e chaos no CI",
+    "priority": "P0",
+    "status": "TODO",
+    "dependencies": [
+      "HNS-03",
+      "HNS-09",
+      "HNS-18",
+      "HNS-19",
+      "HNS-20",
+      "HNS-21",
+      "HNS-22",
+      "HNS-24",
+      "HNS-26",
+      "HNS-27",
+      "HNS-29"
+    ],
+    "requirements": [
+      "R20",
+      "R21",
+      "R22"
+    ],
+    "specifications": [
+      "11-testes.md",
+      "12-entrega-operacao.md"
+    ],
+    "paths": [
+      "web/package.json",
+      "web/scripts",
+      "broker/internal",
+      "hivenode-app",
+      "hivenode-light",
+      "scripts"
+    ],
+    "tasks": [
+      "Executar T01–T54 automatizáveis, separar físicos/comerciais de evidências de CI.",
+      "Validar schema/OpenAPI contracts, authnegativos, concorrência e chaos após cada crash point.",
+      "Regredir proxy/CLI/HiveDocker/Miner/build; usar commits referenciados dos repos próprios.",
+      "Rodar carga alvo staging e publicar p95/ambiente/falhas sem modem; race Go em runner compatível."
+    ],
+    "acceptance": [
+      "Nenhum teste físico vira verde por mock.",
+      "Duplicação observada e isolamento falho bloqueiam release.",
+      "Falhas prévias ficam separadas e CI novo é reproduzível."
+    ],
+    "tests": [
+      "T01",
+      "T24",
+      "T38",
+      "T43",
+      "T44",
+      "T47",
+      "T49"
+    ],
+    "owner": "QA/backend/infra"
+  },
+  {
+    "id": "HNS-31",
+    "title": "Ensaiar migração, backup e rollback com dados representativos",
+    "priority": "P0",
+    "status": "TODO",
+    "dependencies": [
+      "HNS-05",
+      "HNS-09",
+      "HNS-12",
+      "HNS-30"
+    ],
+    "requirements": [
+      "R01",
+      "R20",
+      "R22"
+    ],
+    "specifications": [
+      "04-dados-migracao.md",
+      "12-entrega-operacao.md"
+    ],
+    "paths": [
+      "web/prisma/migrations",
+      "web/scripts",
+      "docs/hivenode-sms"
+    ],
+    "tasks": [
+      "Restaurar backup em staging e reconciliar schema/baseline antes de migrar.",
+      "Ensaiar expand/backfill/dual-read/cutover com relatórios de conta/saldo/shares/financeiro.",
+      "Testar rollback por versão compatível após dados de equipe e novas mensagens.",
+      "Testar restore sem replay de modem e reaplicar supressões/retention/payments."
+    ],
+    "acceptance": [
+      "Contagens/saldos idênticos ou divergências justificadas e aprovadas.",
+      "Sem reset de produção ou restauração que descarte trabalho novo.",
+      "Runbook assinado com comandos do ambiente e limites."
+    ],
+    "tests": [
+      "T01",
+      "T44",
+      "T48"
+    ],
+    "owner": "Backend/DBA com revisão"
+  },
+  {
+    "id": "HNS-32",
+    "title": "Homologar APKs e chips reais com o proprietário",
+    "priority": "P0",
+    "status": "TODO",
+    "dependencies": [
+      "HNS-24",
+      "HNS-25",
+      "HNS-30"
+    ],
+    "requirements": [
+      "R05",
+      "R09",
+      "R18",
+      "R20"
+    ],
+    "specifications": [
+      "11-testes.md",
+      "08-android.md"
+    ],
+    "paths": [
+      "hivenode-app",
+      "hivenode-light",
+      "docs/hivenode-sms/validation-status.json"
+    ],
+    "tasks": [
+      "Entregar APKs identificados/hash e roteiro; agendar somente quando proprietário informar disponibilidade.",
+      "Testar poucos destinos controlados com linha elegível, SIM1/SIM2/eSIM conforme hardware.",
+      "Executar background/reboot/force-stop/permissão/removedSIM/multipart e proxy simultâneo.",
+      "Registrar PASSOU/FALHOU/BLOQUEADO/NAO_EXECUTADO por modelo; compatibilidade limitada quando necessário."
+    ],
+    "acceptance": [
+      "Gate físico não é aprovado antes dos testes do proprietário.",
+      "Build/modelo/Android/linha documentados sem secrets.",
+      "Light não aprovado não é anunciado como SMS funcional; sua flag permanece off."
+    ],
+    "tests": [
+      "T30",
+      "T49",
+      "T50",
+      "T54"
+    ],
+    "owner": "Proprietário + mobile/QA"
+  },
+  {
+    "id": "HNS-33",
+    "title": "Validar jurídico, custos, gateway real e distribuição",
+    "priority": "P0",
+    "status": "TODO",
+    "dependencies": [
+      "HNS-01",
+      "HNS-02",
+      "HNS-12",
+      "HNS-29"
+    ],
+    "requirements": [
+      "R04",
+      "R06",
+      "R16",
+      "R17",
+      "R21"
+    ],
+    "specifications": [
+      "10-seguranca-conformidade.md",
+      "13-decisoes-fontes.md"
+    ],
+    "paths": [
+      "docs/hivenode-sms",
+      "web/src/app/api/admin/plans"
+    ],
+    "tasks": [
+      "Obter revisão de termos/privacidade/tratamento/uso e enquadramento por responsável.",
+      "Validar contrato/linha para piloto e documentação pública de limites/suporte.",
+      "Executar pagamento/cancelamento real controlado autorizado e canal de distribuição.",
+      "Confirmar custos e preços sustentáveis; não executar comunicações externas sem autorização do responsável."
+    ],
+    "acceptance": [
+      "Responsabilidade do cliente não é exoneração total.",
+      "Sem linha elegível/gateway/distribuição liberados, release real bloqueado.",
+      "Valores e pendências atualizados com decisão rastreável."
+    ],
+    "tests": [
+      "T14",
+      "T19",
+      "T40",
+      "T52"
+    ],
+    "owner": "Produto/jurídico/financeiro"
+  },
+  {
+    "id": "HNS-34",
+    "title": "Liberar piloto controlado, kill switch e checklist operacional",
+    "priority": "P0",
+    "status": "TODO",
+    "dependencies": [
+      "HNS-26",
+      "HNS-27",
+      "HNS-29",
+      "HNS-30",
+      "HNS-31",
+      "HNS-32",
+      "HNS-33"
+    ],
+    "requirements": [
+      "R19",
+      "R20",
+      "R21",
+      "R22"
+    ],
+    "specifications": [
+      "12-entrega-operacao.md",
+      "11-testes.md"
+    ],
+    "paths": [
+      "docs/hivenode-sms",
+      "configuração de staging/produção"
+    ],
+    "tasks": [
+      "Revisar todos os gates/evidências; começar por allowlist de conta/nó/linha/destinos.",
+      "Testar kill switch sem perder eventos finais nem interromper proxy.",
+      "Definir responsáveis, alertas e rotina de suporte/custos; comunicar condições públicas aprovadas.",
+      "Só após autorização operacional publicar/deployar; registrar versão/flags/rollback e limitações."
+    ],
+    "acceptance": [
+      "Sem produção por CI apenas; gates P/L exigidos.",
+      "Nenhum backlog acumulado é disparado automaticamente na reativação.",
+      "Relatório final distingue principal/Light/MCP stdio/remoto e cobertura real."
+    ],
+    "tests": [
+      "T41",
+      "T47",
+      "T48",
+      "T50",
+      "T52",
+      "T54"
+    ],
+    "owner": "Responsável de release + proprietário"
+  }
+]

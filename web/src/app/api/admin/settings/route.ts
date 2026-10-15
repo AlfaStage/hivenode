@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { requireAdmin } from "@/lib/auth";
-import { apiError, apiSuccess } from "@/lib/api-utils";
+import { apiSuccess, handleApiError } from "@/lib/api-utils";
 import { getSystemSettings, updateSystemSettings } from "@/lib/settings";
 
 export async function GET() {
@@ -9,7 +9,7 @@ export async function GET() {
     const settings = await getSystemSettings();
     return apiSuccess({ settings });
   } catch (error) {
-    return apiError("Erro ao carregar configurações do sistema", 500);
+    return handleApiError(error);
   }
 }
 
@@ -21,6 +21,6 @@ export async function PUT(request: NextRequest) {
     const updated = await updateSystemSettings(body);
     return apiSuccess({ settings: updated, message: "Configurações salvas com sucesso!" });
   } catch (error) {
-    return apiError("Erro ao atualizar configurações", 500);
+    return handleApiError(error);
   }
 }

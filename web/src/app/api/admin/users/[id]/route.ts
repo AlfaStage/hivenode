@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
-import { apiError, apiSuccess } from "@/lib/api-utils";
+import { apiError, apiSuccess, handleApiError } from "@/lib/api-utils";
 import { brokerCommand } from "@/lib/broker";
 
 export async function PUT(
@@ -33,9 +33,9 @@ export async function PUT(
     await prisma.auditLog.create({ data: { actorId: actor.userId, action: "user.update", targetId: id } });
     await brokerCommand("/internal/revoke", { userId: id }).catch(console.error);
     return apiSuccess({ user: { id: user.id, email: user.email, role: user.role, balanceGB: user.balanceGB, hivePoints: user.hivePoints } });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[API Admin User Edit]", error);
-    return apiError("Erro ao editar usuário", 500);
+    return handleApiError(error);
   }
 }
 
@@ -44,8 +44,9 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    await requireAdmin();
+    const actor = await requireAdmin();
     const { id } = await params;
+    if (id === actor.userId) return apiError("Não é possível excluir sua própria conta administrativa", 400);
 
     await prisma.user.delete({
       where: { id },
@@ -53,8 +54,8 @@ export async function DELETE(
     await brokerCommand("/internal/revoke", { userId: id }).catch(console.error);
 
     return apiSuccess({ message: "Usuário excluído com sucesso." });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[API Admin User Delete]", error);
-    return apiError("Erro ao excluir usuário", 500);
+    return handleApiError(error);
   }
 }
