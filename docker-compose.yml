@@ -46,6 +46,7 @@ services:
       SMTP_PASS: ${SMTP_PASS:-}
       SMTP_FROM: ${SMTP_FROM:-}
     command: [npx, prisma, migrate, deploy]
+    restart: "no"
     depends_on:
       postgres: { condition: service_healthy }
   web:
