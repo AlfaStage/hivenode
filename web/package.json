@@ -15,6 +15,7 @@
     "db:migrate": "npx prisma migrate dev",
     "db:migrate:deploy": "npx prisma migrate deploy",
     "db:seed": "npx tsx src/lib/seed.ts",
+    "auth:reset-link": "npx tsx src/lib/reset-link.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
