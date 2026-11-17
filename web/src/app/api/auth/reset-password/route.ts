@@ -16,8 +16,8 @@ export async function POST(request: NextRequest) {
       return apiError("Token de redefinição não informado", 400);
     }
 
-    if (!password || password.length < 8) {
-      return apiError("A nova senha deve ter no mínimo 8 caracteres", 400);
+    if (!password || password.length < 12) {
+      return apiError("A nova senha deve ter no mínimo 12 caracteres", 400);
     }
 
     const payload = await verifyPasswordResetToken(token);

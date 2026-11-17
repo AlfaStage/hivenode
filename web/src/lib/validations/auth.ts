@@ -21,7 +21,7 @@ export const registerSchema = z.object({
     .min(1, "E-mail é obrigatório"),
   password: z
     .string()
-    .min(8, "Senha deve ter no mínimo 8 caracteres")
+    .min(12, "Senha deve ter no mínimo 12 caracteres")
     .max(72, "Senha deve ter no máximo 72 caracteres"),
   confirmPassword: z
     .string()

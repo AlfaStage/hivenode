@@ -122,7 +122,7 @@ function ResetPasswordForm() {
                 type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Mínimo 8 caracteres"
+                placeholder="Mínimo 12 caracteres"
                 required
                 minLength={8}
                 className="w-full h-11 px-4 pr-12 rounded-xl bg-muted border border-border text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200 outline-none"

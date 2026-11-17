@@ -112,7 +112,7 @@ export default function RegisterPage() {
                 type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Mínimo 8 caracteres"
+                placeholder="Mínimo 12 caracteres"
                 autoComplete="new-password"
                 required
                 minLength={8}
