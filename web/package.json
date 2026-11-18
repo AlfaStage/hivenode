@@ -21,7 +21,8 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:browser": "cross-env TEST_PRODUCTION_BUILD=true tsx scripts/browser-integration.ts",
-    "nodes:dump": "npx tsx src/lib/nodes-dump.ts"
+    "nodes:dump": "npx tsx src/lib/nodes-dump.ts",
+    "grant:gb": "npx tsx src/lib/grant-gb.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
