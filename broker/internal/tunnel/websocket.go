@@ -207,7 +207,10 @@ func (tm *TunnelManager) HandleWS(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Unauthorized", 401)
 		return
 	}
-	upgrader := websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return r.Header.Get("Origin") == "" }}
+	// Android's React Native client sends the broker's HTTP(S) origin.
+	// The default policy accepts same-host origins and originless native clients,
+	// while rejecting cross-origin websites. Device authentication still runs above.
+	upgrader := websocket.Upgrader{}
 	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		return
