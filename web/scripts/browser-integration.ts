@@ -26,9 +26,11 @@ async function main() {
     const password = "Local-Test-Password-123!";
     const hash = await hashPassword(password);
     const email = randomUUID() + "@example.com";
-    await prisma.user.create({ data: { email, passwordHash: hash } });
+    await prisma.user.create({ data: { email, passwordHash: hash, hivePoints: 100 } });
+    const otherEmail = randomUUID() + "@example.com";
+    await prisma.user.create({ data: { email: otherEmail, passwordHash: hash, hivePoints: 100 } });
     const admin = await prisma.user.create({ data: { email: randomUUID() + "@example.com", passwordHash: hash, role: "ADMIN" } });
-    await checkBrowser(base, email, password, await generateToken(admin.id, admin.role));
+    await checkBrowser(base, email, otherEmail, password, await generateToken(admin.id, admin.role));
     console.log("BROWSER INTEGRATION: passed");
   } finally {
     if (next.pid && process.platform === "win32") spawn("taskkill", ["/PID", String(next.pid), "/T", "/F"], { stdio: "ignore" });

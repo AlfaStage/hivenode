@@ -8,7 +8,7 @@ import {
   Users, Pickaxe, ChevronDown, ChevronRight, Zap, Coins, Settings 
 } from "lucide-react";
 
-export function Sidebar({ role }: { role?: string }) {
+export function Sidebar({ role, minerBetaAccess }: { role: string; minerBetaAccess: boolean }) {
   const pathname = usePathname();
   const [isAdminOpen, setIsAdminOpen] = useState(pathname?.startsWith("/dashboard/admin") ?? false);
 
@@ -42,7 +42,7 @@ export function Sidebar({ role }: { role?: string }) {
       <nav className="flex-1 space-y-2">
         <div className="mb-4">
           <p className="px-4 text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Painel do Usuário</p>
-          {links.map((link) => {
+          {links.filter(link => minerBetaAccess || link.href !== "/dashboard/miner").map((link) => {
             const isActive = pathname === link.href;
             const Icon = link.icon;
 
@@ -50,6 +50,7 @@ export function Sidebar({ role }: { role?: string }) {
               <Link
                 key={link.href}
                 href={link.href}
+                prefetch={link.href === "/dashboard/miner" ? false : undefined}
                 className={`group flex items-center gap-3.5 px-4 py-3.5 rounded-2xl text-sm font-semibold transition-all duration-300 mb-1 ${
                   isActive
                     ? "bg-primary text-primary-foreground shadow-md shadow-primary/20"

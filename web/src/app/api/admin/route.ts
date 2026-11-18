@@ -8,7 +8,7 @@ export async function GET() {
     await requireAdmin();
     const users = await prisma.user.findMany({ select: {
       id: true, email: true, role: true, disabled: true, balanceGB: true, hivePoints: true,
-      walletAddress: true, createdAt: true,
+      walletAddress: true, createdAt: true, minerBetaAccess: true,
       nodes: { select: { id: true, userId: true, deviceModel: true, ipAddress: true, visibility: true, status: true, type: true, createdAt: true, proxies: { select: { id: true, userId: true, nodeId: true, proxyUser: true,
         status: true, totalBytesRx: true, totalBytesTx: true, createdAt: true } } } },
       subscriptions: true,

@@ -15,6 +15,7 @@ export async function POST(request: Request) {
     if (Math.abs(Date.now() / 1000 - timestamp) > 90) return apiError("Expired handshake", 401);
     const node = await prisma.node.findUnique({ where: { id: nodeId }, include: { user: true } });
     if (!node?.user || node.user.disabled || node.status === "BLOCKED" || !node.tunnelSecret) return apiError("Forbidden", 403);
+    if (node.visibility === "PUBLIC" && !node.user.minerBetaAccess) return apiError("Forbidden", 403);
     const expected = createHmac("sha256", decrypt(node.tunnelSecret)).update(`${nodeId}:${timestamp}`).digest("hex");
     if (!timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return apiError("Unauthorized", 401);
     if (!await redis.set(`handshake:${sig}`, "1", "EX", 180, "NX")) return apiError("Handshake reused", 401);

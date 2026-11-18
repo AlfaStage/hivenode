@@ -25,6 +25,7 @@ export async function POST(request: NextRequest) {
     const verificationUri = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/dashboard/${type === "miner" ? "miner" : "proxies"}`;
 
     const sessionData = {
+      type,
       deviceCode,
       userCode,
       expiresAt,

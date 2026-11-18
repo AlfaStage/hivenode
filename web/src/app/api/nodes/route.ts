@@ -14,7 +14,10 @@ const schema = z.object({ deviceName: z.string().trim().min(1).max(100),
 export async function GET() {
   try {
     const user = await requireAuth();
-    const nodes = await prisma.node.findMany({ where: { userId: user.userId }, orderBy: { createdAt: "desc" } });
+    const nodes = await prisma.node.findMany({
+      where: { userId: user.userId, visibility: user.minerBetaAccess ? undefined : "PRIVATE" },
+      orderBy: { createdAt: "desc" },
+    });
     const online = nodes.length ? await redis.mget(...nodes.map(n => `node:online:${n.id}`)) : [];
     const telemetry = nodes.length ? await redis.mget(...nodes.map(n => `node:telemetry:${n.id}`)) : [];
     return apiSuccess({ nodes: nodes.map((node, index) => {
@@ -34,12 +37,18 @@ export async function POST(request: Request) {
     if (!parsed.success) return apiError("Dados do aparelho inválidos", 400);
     const input = parsed.data;
     const node = await serializable(async tx => {
+      const ensureMinerAccess = async () => {
+        const account = await tx.user.findUnique({ where: { id: user.userId }, select: { minerBetaAccess: true } });
+        if (!account?.minerBetaAccess) throw new Error("Forbidden");
+      };
+      if (input.visibility === "PUBLIC") await ensureMinerAccess();
       if (input.installationId) {
         const existing = await tx.node.findUnique({ where: { userId_installationId: {
           userId: user.userId, installationId: input.installationId,
         } } });
         if (existing) {
           if (existing.status === "BLOCKED") throw new Error("Forbidden");
+          if (existing.visibility === "PUBLIC" && input.visibility !== "PUBLIC") await ensureMinerAccess();
           return existing;
         }
       }

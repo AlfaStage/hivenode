@@ -59,7 +59,7 @@ const STATUS_BADGES: Record<string, { color: string; label: string; icon: React.
 export default function BillingPage() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
-  const [userData, setUserData] = useState<{ balanceGB: number; activePlanId: string | null; email: string; hivePoints: number; subscriptions: Subscription[] } | null>(null);
+  const [userData, setUserData] = useState<{ balanceGB: number; activePlanId: string | null; email: string; hivePoints: number; minerBetaAccess: boolean; subscriptions: Subscription[] } | null>(null);
   const [loading, setLoading] = useState(true);
   const [purchasing, setPurchasing] = useState<string | null>(null);
   const [couponCode, setCouponCode] = useState("");
@@ -161,7 +161,7 @@ export default function BillingPage() {
               </p>
             </div>
             
-            {(userData?.hivePoints ?? 0) > 0 && (
+            {userData?.minerBetaAccess && userData.hivePoints > 0 && (
               <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 min-w-[200px]">
                 <p className="text-sm font-medium text-amber-500">Pontos Miner (Tokens)</p>
                 <div className="flex items-baseline gap-2 mt-1">

@@ -44,7 +44,8 @@ async function issueOneTime(userId: string, type: string, seconds: number) {
     .setIssuer(issuer).setAudience(type).setJti(id).setIssuedAt()
     .setExpirationTime(`${seconds}s`).sign(secret());
 }
-export const generateQrLinkToken = (userId: string) => issueOneTime(userId, "qr_link", 300);
+export const generateQrLinkToken = (userId: string, miner = false) =>
+  issueOneTime(userId, miner ? "miner_qr_link" : "qr_link", 300);
 export const generatePasswordResetToken = (userId: string) => issueOneTime(userId, "password_reset", 900);
 
 export async function verifyOneTimeToken(token: string, type: string) {
@@ -64,7 +65,7 @@ export async function setAuthCookie(token: string) {
 export async function getAuthCookie() { return (await cookies()).get(cookieName)?.value; }
 export async function removeAuthCookie() { (await cookies()).delete(cookieName); }
 
-export async function getAuthenticatedUser(): Promise<TokenPayload | null> {
+export async function getAuthenticatedUser(): Promise<(TokenPayload & { minerBetaAccess: boolean }) | null> {
   try {
     const bearer = (await headers()).get("authorization");
     const token = bearer?.startsWith("Bearer ") ? bearer.slice(7) : await getAuthCookie();
@@ -72,9 +73,9 @@ export async function getAuthenticatedUser(): Promise<TokenPayload | null> {
     const payload = await verifyToken(token);
     const { prisma } = await import("./prisma");
     const user = await prisma.user.findUnique({ where: { id: payload.userId },
-      select: { role: true, sessionVersion: true, disabled: true } });
+      select: { role: true, sessionVersion: true, disabled: true, minerBetaAccess: true } });
     if (!user || user.disabled || user.sessionVersion !== payload.version) return null;
-    return { ...payload, role: payload.scope === "device" ? "CUSTOMER" : user.role };
+    return { ...payload, role: payload.scope === "device" ? "CUSTOMER" : user.role, minerBetaAccess: user.minerBetaAccess };
   } catch { return null; }
 }
 export async function requireAuth() {

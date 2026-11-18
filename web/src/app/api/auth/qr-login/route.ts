@@ -8,12 +8,14 @@ export async function POST(request: NextRequest) {
     const { linkToken } = await request.json();
     if (!linkToken) return apiError("Token ausente", 400);
 
-    const payload = await verifyOneTimeToken(linkToken, "qr_link");
+    const minerPayload = await verifyOneTimeToken(linkToken, "miner_qr_link").catch(() => null);
+    const payload = minerPayload ?? await verifyOneTimeToken(linkToken, "qr_link");
 
     const user = await prisma.user.findUnique({ where: { id: payload.userId } });
     if (!user || user.disabled) return apiError("Usuário não encontrado", 404);
+    if (minerPayload && !user.minerBetaAccess) return apiError("Não encontrado", 404);
     const consumed = await prisma.oneTimeToken.deleteMany({ where: {
-      id: payload.id, userId: user.id, type: "qr_link", expiresAt: { gt: new Date() },
+      id: payload.id, userId: user.id, type: minerPayload ? "miner_qr_link" : "qr_link", expiresAt: { gt: new Date() },
     } });
     if (consumed.count !== 1) return apiError("Código já utilizado ou expirado", 401);
 

@@ -23,9 +23,11 @@ export async function POST(request: Request) {
     const raw = await redis.get(key);
     if (!raw) return apiError("Sessão de vínculo expirada", 404);
     const session = deviceSessionSchema.parse(JSON.parse(raw));
+    const miner = session.type === "miner";
+    if (miner && !user.minerBetaAccess) return apiError("Código inválido ou expirado", 404);
     if (session.status !== "pending") return apiError("Código já aprovado", 409);
     if (session.expiresAt <= Date.now()) return apiError("Código expirado", 404);
-    const linkToken = await generateQrLinkToken(user.userId);
+    const linkToken = await generateQrLinkToken(user.userId, miner);
     const result = await redis.eval(approve, 1, key, JSON.stringify({ ...session, status: "approved", linkToken }));
     if (result !== 1) return apiError(result === -1 ? "Código já aprovado" : "Código expirado", result === -1 ? 409 : 404);
     return apiSuccess({ message: "Código aprovado. Aguardando o aparelho concluir o vínculo." });

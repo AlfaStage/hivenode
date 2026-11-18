@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { useAdminUsers } from "@/hooks/use-admin-users";
 import type { AdminUser, AdminPlan } from "@/lib/admin-types";
 import { Users, Edit, Trash2, ShieldCheck, Search, Wallet } from "lucide-react";
@@ -23,6 +24,8 @@ export default function AdminUsersPage() {
     walletAddress: "",
       });
   const [saving, setSaving] = useState(false);
+  const [savingBetaAccess, setSavingBetaAccess] = useState(false);
+  const [betaError, setBetaError] = useState("");
 
   const [plans, setPlans] = useState<AdminPlan[]>([]);
   const [grantSubUser, setGrantSubUser] = useState<AdminUser | null>(null);
@@ -45,6 +48,7 @@ export default function AdminUsersPage() {
   useEffect(() => { void fetchPlans(); }, []);
 
   const handleEditClick = (user: AdminUser) => {
+    setBetaError("");
     setEditingUser(user);
     setEditForm({
       role: user.role,
@@ -53,6 +57,28 @@ export default function AdminUsersPage() {
       walletAddress: user.walletAddress || "",
           });
   };
+
+  async function toggleMinerBetaAccess(user: AdminUser) {
+    setSavingBetaAccess(true);
+    setBetaError("");
+    try {
+      const response = await fetch(`/api/admin/users/${user.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ minerBetaAccess: !user.minerBetaAccess }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error);
+      setEditingUser(current => current?.id === user.id
+        ? { ...current, minerBetaAccess: result.data.minerBetaAccess }
+        : current);
+      await fetchUsers();
+    } catch (error) {
+      setBetaError(error instanceof Error ? error.message : "Falha ao atualizar o acesso ao beta.");
+    } finally {
+      setSavingBetaAccess(false);
+    }
+  }
 
   const handleSave = async () => {
     if (!editingUser) return;
@@ -150,6 +176,9 @@ export default function AdminUsersPage() {
         <p className="text-base text-muted-foreground mt-2 font-medium">
           Controle de contas, saldos em GB, carteiras Web3, autenticação 2FA e permissões de cargo.
         </p>
+        <Link className="mt-3 inline-block text-sm underline underline-offset-4" href="/dashboard/admin/beta">
+          Inscrições para o beta
+        </Link>
       </div>
 
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -198,7 +227,7 @@ export default function AdminUsersPage() {
                     <Button variant="outline" size="sm" onClick={() => handleGrantClick(user)} className="border-border text-emerald-400 hover:bg-emerald-500/10">
                       <ShieldCheck className="w-4 h-4" />
                     </Button>
-                    <Button variant="outline" size="sm" onClick={() => handleEditClick(user)} className="border-border">
+                    <Button variant="outline" size="sm" aria-label={`Editar ${user.email}`} onClick={() => handleEditClick(user)} className="border-border">
                       <Edit className="w-4 h-4 text-muted-foreground" />
                     </Button>
                     <Button variant="outline" size="sm" onClick={() => handleDelete(user.id)} className="border-destructive/30 hover:bg-destructive/10 text-destructive">
@@ -238,6 +267,20 @@ export default function AdminUsersPage() {
                     <span>ID: {editingUser.id.split("-")[0]}...</span>
                   </p>
                 </div>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3">
+                <div>
+                  <p className="text-sm font-semibold">Beta do HiveMiner</p>
+                  <p className="text-xs text-muted-foreground" role="status">
+                    {editingUser.minerBetaAccess ? "Acesso liberado" : "Acesso desativado"}
+                  </p>
+                </div>
+                <Button type="button" variant="outline" size="sm" disabled={savingBetaAccess || saving}
+                  onClick={() => void toggleMinerBetaAccess(editingUser)}>
+                  {editingUser.minerBetaAccess ? "Revogar acesso" : "Liberar acesso"}
+                </Button>
+                {betaError && <p className="w-full text-sm text-destructive" role="alert">{betaError}</p>}
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -300,7 +343,7 @@ export default function AdminUsersPage() {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditingUser(null)}>Cancelar</Button>
-            <Button onClick={handleSave} disabled={saving} className="bg-primary text-primary-foreground font-bold">
+            <Button onClick={handleSave} disabled={saving || savingBetaAccess} className="bg-primary text-primary-foreground font-bold">
               {saving ? "Salvando..." : "Salvar Alterações"}
             </Button>
           </DialogFooter>

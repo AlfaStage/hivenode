@@ -3,6 +3,33 @@ import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
 import { apiError, apiSuccess, handleApiError } from "@/lib/api-utils";
 import { brokerCommand } from "@/lib/broker";
+import { z } from "zod";
+
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const actor = await requireAdmin();
+    const { id } = await params;
+    const { minerBetaAccess } = z.object({ minerBetaAccess: z.boolean() }).parse(await request.json());
+    await prisma.$transaction([
+      prisma.user.update({ where: { id }, data: { minerBetaAccess } }),
+      prisma.auditLog.create({
+        data: { actorId: actor.userId, targetId: id, action: minerBetaAccess ? "miner_beta.grant" : "miner_beta.revoke" },
+      }),
+    ]);
+
+    if (!minerBetaAccess) {
+      const nodes = await prisma.node.findMany({ where: { userId: id, visibility: "PUBLIC" }, select: { id: true } });
+      await Promise.allSettled(nodes.map(node => brokerCommand("/internal/revoke", { nodeId: node.id })));
+    }
+
+    return apiSuccess({ minerBetaAccess });
+  } catch (error) {
+    return handleApiError(error);
+  }
+}
 
 export async function PUT(
   request: NextRequest,

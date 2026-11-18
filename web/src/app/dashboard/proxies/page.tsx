@@ -720,14 +720,6 @@ export default function ProxiesPage() {
                   >
                     📥 Baixar APK HiveNode (Proxy)
                   </a>
-                  <a
-                    href="https://expo.dev/artifacts/eas/mvhpPxGjdeMgszlNfmRP-HNQMPcpHbWyQ_QhI3L17fs.apk"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center justify-center gap-2 w-full py-2 px-3 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-lg text-xs font-bold transition-all"
-                  >
-                    📥 Baixar APK HiveMiner (Miner)
-                  </a>
                 </div>
               </div>
 

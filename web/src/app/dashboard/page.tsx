@@ -14,7 +14,7 @@ export default async function DashboardPage() {
       balanceGB: true,
       _count: {
         select: {
-          nodes: true,
+          nodes: authUser.minerBetaAccess ? true : { where: { visibility: "PRIVATE" } },
           subscriptions: true,
         },
       },

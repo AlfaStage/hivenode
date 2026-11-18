@@ -10,6 +10,10 @@ export async function GET() {
       { shares: { some: { sharedWithId: user.userId, status: "ACCEPTED" } } },
     ] }, select: { id: true, deviceModel: true, visibility: true, status: true }, take: 200 });
     const online = nodes.length ? await redis.mget(...nodes.map(node => `node:online:${node.id}`)) : [];
-    return apiSuccess({ nodes: nodes.map((node, index) => ({ ...node, status: online[index] ? "ONLINE" : "OFFLINE" })) });
+    return apiSuccess({ nodes: nodes.map((node, index) => ({
+      ...node,
+      deviceModel: node.visibility === "PUBLIC" && !user.minerBetaAccess ? "Aparelho público" : node.deviceModel,
+      status: online[index] ? "ONLINE" : "OFFLINE",
+    })) });
   } catch (error) { return handleApiError(error); }
 }

@@ -26,7 +26,7 @@ export async function GET() {
         createdAt: true,
         _count: {
           select: {
-            nodes: true,
+            nodes: authUser.minerBetaAccess ? true : { where: { visibility: "PRIVATE" } },
             subscriptions: true,
             proxies: true,
           },
@@ -64,7 +64,7 @@ export async function GET() {
     }
 
     const settings = await getSystemSettings();
-    return apiSuccess({ ...user, pointsToGbRate: settings.crypto.pointsToHiveRate });
+    return apiSuccess({ ...user, minerBetaAccess: authUser.minerBetaAccess, pointsToGbRate: settings.crypto.pointsToHiveRate });
   } catch (error) {
     console.error("[API] Me error:", error);
     return apiError("Erro interno do servidor", 500);

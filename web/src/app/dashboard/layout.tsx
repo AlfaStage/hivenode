@@ -40,7 +40,7 @@ export default async function DashboardLayout({
   return (
     <div className="min-h-screen bg-background flex">
       {/* Sidebar remodelada */}
-      <Sidebar role={user.role} />
+      <Sidebar role={user.role} minerBetaAccess={user.minerBetaAccess} />
 
       {/* Main content */}
       <main className="min-w-0 flex-1 overflow-x-hidden flex flex-col bg-muted/20">
@@ -53,7 +53,9 @@ export default async function DashboardLayout({
         <nav aria-label="Navegação do painel" className="flex flex-wrap gap-2 border-b border-border px-3 py-2 lg:hidden">
           <Link className="rounded-md px-3 py-2 hover:bg-muted" href="/dashboard">Visão geral</Link>
           <Link className="rounded-md px-3 py-2 hover:bg-muted" href="/dashboard/proxies">Proxies</Link>
-          <Link className="rounded-md px-3 py-2 hover:bg-muted" href="/dashboard/miner">HiveMiner</Link>
+          {user.minerBetaAccess && (
+            <Link className="rounded-md px-3 py-2 hover:bg-muted" href="/dashboard/miner" prefetch={false}>HiveMiner</Link>
+          )}
           <Link className="rounded-md px-3 py-2 hover:bg-muted" href="/dashboard/billing">Faturamento</Link>
         </nav>
         <div className="min-w-0 p-3 sm:p-6 xl:p-10">{children}</div>

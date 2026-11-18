@@ -108,13 +108,19 @@ async function main() {
     for (const user of [a.user, b.user]) await prisma.subscription.create({ data: { userId: user.id, planId: plan.id, planType: "STARTER", planCategory: "PRIVATE_FLEET", currentPeriodEnd: new Date(Date.now() + 86400000) } });
     const pairing = await request("/api/auth/device-code/generate", "POST", { type: "miner" });
     await request("/api/auth/device-code/poll", "POST", { deviceCode: pairing.deviceCode });
+    await request("/api/auth/device-code/approve", "POST", { userCode: pairing.userCode }, a.token, 404);
+    await request(`/api/admin/users/${a.user.id}`, "PATCH", { minerBetaAccess: true }, a.token, 403);
+    await request(`/api/admin/users/${a.user.id}`, "PATCH", { minerBetaAccess: true }, login.token);
     await request("/api/auth/device-code/approve", "POST", { userCode: pairing.userCode }, a.token);
-    await request("/api/auth/device-code/approve", "POST", { userCode: pairing.userCode }, b.token, 409);
+    await request("/api/auth/device-code/approve", "POST", { userCode: pairing.userCode }, a.token, 409);
     const polls = await Promise.all(Array.from({ length: 4 }, () => fetch(base + "/api/auth/device-code/poll", {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deviceCode: pairing.deviceCode }),
     })));
     assert.equal(polls.filter(response => response.ok).length, 1);
     check("device approval cannot be overwritten and concurrent polling consumes the code once");
+    await request("/api/auth/qr-link?type=miner", "GET", undefined, b.token, 404);
+    await request("/api/nodes", "POST", { deviceName: "Public supplier", visibility: "PUBLIC" }, b.token, 403);
+    check("private beta permissions are per customer and enforced for Miner pairing and node registration");
     const plans = await request("/api/plans"); assert(plans.plans.some((p: { id: string }) => p.id === plan.id)); check("customers can read commercial plans");
     const na = await request("/api/nodes", "POST", { deviceName: "A", visibility: "PRIVATE", installationId: `${run}-installation-a` }, a.token);
     const nb = await request("/api/nodes", "POST", { deviceName: "B", visibility: "PRIVATE", installationId: `${run}-installation-b` }, b.token);

@@ -13,7 +13,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     
     // Verifica se o Node pertence ao usuário
     const node = await prisma.node.findFirst({
-      where: { id: resolvedParams.id, userId: payload.userId }
+      where: { id: resolvedParams.id, userId: payload.userId, visibility: payload.minerBetaAccess ? undefined : "PRIVATE" }
     });
 
     if (!node) return apiError("Aparelho não encontrado", 404);
@@ -49,8 +49,10 @@ export async function PATCH(
     
     if (newName === undefined && newTags === undefined) return apiError("Nenhuma alteração enviada", 400);
 
-    const node = await prisma.node.findUnique({ where: { id: resolvedParams.id } });
-    if (!node || node.userId !== payload.userId) {
+    const node = await prisma.node.findFirst({
+      where: { id: resolvedParams.id, userId: payload.userId, visibility: payload.minerBetaAccess ? undefined : "PRIVATE" },
+    });
+    if (!node) {
       return apiError("Aparelho não encontrado", 404);
     }
 

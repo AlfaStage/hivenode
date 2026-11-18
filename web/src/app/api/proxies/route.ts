@@ -42,6 +42,8 @@ export async function GET() {
     const proxies = await prisma.proxyCredential.findMany({ where: { userId: user.userId },
       include: { node: { select: { id: true, deviceModel: true, visibility: true, status: true } } }, orderBy: { createdAt: "desc" } });
     return apiSuccess({ proxies: proxies.map(({ passwordEncrypted, ...p }) => ({ ...p,
+      node: p.node.visibility === "PUBLIC" && !user.minerBetaAccess
+        ? { ...p.node, deviceModel: "Aparelho público" } : p.node,
       proxyPass: passwordEncrypted ? decrypt(passwordEncrypted) : "", needsRotation: !passwordEncrypted,
     })), host: process.env.NEXT_PUBLIC_SOCKS_HOST || "localhost", port: Number(process.env.BROKER_SOCKS_PORT || 10000) });
   } catch (error) { return handleApiError(error); }

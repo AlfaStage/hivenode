@@ -24,6 +24,8 @@ model User {
   balanceGB        Float          @default(0.0)
   sessionVersion   Int            @default(0)
   disabled         Boolean        @default(false)
+  minerBetaAccess  Boolean        @default(false)
+  betaApplication  BetaApplication?
   
   // Integração Web3 & Tokenomics
   walletAddress    String?
@@ -48,6 +50,18 @@ model User {
   updatedAt        DateTime       @updatedAt
 
   @@map("users")
+}
+
+model BetaApplication {
+  id        String   @id @default(uuid())
+  userId    String?  @unique
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email     String?  @unique
+  phone     String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt, id])
+  @@map("beta_applications")
 }
 
 model Node {
