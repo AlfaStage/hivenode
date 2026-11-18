@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Eye, EyeOff, LogIn } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
+  const fromPlans = useSearchParams().get("origem") === "planos";
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -35,7 +36,7 @@ export default function LoginPage() {
         return;
       }
 
-      router.push("/dashboard");
+      router.push(fromPlans ? "/dashboard/billing" : "/dashboard");
     } catch {
       setError("Erro de conexão. Tente novamente.");
     } finally {
@@ -162,7 +163,7 @@ export default function LoginPage() {
         <p className="text-center text-sm text-muted-foreground">
           Não tem uma conta?{" "}
           <Link
-            href="/register"
+            href={fromPlans ? "/register?origem=planos" : "/register"}
             className="text-primary hover:text-primary-hover font-medium transition-colors"
           >
             Criar conta

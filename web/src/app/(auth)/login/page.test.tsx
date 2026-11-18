@@ -2,9 +2,17 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import LoginPage from "./page";
 const push = vi.hoisted(() => vi.fn());
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
+let search = "";
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push }),
+  useSearchParams: () => new URLSearchParams(search),
+}));
 afterEach(() => { vi.unstubAllGlobals(); push.mockClear(); });
-it("submits browser-filled values and ignores stale local tokens", async () => {
+it.each([
+  { query: "", destination: "/dashboard" },
+  { query: "origem=planos", destination: "/dashboard/billing" },
+])("submits browser-filled values and navigates to $destination", async ({ query, destination }) => {
+  search = query;
   const getItem = vi.fn(() => "expired-token");
   vi.stubGlobal("localStorage", { getItem });
   vi.stubGlobal("FormData", window.FormData);
@@ -23,5 +31,5 @@ it("submits browser-filled values and ignores stale local tokens", async () => {
   await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/auth/login", expect.objectContaining({
     body: JSON.stringify({ email: email.value, password: password.value }),
   })));
-  await waitFor(() => expect(push).toHaveBeenCalledWith("/dashboard"));
+  await waitFor(() => expect(push).toHaveBeenCalledWith(destination));
 });

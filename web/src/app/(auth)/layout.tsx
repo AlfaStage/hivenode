@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 
 export const metadata: Metadata = {
   title: "Autenticação",
@@ -22,7 +23,7 @@ export default function AuthLayout({
       <div className="absolute inset-0 pointer-events-none opacity-[0.03] bg-[linear-gradient(rgba(255,255,255,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.1)_1px,transparent_1px)] bg-[size:60px_60px]" />
 
       <main className="relative z-10 w-full max-w-md mx-auto px-4 py-8">
-        {children}
+        <Suspense>{children}</Suspense>
       </main>
     </div>
   );

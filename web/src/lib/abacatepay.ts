@@ -24,6 +24,10 @@ async function getApiKey(): Promise<string | null> {
   }
 }
 
+export async function isBillingConfigured() {
+  return Boolean(await getApiKey());
+}
+
 // Helper: faz request autenticado na API AbacatePay v2
 async function abacateRequest(path: string, method: string = "GET", body?: unknown) {
   const apiKey = await getApiKey();
