@@ -625,10 +625,13 @@ export default function ProxiesPage() {
               </div>
               
               <div>
-                <label htmlFor="proxyUser" className="block text-[#8e8e99] text-sm mb-2">Usuário SOCKS5</label>
-                <input 
+                <label htmlFor="proxyUser" className="block text-[#8e8e99] text-sm mb-2">Usuário SOCKS5 (3 a 64: letras, números, _ ou -)</label>
+                <input
                   id="proxyUser"
                   required
+                  minLength={3}
+                  maxLength={64}
+                  pattern="[a-zA-Z0-9_\-]+"
                   type="text"
                   placeholder="Ex: alfastage"
                   value={newUser}
@@ -638,12 +641,14 @@ export default function ProxiesPage() {
               </div>
 
               <div>
-                <label htmlFor="proxyPass" className="block text-[#8e8e99] text-sm mb-2">Senha SOCKS5</label>
-                <input 
+                <label htmlFor="proxyPass" className="block text-[#8e8e99] text-sm mb-2">Senha SOCKS5 (mínimo 12 caracteres)</label>
+                <input
                   id="proxyPass"
                   required
+                  minLength={12}
+                  maxLength={72}
                   type="text"
-                  placeholder="Sua senha segura"
+                  placeholder="Mínimo 12 caracteres"
                   value={newPass}
                   onChange={e => setNewPass(e.target.value)}
                   className="w-full bg-[#0a0a0c] border border-[#27272e] rounded-lg px-4 py-3 text-white focus:border-amber-500 focus:outline-none"
