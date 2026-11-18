@@ -4,10 +4,10 @@ import { LogOut } from "lucide-react";
 
 export function Header({ userRole, avatarUrl, name }: { userRole: string, avatarUrl: string, name: string }) {
   return (
-    <header className="h-20 border-b border-border bg-card/40 backdrop-blur-md flex items-center justify-between px-8 sticky top-0 z-50">
+    <header className="min-h-20 shrink-0 border-b border-border bg-card/40 backdrop-blur-md flex items-center justify-between gap-3 px-3 sm:px-8 sticky top-0 z-50">
       <h2 className="text-xl font-bold tracking-tight text-foreground">Painel de Controle</h2>
       
-      <div className="flex items-center gap-6">
+      <div className="flex items-center gap-2 sm:gap-6">
         <div className="flex flex-col items-end hidden md:flex">
           <span className="text-sm font-bold text-foreground">{name}</span>
           <span className="text-xs font-bold text-primary uppercase tracking-widest">{userRole}</span>

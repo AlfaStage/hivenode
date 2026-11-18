@@ -16,10 +16,12 @@ export async function GET() {
     const user = await requireAuth();
     const nodes = await prisma.node.findMany({ where: { userId: user.userId }, orderBy: { createdAt: "desc" } });
     const online = nodes.length ? await redis.mget(...nodes.map(n => `node:online:${n.id}`)) : [];
+    const telemetry = nodes.length ? await redis.mget(...nodes.map(n => `node:telemetry:${n.id}`)) : [];
     return apiSuccess({ nodes: nodes.map((node, index) => {
       const { tunnelSecret, ...n } = node;
       void tunnelSecret;
       return { ...n,
+      telemetry: online[index] && telemetry[index] ? JSON.parse(telemetry[index]!) : null,
       deviceName: n.deviceModel, status: n.status === "BLOCKED" ? "BLOCKED" : online[index] ? "ONLINE" : "OFFLINE",
     }; }) });
   } catch (error) { return handleApiError(error); }

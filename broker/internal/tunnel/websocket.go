@@ -13,6 +13,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -38,6 +39,40 @@ type Device struct {
 	mu                     sync.Mutex
 	done                   chan struct{}
 	once                   sync.Once
+	telemetryMu            sync.Mutex
+	telemetry              map[string]interface{}
+	rx, tx, latency        atomic.Int64
+	pingAt                 atomic.Int64
+}
+
+func (tm *TunnelManager) publishTelemetry(d *Device) {
+	d.telemetryMu.Lock()
+	payload := make(map[string]interface{}, len(d.telemetry)+4)
+	for key, value := range d.telemetry {
+		payload[key] = value
+	}
+	d.telemetryMu.Unlock()
+	payload["rx"], payload["tx"] = d.rx.Load(), d.tx.Load()
+	if rtt := d.latency.Load(); rtt > 0 {
+		payload["latency"] = float64(rtt) / float64(time.Millisecond)
+	}
+	if tm.redisClient != nil {
+		encoded, _ := json.Marshal(payload)
+		tm.redisClient.Set(context.Background(), "node:telemetry:"+d.id, string(encoded), 90*time.Second)
+	}
+	tm.Broadcast(BroadcastEvent{Type: "TELEMETRY", NodeID: d.id, UserID: d.userID, Payload: payload})
+}
+
+// Only accept proxy-provided client addresses when the immediate peer is internal.
+func deviceIP(r *http.Request) string {
+	host, _, _ := net.SplitHostPort(r.RemoteAddr)
+	peer := net.ParseIP(host)
+	if peer != nil && (peer.IsPrivate() || peer.IsLoopback()) {
+		if forwarded := net.ParseIP(strings.TrimSpace(strings.Split(r.Header.Get("X-Forwarded-For"), ",")[0])); forwarded != nil {
+			return forwarded.String()
+		}
+	}
+	return host
 }
 
 func (d *Device) send(kind int, payload []byte) error {
@@ -63,19 +98,22 @@ func (d *Device) binary(id string, payload []byte) error {
 func (d *Device) close() { d.once.Do(func() { close(d.done); d.ws.Close() }) }
 
 type stream struct {
-	id       string
-	identity Identity
-	device   *Device
-	tm       *TunnelManager
-	data     chan []byte
-	dial     chan bool
-	done     chan struct{}
-	once     sync.Once
+	id                   string
+	identity             Identity
+	device               *Device
+	tm                   *TunnelManager
+	data                 chan []byte
+	dial                 chan bool
+	done                 chan struct{}
+	once                 sync.Once
+	usageMu              sync.Mutex
+	pendingRx, pendingTx int
 }
 
 func (s *stream) close() {
 	s.once.Do(func() {
 		close(s.done)
+		_ = s.tm.flushUsage(s)
 		s.tm.mu.Lock()
 		delete(s.tm.streams, s.id)
 		s.tm.mu.Unlock()
@@ -176,6 +214,23 @@ func (tm *TunnelManager) openStream(d *Device, identity Identity, host string) (
 	select {
 	case ok := <-s.dial:
 		if ok {
+			if !identity.Metered {
+				go func() {
+					ticker := time.NewTicker(time.Second)
+					defer ticker.Stop()
+					for {
+						select {
+						case <-s.done:
+							return
+						case <-ticker.C:
+							if tm.flushUsage(s) != nil {
+								s.close()
+								return
+							}
+						}
+					}
+				}()
+			}
 			return s, nil
 		}
 	case <-time.After(20 * time.Second):
@@ -187,6 +242,45 @@ func (tm *TunnelManager) openStream(d *Device, identity Identity, host string) (
 
 // Each authorized chunk has one durable id. Retrying never charges a chunk twice.
 func (tm *TunnelManager) charge(s *stream, rx, tx int) error {
+	// Private fleet traffic is unmetered: aggregate accounting off the packet path.
+	// Paid traffic keeps the debit-before-forward contract for every chunk.
+	if !s.identity.Metered {
+		s.usageMu.Lock()
+		defer s.usageMu.Unlock()
+		if s.pendingRx+rx > 1048576 || s.pendingTx+tx > 1048576 {
+			if err := tm.flushUsageLocked(s); err != nil {
+				return err
+			}
+		}
+		s.pendingRx += rx
+		s.pendingTx += tx
+		flush := s.pendingRx+s.pendingTx >= 512*1024
+		if !flush {
+			return nil
+		}
+		return tm.flushUsageLocked(s)
+	}
+	return tm.recordUsage(s, rx, tx)
+}
+
+func (tm *TunnelManager) flushUsage(s *stream) error {
+	s.usageMu.Lock()
+	defer s.usageMu.Unlock()
+	return tm.flushUsageLocked(s)
+}
+
+func (tm *TunnelManager) flushUsageLocked(s *stream) error {
+	if s.pendingRx+s.pendingTx == 0 {
+		return nil
+	}
+	if err := tm.recordUsage(s, s.pendingRx, s.pendingTx); err != nil {
+		return err
+	}
+	s.pendingRx, s.pendingTx = 0, 0
+	return nil
+}
+
+func (tm *TunnelManager) recordUsage(s *stream, rx, tx int) error {
 	event := map[string]interface{}{"id": uuid(), "proxyId": s.identity.ProxyID, "nodeId": s.identity.NodeID, "bytesRx": rx, "bytesTx": tx}
 	var err error
 	for attempt := 0; attempt < 2; attempt++ {
@@ -215,7 +309,7 @@ func (tm *TunnelManager) HandleWS(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		return
 	}
-	d := &Device{id: auth.NodeID, userID: auth.UserID, visibility: auth.Visibility, ws: ws, done: make(chan struct{})}
+	d := &Device{id: auth.NodeID, userID: auth.UserID, visibility: auth.Visibility, ws: ws, done: make(chan struct{}), telemetry: map[string]interface{}{"ip": deviceIP(r)}}
 	tm.mu.Lock()
 	old := tm.devices[d.id]
 	tm.devices[d.id] = d
@@ -249,7 +343,12 @@ func (tm *TunnelManager) HandleWS(w http.ResponseWriter, r *http.Request) {
 	}()
 	ws.SetReadLimit(1024 * 1024)
 	ws.SetReadDeadline(time.Now().Add(75 * time.Second))
-	ws.SetPongHandler(func(string) error { return ws.SetReadDeadline(time.Now().Add(75 * time.Second)) })
+	ws.SetPongHandler(func(string) error {
+		if sent := d.pingAt.Load(); sent > 0 {
+			d.latency.Store(time.Now().UnixNano() - sent)
+		}
+		return ws.SetReadDeadline(time.Now().Add(75 * time.Second))
+	})
 	heartbeat := func() {
 		if tm.redisClient != nil {
 			tm.redisClient.Set(context.Background(), "node:online:"+d.id, d.userID, 75*time.Second)
@@ -258,18 +357,20 @@ func (tm *TunnelManager) HandleWS(w http.ResponseWriter, r *http.Request) {
 	heartbeat()
 	tm.Broadcast(BroadcastEvent{Type: "NODE_ONLINE", NodeID: d.id, UserID: d.userID})
 	go func() {
-		ticker := time.NewTicker(25 * time.Second)
+		ticker := time.NewTicker(5 * time.Second)
 		defer ticker.Stop()
 		for {
 			select {
 			case <-d.done:
 				return
 			case <-ticker.C:
+				d.pingAt.Store(time.Now().UnixNano())
 				if d.send(websocket.PingMessage, nil) != nil {
 					d.close()
 					return
 				}
 				heartbeat()
+				tm.publishTelemetry(d)
 			}
 		}
 	}()
@@ -303,12 +404,15 @@ func (tm *TunnelManager) HandleWS(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		var message struct {
-			Type    string      `json:"type"`
-			ConnID  string      `json:"connId"`
-			Payload interface{} `json:"payload"`
-			Network string      `json:"network"`
-			Battery float64     `json:"battery"`
-			Uptime  int64       `json:"uptime"`
+			Type      string      `json:"type"`
+			ConnID    string      `json:"connId"`
+			Payload   interface{} `json:"payload"`
+			Network   string      `json:"network"`
+			Battery   *float64    `json:"battery"`
+			Uptime    int64       `json:"uptime"`
+			Model     string      `json:"model"`
+			SSID      string      `json:"ssid"`
+			Frequency int         `json:"frequency"`
 		}
 		if json.Unmarshal(data, &message) != nil {
 			continue
@@ -318,7 +422,20 @@ func (tm *TunnelManager) HandleWS(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		if message.Type == "TELEMETRY" {
-			tm.Broadcast(BroadcastEvent{Type: "TELEMETRY", NodeID: d.id, UserID: d.userID, Payload: map[string]interface{}{"network": message.Network, "battery": message.Battery, "uptime": message.Uptime}})
+			d.telemetryMu.Lock()
+			d.telemetry["network"], d.telemetry["uptime"] = message.Network, message.Uptime
+			if message.Battery != nil {
+				d.telemetry["battery"] = *message.Battery
+			}
+			if len(message.Model) <= 128 {
+				d.telemetry["model"] = message.Model
+			}
+			if len(message.SSID) <= 128 {
+				d.telemetry["ssid"] = message.SSID
+			}
+			d.telemetry["frequency"] = message.Frequency
+			d.telemetryMu.Unlock()
+			tm.publishTelemetry(d)
 			continue
 		}
 		if message.Type == "LOG" {

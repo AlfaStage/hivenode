@@ -1,11 +1,15 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import QRCode from "react-qr-code";
 import { subscribeDashboard } from "@/lib/dashboard-client";
 import { Shield, Plus, Activity, HardDrive, Eye, EyeOff, TerminalSquare, QrCode, Trash2, Copy, Wifi, Battery, Clock, Tag, Info, ArrowDown, ArrowUp } from "lucide-react";
 
+type Telemetry = {ip?: string; network?: string; model?: string; ssid?: string; frequency?: number; battery?: number; uptime?: number; rx?: number; tx?: number; latency?: number; receivedAt?: number; downloadRate?: number; uploadRate?: number};
+
 type Node = {
+  telemetry?: Telemetry | null;
   id: string;
   deviceName: string;
   deviceModel?: string;
@@ -28,14 +32,14 @@ export default function ProxiesPage() {
   const [nodes, setNodes] = useState<Node[]>([]);
   const [proxies, setProxies] = useState<Proxy[]>([]);
   const [loading, setLoading] = useState(true);
-  
+
   // Modals
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isQrOpen, setIsQrOpen] = useState(false);
   const [qrPayload, setQrPayload] = useState("");
   const [cliCode, setCliCode] = useState("");
   const [approving, setApproving] = useState(false);
-  
+
   // Forms
   const [selectedNode, setSelectedNode] = useState("");
   const [newUser, setNewUser] = useState("");
@@ -50,11 +54,11 @@ export default function ProxiesPage() {
   const [newNodeName, setNewNodeName] = useState("");
   const [openCopyPopover, setOpenCopyPopover] = useState<string | null>(null);
   const [openDetailsPopover, setOpenDetailsPopover] = useState<string | null>(null);
-  
+
   const [isEditTagsOpen, setIsEditTagsOpen] = useState(false);
   const [nodeToEditTags, setNodeToEditTags] = useState<string | null>(null);
   const [tagsInput, setTagsInput] = useState("");
-  
+
   const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
 
   const togglePasswordVisibility = (id: string) => {
@@ -63,10 +67,10 @@ export default function ProxiesPage() {
     else newSet.add(id);
     setVisiblePasswords(newSet);
   };
-  
+
   // Telemetria ao vivo dos aparelhos conectados
-  const [nodeTelemetry, setNodeTelemetry] = useState<Record<string, {ip?: string, network?: string, battery?: number, uptime?: number, rx?: number, tx?: number, latency?: number}>>({});
-  
+  const [nodeTelemetry, setNodeTelemetry] = useState<Record<string, Telemetry>>({});
+
   // O Log Context define se estamos vendo logs globais (celular) ou locais (proxy)
   const [logContext, setLogContext] = useState<{type: "node" | "proxy", title: string, id: string} | null>(null);
   const [liveLogs, setLiveLogs] = useState<{id?: string, time: string, msg: string, nodeId: string}[]>([]);
@@ -74,13 +78,15 @@ export default function ProxiesPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const proxyRes = await fetch("/api/proxies");
+      const [proxyRes, nodeRes] = await Promise.all([fetch("/api/proxies"), fetch("/api/nodes")]);
       const proxyData = await proxyRes.json();
       if (proxyRes.ok) setProxies(proxyData.data.proxies || []);
 
-      const nodeRes = await fetch("/api/nodes");
       const nodeData = await nodeRes.json();
-      if (nodeRes.ok) setNodes(nodeData.data.nodes || []);
+      if (nodeRes.ok) {
+        setNodes(nodeData.data.nodes || []);
+        setNodeTelemetry(prev => ({...prev, ...Object.fromEntries((nodeData.data.nodes || []).filter((n: Node) => n.telemetry).map((n: Node) => [n.id, n.telemetry]))}));
+      }
     } catch (e) {
       console.error(e);
     }
@@ -94,7 +100,7 @@ export default function ProxiesPage() {
     // Conecta no WebSocket do Go Broker usando o mesmo IP que o usuário digitou na URL
     const ws = { onmessage: (() => {}) as (event: MessageEvent) => void };
     const unsubscribe = subscribeDashboard(event => ws.onmessage(event));
-    
+
     ws.onmessage = (event) => {
       try {
         const msg = JSON.parse(event.data);
@@ -106,13 +112,14 @@ export default function ProxiesPage() {
           const formattedName = msg.payload.startsWith("HiveNode ") ? msg.payload : `HiveNode ${msg.payload}`;
           setNodes(prev => prev.map(n => n.id === msg.nodeId ? { ...n, deviceModel: formattedName } : n));
         } else if (msg.type === "TELEMETRY") {
-          setNodeTelemetry(prev => ({
-            ...prev,
-            [msg.nodeId]: {
-              ...prev[msg.nodeId],
-              ...msg.payload
-            }
-          }));
+          setNodeTelemetry(prev => {
+            const old = prev[msg.nodeId];
+            const now = Date.now();
+            const seconds = old?.receivedAt ? (now-old.receivedAt)/1000 : 0;
+            return {...prev, [msg.nodeId]: {...old, ...msg.payload, receivedAt: now,
+              downloadRate: seconds > 0 ? Math.max(0, (Number(msg.payload.rx)-Number(old?.rx ?? msg.payload.rx))/seconds) : 0,
+              uploadRate: seconds > 0 ? Math.max(0, (Number(msg.payload.tx)-Number(old?.tx ?? msg.payload.tx))/seconds) : 0}};
+          });
         } else if (msg.type === "LOG") {
         setLiveLogs(prev => [{
           id: Math.random().toString(36).substr(2, 9),
@@ -126,7 +133,14 @@ export default function ProxiesPage() {
     }
     };
 
-    return unsubscribe;
+    const refresh = setInterval(async () => {
+      if (document.visibilityState !== "visible") return;
+      try {
+        const response = await fetch("/api/proxies");
+        if (response.ok) { const json = await response.json(); setProxies(json.data.proxies || []); }
+      } catch { /* Keep the last valid data while offline. */ }
+    }, 10000);
+    return () => { clearInterval(refresh); unsubscribe(); };
   }, [fetchData]);
 
   const handleGenerateQr = async () => {
@@ -134,10 +148,10 @@ export default function ProxiesPage() {
       const res = await fetch("/api/auth/qr-link");
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      
+
       // Compressão Extrema para o QR Code Nível L ficar minúsculo
       const payload = `hivenode|${data.data.linkToken}`;
-      
+
       setQrPayload(payload);
       setIsQrOpen(true);
     } catch (e: unknown) {
@@ -172,7 +186,7 @@ export default function ProxiesPage() {
       const res = await fetch(`/api/nodes/${nodeToDelete}`, { method: "DELETE" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      
+
       setIsDeleteModalOpen(false);
       setNodeToDelete(null);
       fetchData(); // Atualiza a tabela
@@ -192,7 +206,7 @@ export default function ProxiesPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      
+
       setIsRenameNodeOpen(false);
       setNodeToRename(null);
       // Não chamo fetchData() porque o Broadcaster WebSocket (NODE_RENAMED) vai atualizar sozinho!
@@ -213,10 +227,10 @@ export default function ProxiesPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      
+
       setIsEditTagsOpen(false);
       setNodeToEditTags(null);
-      fetchData(); 
+      fetchData();
     } catch (e: unknown) {
       if (e instanceof Error) alert(e.message);
     }
@@ -228,7 +242,7 @@ export default function ProxiesPage() {
       const res = await fetch(`/api/proxies/${proxyToDelete}`, { method: "DELETE" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      
+
       setIsDeleteProxyOpen(false);
       setProxyToDelete(null);
       fetchData();
@@ -265,7 +279,7 @@ export default function ProxiesPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      
+
       alert("Proxy Criado e Sincronizado no Redis com Sucesso!");
       setIsCreateOpen(false);
       setNewUser("");
@@ -289,9 +303,9 @@ export default function ProxiesPage() {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="flex min-w-0 flex-col gap-8">
       {/* Header */}
-      <div className="flex justify-between items-center bg-[#111114] p-6 border border-[#27272e] rounded-xl">
+      <div className="flex flex-wrap gap-4 justify-between items-center bg-[#111114] p-6 border border-[#27272e] rounded-xl">
         <div className="flex items-center gap-4">
           <div className="p-3 bg-amber-500/10 rounded-lg border border-amber-500/20">
             <Shield className="w-8 h-8 text-amber-500" />
@@ -303,7 +317,7 @@ export default function ProxiesPage() {
             </p>
           </div>
         </div>
-        <button 
+        <button
           type="button"
           onClick={() => setIsCreateOpen(true)}
           className="flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white px-5 py-3 rounded-lg font-medium transition-colors"
@@ -329,12 +343,12 @@ export default function ProxiesPage() {
 
       {/* Lista de Aparelhos (Nodes BYOD) */}
       <div className="bg-[#111114] border border-[#27272e] rounded-xl overflow-hidden">
-        <div className="p-6 border-b border-[#27272e] flex items-center justify-between">
+        <div className="p-4 sm:p-6 border-b border-[#27272e] flex flex-wrap gap-3 items-center justify-between">
           <h2 className="text-lg font-bold text-white flex items-center gap-2">
             <HardDrive className="w-5 h-5 text-emerald-500" />
             Meus Aparelhos Conectados
           </h2>
-          <button 
+          <button
             type="button"
             onClick={handleGenerateQr}
             className="flex items-center gap-2 bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 px-4 py-2 rounded-lg font-medium transition-colors text-sm"
@@ -343,21 +357,21 @@ export default function ProxiesPage() {
             Vincular App (QR Code)
           </button>
         </div>
-        
+
         {loading ? (
           <div className="p-8 text-center text-[#8e8e99]">Buscando aparelhos...</div>
         ) : nodes.length === 0 ? (
           <div className="p-8 text-center text-[#8e8e99]">Nenhum aparelho Android vinculado ainda.</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
+          <div className="max-h-[65vh] overflow-auto">
+            <table className="w-full min-w-[960px] text-left text-sm">
               <thead className="bg-[#0a0a0c] text-[#8e8e99] text-sm uppercase">
                 <tr>
                   <th className="px-6 py-4 font-medium">Aparelho</th>
                   <th className="px-6 py-4 font-medium">Status</th>
                   <th className="px-6 py-4 font-medium">Rede</th>
-                  <th className="px-6 py-4 font-medium">IP Externo</th>
-                  <th className="px-6 py-4 font-medium">Banda Larga</th>
+                  <th className="px-6 py-4 font-medium">IP Externo (túnel)</th>
+                  <th className="px-6 py-4 font-medium">Tráfego da sessão e RTT</th>
                   <th className="px-6 py-4 font-medium">Tags</th>
                   <th className="px-6 py-4 font-medium text-right">Ações</th>
                 </tr>
@@ -370,7 +384,7 @@ export default function ProxiesPage() {
                         {(n.deviceModel || n.deviceName).startsWith("HiveNode ") ? (n.deviceModel || n.deviceName) : `HiveNode ${n.deviceModel || n.deviceName}`}
                       </div>
                       <div className="text-xs mt-1 text-[#8e8e99] font-mono">
-                        {n.id.split("-")[0]}
+                        {nodeTelemetry[n.id]?.model || "Modelo não informado pelo app"} · {n.id.split("-")[0]}
                       </div>
                     </td>
                     <td className="px-6 py-4">
@@ -383,17 +397,21 @@ export default function ProxiesPage() {
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2 text-sm text-[#f0f0f2]">
                         <Wifi className="w-4 h-4 text-blue-400" />
-                        {nodeTelemetry[n.id]?.network || "---"}
+                        {nodeTelemetry[n.id]?.network || "Aguardando"}
+                      </div>
+                      <div className="mt-1 max-w-48 break-words text-xs text-muted-foreground">
+                        {nodeTelemetry[n.id]?.ssid || (nodeTelemetry[n.id]?.network === "Wi-Fi" ? "SSID indisponível" : "")}
+                        {(nodeTelemetry[n.id]?.frequency ?? 0) > 0 ? ` · ${nodeTelemetry[n.id].frequency! >= 5925 ? "6" : nodeTelemetry[n.id].frequency! >= 4900 ? "5" : "2,4"} GHz` : ""}
                       </div>
                     </td>
                     <td className="px-6 py-4 text-[#8e8e99] font-mono text-sm">
-                      {nodeTelemetry[n.id]?.ip || "---.---.---.---"}
+                      {nodeTelemetry[n.id]?.ip || "Aguardando telemetria"}
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex flex-col gap-1 text-xs font-mono">
-                        <span className="text-emerald-400 flex items-center gap-1"><ArrowDown className="w-3 h-3"/> {formatBytes(nodeTelemetry[n.id]?.rx || 0)}</span>
-                        <span className="text-blue-400 flex items-center gap-1"><ArrowUp className="w-3 h-3"/> {formatBytes(nodeTelemetry[n.id]?.tx || 0)}</span>
-                        <span className="text-amber-500 flex items-center gap-1"><Activity className="w-3 h-3"/> {nodeTelemetry[n.id]?.latency || 0}ms</span>
+                        <span className="text-emerald-400 flex items-center gap-1"><ArrowDown className="w-3 h-3"/> {formatBytes(nodeTelemetry[n.id]?.rx || 0)} · {formatBytes(nodeTelemetry[n.id]?.downloadRate || 0)}/s</span>
+                        <span className="text-blue-400 flex items-center gap-1"><ArrowUp className="w-3 h-3"/> {formatBytes(nodeTelemetry[n.id]?.tx || 0)} · {formatBytes(nodeTelemetry[n.id]?.uploadRate || 0)}/s</span>
+                        <span className="text-amber-500 flex items-center gap-1"><Activity className="w-3 h-3"/> {nodeTelemetry[n.id]?.latency != null ? `${Math.round(nodeTelemetry[n.id].latency!)} ms (túnel)` : "RTT aguardando"}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4">
@@ -407,36 +425,33 @@ export default function ProxiesPage() {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex justify-end gap-2 relative">
-                        <div className="relative">
-                          <button 
+                        <Popover open={openDetailsPopover === n.id} onOpenChange={open => setOpenDetailsPopover(open ? n.id : null)}>
+<PopoverTrigger render={<button
                             type="button"
-                            onClick={() => setOpenDetailsPopover(openDetailsPopover === n.id ? null : n.id)}
                             className="p-2 text-emerald-400 hover:bg-emerald-400/10 rounded-lg transition-colors"
                             title="Detalhes do Aparelho"
                           >
                             <Info className="w-5 h-5" />
-                          </button>
-                          {openDetailsPopover === n.id && (
-                            <div className="absolute right-0 top-full mt-2 w-64 bg-[#1a1a20] border border-[#27272e] rounded-lg shadow-xl z-10 overflow-hidden text-left p-4">
+                          </button>} />
+<PopoverContent align="end" className="max-w-[calc(100vw-2rem)]">
                               <h3 className="text-white font-bold mb-3 text-sm">Detalhes do Sistema</h3>
-                              <div className="space-y-3 text-sm">
+                              <div className="flex flex-col gap-3 text-sm">
                                 <div className="flex justify-between items-center">
                                   <span className="text-[#8e8e99] flex items-center gap-2"><Clock className="w-4 h-4"/> Uptime</span>
                                   <span className="text-white font-mono">{nodeTelemetry[n.id]?.uptime ? `${Math.floor((nodeTelemetry[n.id].uptime ?? 0) / 60)}m` : "---"}</span>
                                 </div>
                                 <div className="flex justify-between items-center">
                                   <span className="text-[#8e8e99] flex items-center gap-2"><Battery className="w-4 h-4"/> Bateria</span>
-                                  <span className="text-white font-mono">{nodeTelemetry[n.id]?.battery ? `${Math.floor((nodeTelemetry[n.id].battery ?? 0) * 100)}%` : "---"}</span>
+                                  <span className="text-white font-mono">{nodeTelemetry[n.id]?.battery != null ? `${Math.floor((nodeTelemetry[n.id].battery ?? 0) * 100)}%` : "---"}</span>
                                 </div>
                                 <div className="flex justify-between items-center border-t border-[#27272e] pt-3 mt-3">
                                   <span className="text-[#8e8e99] flex items-center gap-2">Vínculo</span>
                                   <span className="text-white font-mono text-xs">{new Date(n.createdAt).toLocaleDateString()}</span>
                                 </div>
                               </div>
-                            </div>
-                          )}
-                        </div>
-                        <button 
+                            </PopoverContent>
+</Popover>
+                        <button
                           type="button"
                           onClick={() => {
                             setNodeToEditTags(n.id);
@@ -448,7 +463,7 @@ export default function ProxiesPage() {
                         >
                           <Tag className="w-5 h-5" />
                         </button>
-                        <button 
+                        <button
                           type="button"
                           onClick={() => setLogContext({ type: "node", title: `Aparelho ${n.deviceModel || n.deviceName}`, id: n.id })}
                           className="p-2 text-[#8e8e99] hover:bg-[#27272e] rounded-lg transition-colors"
@@ -456,13 +471,13 @@ export default function ProxiesPage() {
                         >
                           <Eye className="w-5 h-5" />
                         </button>
-                        <button 
+                        <button
                           type="button"
                           onClick={() => {
                           const originalName = (n.deviceModel || n.deviceName).replace(/^HiveNode /, "");
-                          setNodeToRename(n.id); 
-                          setNewNodeName(originalName); 
-                          setIsRenameNodeOpen(true); 
+                          setNodeToRename(n.id);
+                          setNewNodeName(originalName);
+                          setIsRenameNodeOpen(true);
                         }}
                           className="p-2 text-blue-500 hover:bg-blue-500/10 rounded-lg transition-colors"
                           title="Renomear Aparelho"
@@ -472,7 +487,7 @@ export default function ProxiesPage() {
                             <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
                           </svg>
                         </button>
-                        <button 
+                        <button
                           type="button"
                           onClick={() => { setNodeToDelete(n.id); setIsDeleteModalOpen(true); }}
                           className="p-2 text-rose-500 hover:bg-rose-500/10 rounded-lg transition-colors"
@@ -498,7 +513,7 @@ export default function ProxiesPage() {
             Credenciais e Consumo (GB)
           </h2>
         </div>
-        
+
         {loading ? (
           <div className="p-12 text-center text-[#8e8e99]">Carregando tráfego do servidor...</div>
         ) : proxies.length === 0 ? (
@@ -506,8 +521,8 @@ export default function ProxiesPage() {
             Você ainda não possui Proxies criados. Clique em &quot;Novo Proxy SOCKS5&quot; acima.
           </div>
         ) : (
-          <div className="overflow-visible pb-20">
-            <table className="w-full text-left">
+          <div className="max-h-[65vh] overflow-auto">
+            <table className="w-full min-w-[960px] text-left text-sm">
               <thead className="bg-[#0a0a0c] text-[#8e8e99] text-sm uppercase">
                 <tr>
                   <th className="px-6 py-4 font-medium">Usuário</th>
@@ -525,9 +540,9 @@ export default function ProxiesPage() {
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2 text-[#8e8e99]">
                         {visiblePasswords.has(p.id) ? p.proxyPass : "••••••••"}
-                        <button 
+                        <button
                           type="button"
-                          onClick={() => togglePasswordVisibility(p.id)} 
+                          onClick={() => togglePasswordVisibility(p.id)}
                           className="hover:text-amber-500 hover:bg-amber-500/10 p-1 rounded transition-colors"
                           title="Mostrar/Esconder Senha"
                         >
@@ -538,8 +553,8 @@ export default function ProxiesPage() {
                     <td className="px-6 py-4">
                       <span className="flex items-center gap-2 text-amber-400 bg-amber-400/10 px-3 py-1 rounded-full text-xs font-bold w-max">
                         <HardDrive className="w-3 h-3" />
-                        {(p.node?.deviceModel || p.node?.deviceName)?.startsWith("HiveNode ") 
-                          ? (p.node?.deviceModel || p.node?.deviceName) 
+                        {(p.node?.deviceModel || p.node?.deviceName)?.startsWith("HiveNode ")
+                          ? (p.node?.deviceModel || p.node?.deviceName)
                           : (p.node?.deviceModel ? `HiveNode ${p.node.deviceModel}` : "Aparelho Removido")
                         }
                       </span>
@@ -548,26 +563,23 @@ export default function ProxiesPage() {
                     <td className="px-6 py-4 text-emerald-400 font-bold">{formatBytes(p.totalBytesTx)}</td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex justify-end gap-2 relative">
-                        <div className="relative">
-                          <button 
+                        <Popover open={openCopyPopover === p.id} onOpenChange={open => setOpenCopyPopover(open ? p.id : null)}>
+<PopoverTrigger render={<button
                             type="button"
-                            onClick={() => setOpenCopyPopover(openCopyPopover === p.id ? null : p.id)}
                             className="text-blue-400 hover:bg-blue-400/10 rounded-lg p-2 transition-colors"
                             title="Copiar Credenciais"
                           >
                             <Copy className="w-5 h-5" />
-                          </button>
-                          {openCopyPopover === p.id && (
-                            <div className="absolute right-0 top-full mt-2 w-48 bg-[#1a1a20] border border-[#27272e] rounded-lg shadow-xl z-10 overflow-hidden text-left">
+                          </button>} />
+<PopoverContent align="end" className="max-w-[calc(100vw-2rem)]">
                               <button type="button" onClick={() => handleCopy(`socks5://${p.proxyUser}:${p.proxyPass}@${window.location.hostname}:10000`)} className="block w-full text-left px-4 py-3 text-sm text-[#f0f0f2] hover:bg-[#27272e] border-b border-[#27272e]">Copiar URL SOCKS5</button>
                               <button type="button" onClick={() => handleCopy(p.proxyUser)} className="block w-full text-left px-4 py-2 text-sm text-[#f0f0f2] hover:bg-[#27272e]">Copiar Usuário</button>
                               <button type="button" onClick={() => handleCopy(p.proxyPass)} className="block w-full text-left px-4 py-2 text-sm text-[#f0f0f2] hover:bg-[#27272e]">Copiar Senha</button>
                               <button type="button" onClick={() => handleCopy(window.location.hostname)} className="block w-full text-left px-4 py-2 text-sm text-[#f0f0f2] hover:bg-[#27272e]">Copiar Endereço</button>
                               <button type="button" onClick={() => handleCopy("10000")} className="block w-full text-left px-4 py-2 text-sm text-[#f0f0f2] hover:bg-[#27272e]">Copiar Porta</button>
-                            </div>
-                          )}
-                        </div>
-                        <button 
+                            </PopoverContent>
+</Popover>
+                        <button
                           type="button"
                           onClick={() => setLogContext({ type: "proxy", title: `Credencial ${p.proxyUser}`, id: p.node?.id || "" })}
                           className="text-[#8e8e99] hover:bg-[#27272e] rounded-lg p-2 transition-colors"
@@ -575,7 +587,7 @@ export default function ProxiesPage() {
                         >
                           <Eye className="w-5 h-5" />
                         </button>
-                        <button 
+                        <button
                           type="button"
                           onClick={() => handleRotateProxy(p.id)}
                           className="text-amber-500 hover:bg-amber-500/10 rounded-lg p-2 transition-colors"
@@ -583,7 +595,7 @@ export default function ProxiesPage() {
                         >
                           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><title>Rotacionar Senha</title><path d="M21.5 2v6h-6M2.13 15.57a9 9 0 1 0 3.84-10.36L2 8"/></svg>
                         </button>
-                        <button 
+                        <button
                           type="button"
                           onClick={() => { setProxyToDelete(p.id); setIsDeleteProxyOpen(true); }}
                           className="text-rose-500 hover:bg-rose-500/10 rounded-lg p-2 transition-colors"
@@ -603,13 +615,13 @@ export default function ProxiesPage() {
 
       {/* Modal Criar Proxy */}
       {isCreateOpen && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
-          <div className="bg-[#111114] border border-[#27272e] rounded-xl w-full max-w-md p-6">
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="bg-[#111114] border border-[#27272e] rounded-xl w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto p-4 sm:p-6">
             <h2 className="text-xl font-bold text-white mb-6">Nova Credencial Proxy</h2>
             <form onSubmit={handleCreateProxy} className="space-y-4">
               <div>
                 <label htmlFor="nodeSelect" className="block text-[#8e8e99] text-sm mb-2">Vincular a qual Aparelho?</label>
-                <select 
+                <select
                   id="nodeSelect"
                   required
                   title="Selecione o Aparelho"
@@ -623,7 +635,7 @@ export default function ProxiesPage() {
                   ))}
                 </select>
               </div>
-              
+
               <div>
                 <label htmlFor="proxyUser" className="block text-[#8e8e99] text-sm mb-2">Usuário SOCKS5 (3 a 64: letras, números, _ ou -)</label>
                 <input
@@ -656,15 +668,15 @@ export default function ProxiesPage() {
               </div>
 
               <div className="flex justify-end gap-3 mt-8">
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   onClick={() => setIsCreateOpen(false)}
                   className="px-5 py-3 text-[#8e8e99] hover:text-white"
                 >
                   Cancelar
                 </button>
-                <button 
-                  type="submit" 
+                <button
+                  type="submit"
                   disabled={creating}
                   className="px-5 py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-lg font-bold"
                 >
@@ -679,7 +691,7 @@ export default function ProxiesPage() {
       {/* Modal QR Code */}
       {isQrOpen && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-          <div className="bg-[#111114] border border-[#27272e] rounded-xl w-full max-w-2xl p-6 text-center max-h-[90vh] overflow-y-auto">
+          <div className="bg-[#111114] border border-[#27272e] rounded-xl w-full max-w-2xl max-h-[calc(100dvh-2rem)] overflow-y-auto p-4 sm:p-6 text-center max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-bold text-white flex items-center gap-2">
                 <QrCode className="w-5 h-5 text-emerald-500" />
@@ -687,11 +699,11 @@ export default function ProxiesPage() {
               </h2>
               <button type="button" onClick={() => setIsQrOpen(false)} className="text-[#8e8e99] hover:text-white">✕</button>
             </div>
-            
+
             <p className="text-[#8e8e99] text-sm mb-6">
               Escaneie com o app móvel, instale o APK no Android ou use o comando Linux para servidores.
             </p>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
               {/* QR Code & APK Downloads */}
               <div className="flex flex-col items-center p-4 bg-[#0a0a0c] border border-[#27272e] rounded-xl">
@@ -700,7 +712,7 @@ export default function ProxiesPage() {
                 </div>
                 <div className="space-y-2 w-full">
                   <p className="text-xs font-bold text-slate-400 text-center uppercase tracking-wider">APKs Oficiais Android</p>
-                  <a 
+                  <a
                     href="https://expo.dev/artifacts/eas/QAjitJ15Xm0302G60u_gQ-3fLAtPpf-gsHqLLQNo-t8.apk"
                     target="_blank"
                     rel="noreferrer"
@@ -708,7 +720,7 @@ export default function ProxiesPage() {
                   >
                     📥 Baixar APK HiveNode (Proxy)
                   </a>
-                  <a 
+                  <a
                     href="https://expo.dev/artifacts/eas/mvhpPxGjdeMgszlNfmRP-HNQMPcpHbWyQ_QhI3L17fs.apk"
                     target="_blank"
                     rel="noreferrer"
@@ -726,8 +738,8 @@ export default function ProxiesPage() {
                   <p className="text-xs text-slate-400 mb-3">Comando único universal para Ubuntu, Debian, CentOS ou Arch:</p>
                   <div className="bg-black p-3 rounded-lg border border-[#27272e] font-mono text-xs text-emerald-400 flex items-center justify-between overflow-x-auto">
                     <span>curl -fsSL https://hivenode.alfastage.com.br/install.sh | sh</span>
-                    <button 
-                      type="button" 
+                    <button
+                      type="button"
                       onClick={() => navigator.clipboard.writeText("curl -fsSL https://hivenode.alfastage.com.br/install.sh | sh")}
                       className="ml-2 px-2 py-1 bg-[#1e1e24] hover:bg-[#27272e] text-slate-300 rounded text-[10px] font-sans"
                     >
@@ -740,17 +752,17 @@ export default function ProxiesPage() {
                   <p className="text-xs font-bold text-slate-300 mb-1">Aprovar Código do Terminal</p>
                   <p className="text-xs text-slate-400 mb-2">Se a CLI informou um código de 6 caracteres, digite abaixo:</p>
                   <div className="flex gap-2">
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       placeholder="Ex: HIVE-X"
                       value={cliCode}
                       onChange={(e) => setCliCode(e.target.value.toUpperCase())}
                       maxLength={8}
                       className="w-full bg-[#15151a] border border-[#2f2f38] rounded-lg px-3 py-2 text-amber-400 font-mono text-sm focus:border-amber-500 focus:outline-none uppercase"
                     />
-                    <button 
+                    <button
                       type="button"
-                      onClick={handleApproveCliCode} 
+                      onClick={handleApproveCliCode}
                       disabled={approving || cliCode.length < 5}
                       className="bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-black font-bold px-4 rounded-lg"
                     >
@@ -767,7 +779,7 @@ export default function ProxiesPage() {
       {/* Modal Logs Remotos via WebSocket */}
       {logContext && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-          <div className="bg-[#111114] border border-[#27272e] rounded-xl w-full max-w-2xl p-6">
+          <div className="bg-[#111114] border border-[#27272e] rounded-xl w-full max-w-2xl max-h-[calc(100dvh-2rem)] overflow-y-auto p-4 sm:p-6">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-bold text-white flex items-center gap-2">
                 <TerminalSquare className="w-5 h-5 text-amber-500" />
@@ -775,12 +787,12 @@ export default function ProxiesPage() {
               </h2>
               <button type="button" onClick={() => setLogContext(null)} className="text-[#8e8e99] hover:text-white">✕</button>
             </div>
-            
+
             <div className="bg-[#0a0a0c] p-4 rounded-lg font-mono text-sm h-64 overflow-y-auto border border-[#27272e]">
               <div className="text-[#8e8e99] mb-4 pb-2 border-b border-[#27272e]">
                 <span className="text-emerald-400">✅ Filtro Ativo para: {logContext.type === "node" ? "Todo o Aparelho (Mestre)" : "Somente Proxy Específico"}</span>
               </div>
-              
+
               {liveLogs.filter(l => l.nodeId === logContext.id).length === 0 ? (
                 <div className="text-[#4b4b57] text-center mt-10">Aguardando novo tráfego...</div>
               ) : (
@@ -798,7 +810,7 @@ export default function ProxiesPage() {
       {/* Modal de Exclusão de Aparelho */}
       {isDeleteModalOpen && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-          <div className="bg-[#111114] border border-[#27272e] rounded-xl w-full max-w-md p-6">
+          <div className="bg-[#111114] border border-[#27272e] rounded-xl w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto p-4 sm:p-6">
             <h2 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
               <Trash2 className="w-6 h-6 text-rose-500" />
               Remover Aparelho?
@@ -806,16 +818,16 @@ export default function ProxiesPage() {
             <p className="text-[#8e8e99] mb-6">
               Tem certeza que deseja apagar este celular da rede? A conexão VPN dele cairá <b>imediatamente</b> e você precisará ler o QR Code de novo se quiser voltar.
             </p>
-            
+
             <div className="flex gap-4 mt-8">
-              <button 
+              <button
                 type="button"
                 onClick={() => { setIsDeleteModalOpen(false); setNodeToDelete(null); }}
                 className="flex-1 px-4 py-3 bg-[#1a1a20] hover:bg-[#27272e] text-white rounded-lg font-medium transition-colors"
               >
                 Cancelar
               </button>
-              <button 
+              <button
                 type="button"
                 onClick={handleDeleteNode}
                 className="flex-1 px-4 py-3 bg-rose-500 hover:bg-rose-600 text-white rounded-lg font-medium transition-colors"
@@ -830,7 +842,7 @@ export default function ProxiesPage() {
       {/* Modal de Renomear Aparelho */}
       {isRenameNodeOpen && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-          <div className="bg-[#111114] border border-[#27272e] rounded-xl w-full max-w-md p-6">
+          <div className="bg-[#111114] border border-[#27272e] rounded-xl w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto p-4 sm:p-6">
             <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500">
                 <title>Renomear</title>
@@ -843,7 +855,7 @@ export default function ProxiesPage() {
                 <label htmlFor="renameInput" className="block text-[#8e8e99] text-sm mb-2">Novo Nome</label>
                 <div className="flex bg-[#0a0a0c] border border-[#27272e] rounded-lg overflow-hidden focus-within:border-blue-500">
                   <span className="px-4 py-3 bg-[#1a1a20] text-[#8e8e99] border-r border-[#27272e] font-medium">HiveNode</span>
-                  <input 
+                  <input
                     id="renameInput"
                     required
                     type="text"
@@ -855,14 +867,14 @@ export default function ProxiesPage() {
                 </div>
               </div>
               <div className="flex gap-4">
-                <button 
+                <button
                   type="button"
                   onClick={() => { setIsRenameNodeOpen(false); setNodeToRename(null); }}
                   className="flex-1 px-4 py-3 bg-[#1a1a20] hover:bg-[#27272e] text-white rounded-lg font-medium transition-colors"
                 >
                   Cancelar
                 </button>
-                <button 
+                <button
                   type="submit"
                   className="flex-1 px-4 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors"
                 >
@@ -877,7 +889,7 @@ export default function ProxiesPage() {
       {/* Modal de Editar Tags */}
       {isEditTagsOpen && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-          <div className="bg-[#111114] border border-[#27272e] rounded-xl w-full max-w-md p-6">
+          <div className="bg-[#111114] border border-[#27272e] rounded-xl w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto p-4 sm:p-6">
             <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
               <Tag className="w-6 h-6 text-amber-500" />
               Editar Tags do Aparelho
@@ -885,7 +897,7 @@ export default function ProxiesPage() {
             <form onSubmit={handleEditTags}>
               <div className="mb-6">
                 <label htmlFor="tagsInput" className="block text-[#8e8e99] text-sm mb-2">Tags (Separadas por vírgula)</label>
-                <input 
+                <input
                   id="tagsInput"
                   type="text"
                   placeholder="Ex: Claro 5G, SP, Backup..."
@@ -895,14 +907,14 @@ export default function ProxiesPage() {
                 />
               </div>
               <div className="flex gap-4">
-                <button 
+                <button
                   type="button"
                   onClick={() => { setIsEditTagsOpen(false); setNodeToEditTags(null); }}
                   className="flex-1 px-4 py-3 bg-[#1a1a20] hover:bg-[#27272e] text-white rounded-lg font-medium transition-colors"
                 >
                   Cancelar
                 </button>
-                <button 
+                <button
                   type="submit"
                   className="flex-1 px-4 py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-lg font-medium transition-colors"
                 >
@@ -917,7 +929,7 @@ export default function ProxiesPage() {
       {/* Modal de Exclusão de Proxy */}
       {isDeleteProxyOpen && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-          <div className="bg-[#111114] border border-[#27272e] rounded-xl w-full max-w-md p-6">
+          <div className="bg-[#111114] border border-[#27272e] rounded-xl w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto p-4 sm:p-6">
             <h2 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
               <Trash2 className="w-6 h-6 text-rose-500" />
               Apagar Credencial Proxy?
@@ -925,16 +937,16 @@ export default function ProxiesPage() {
             <p className="text-[#8e8e99] mb-6">
               Tem certeza que deseja excluir este Proxy SOCKS5? Qualquer pessoa conectada com essa senha cairá <b>imediatamente</b> pois o cache será revogado do Redis.
             </p>
-            
+
             <div className="flex gap-4 mt-8">
-              <button 
+              <button
                 type="button"
                 onClick={() => { setIsDeleteProxyOpen(false); setProxyToDelete(null); }}
                 className="flex-1 px-4 py-3 bg-[#1a1a20] hover:bg-[#27272e] text-white rounded-lg font-medium transition-colors"
               >
                 Cancelar
               </button>
-              <button 
+              <button
                 type="button"
                 onClick={handleDeleteProxy}
                 className="flex-1 px-4 py-3 bg-rose-500 hover:bg-rose-600 text-white rounded-lg font-medium transition-colors"

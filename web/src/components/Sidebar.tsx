@@ -31,7 +31,7 @@ export function Sidebar({ role }: { role?: string }) {
   ];
 
   return (
-    <aside className="hidden lg:flex flex-col w-72 border-r border-border bg-card/30 backdrop-blur-xl p-5 overflow-y-auto">
+    <aside className="hidden lg:flex flex-col w-72 shrink-0 border-r border-border bg-card/30 backdrop-blur-xl p-5 overflow-y-auto">
       <div className="flex items-center gap-4 px-3 mb-10 mt-2">
         <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center shadow-inner">
           <span className="text-lg font-black text-primary">H</span>
