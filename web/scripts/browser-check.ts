@@ -18,12 +18,14 @@ export async function checkBrowser(base: string, email: string, otherEmail: stri
       }).toPass({ timeout: 60000 });
       await page.locator("#login-submit").click();
       await page.waitForURL(base + "/dashboard");
+      const dismissConsent = page.getByRole("button", { name: "Recusar", exact: true });
+      if (await dismissConsent.isVisible()) await dismissConsent.click();
       return page;
     }
 
     async function expectMinerHidden(page: Page) {
       for (const path of ["/dashboard", "/dashboard/proxies", "/dashboard/billing"]) {
-        await page.goto(base + path);
+        await page.goto(base + path, { waitUntil: "domcontentloaded" });
         await expect(page.locator("a[href='/dashboard/miner']")).toHaveCount(0);
         await expect(page.getByText(/Pontos Miner|Baixar APK HiveMiner/)).toHaveCount(0);
         if (path === "/dashboard/proxies") {
@@ -32,9 +34,9 @@ export async function checkBrowser(base: string, email: string, otherEmail: stri
           await expect(page.getByText("Baixar APK HiveMiner", { exact: false })).toHaveCount(0);
         }
       }
-      const response = await page.goto(base + "/dashboard/miner");
+      const response = await page.goto(base + "/dashboard/miner", { waitUntil: "domcontentloaded" });
       assert.equal(response?.status(), 404);
-      assert.equal((await page.request.get(base + "/api/auth/qr-link?type=miner")).status(), 404);
+      assert.equal(await page.evaluate(async () => (await fetch("/api/auth/qr-link?type=miner")).status), 404);
     }
 
     const page = await login(email);
@@ -67,8 +69,7 @@ export async function checkBrowser(base: string, email: string, otherEmail: stri
     await page.goto(base + "/saas", { waitUntil: "domcontentloaded" });
     await page.getByRole("heading", { name: "Compartilhar acesso B2B" }).waitFor();
     await expectMinerHidden(other);
-    const pendingQr = await page.request.get(base + "/api/auth/qr-link?type=miner");
-    const { data: { linkToken } } = await pendingQr.json();
+    const { data: { linkToken } } = await page.evaluate(async () => (await fetch("/api/auth/qr-link?type=miner")).json());
     await adminPage.getByRole("button", { name: "Revogar acesso", exact: true }).click();
     await expect(adminPage.getByText("Acesso desativado", { exact: true })).toBeVisible();
     await expectMinerHidden(page);
