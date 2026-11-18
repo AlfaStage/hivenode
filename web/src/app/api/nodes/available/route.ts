@@ -1,5 +1,6 @@
 import { requireAuth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { redis } from "@/lib/redis";
 import { apiSuccess, handleApiError } from "@/lib/api-utils";
 export async function GET() {
   try {
@@ -8,6 +9,7 @@ export async function GET() {
       { userId: user.userId }, { visibility: "PUBLIC", user: { disabled: false } },
       { shares: { some: { sharedWithId: user.userId, status: "ACCEPTED" } } },
     ] }, select: { id: true, deviceModel: true, visibility: true, status: true }, take: 200 });
-    return apiSuccess({ nodes });
+    const online = nodes.length ? await redis.mget(...nodes.map(node => `node:online:${node.id}`)) : [];
+    return apiSuccess({ nodes: nodes.map((node, index) => ({ ...node, status: online[index] ? "ONLINE" : "OFFLINE" })) });
   } catch (error) { return handleApiError(error); }
 }

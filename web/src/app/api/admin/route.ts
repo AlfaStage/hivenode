@@ -15,9 +15,13 @@ export async function GET() {
     }, orderBy: { createdAt: "desc" } });
     const nodes = users.flatMap(user => user.nodes);
     const online = nodes.length ? await redis.mget(...nodes.map(node => "node:online:" + node.id)) : [];
+    const telemetry = nodes.length ? await redis.mget(...nodes.map(node => "node:telemetry:" + node.id)) : [];
+    const ips = new Map(nodes.map((node, index) => [node.id,
+      online[index] && telemetry[index] ? (JSON.parse(telemetry[index]!) as {ip?: string}).ip : null]));
     const statuses = new Map(nodes.map((node, index) => [node.id, Boolean(online[index])]));
     return apiSuccess({ users: users.map(user => ({ ...user, nodes: user.nodes.map(node => ({
-      ...node, status: node.status === "BLOCKED" ? "BLOCKED" : statuses.get(node.id) ? "ONLINE" : "OFFLINE",
+      ...node, ipAddress: ips.get(node.id) || node.ipAddress,
+      status: node.status === "BLOCKED" ? "BLOCKED" : statuses.get(node.id) ? "ONLINE" : "OFFLINE",
     })) })) });
   } catch (error) { return handleApiError(error); }
 }
