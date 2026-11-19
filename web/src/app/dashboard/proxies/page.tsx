@@ -732,7 +732,7 @@ export default function ProxiesPage() {
                 <div className="space-y-2 w-full">
                   <p className="text-xs font-bold text-slate-400 text-center uppercase tracking-wider">APKs Oficiais Android</p>
                   <a
-                    href="https://expo.dev/artifacts/eas/fxZXHq9PJyn6D8XICiCshyRWiLndcPdgsA8jl7NF3QQ.apk"
+                    href="https://downloads.alfastage.com.br/HiveNode.apk"
                     target="_blank"
                     rel="noreferrer"
                     className="flex items-center justify-center gap-2 w-full py-2 px-3 bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 border border-amber-500/30 rounded-lg text-xs font-bold transition-all"
