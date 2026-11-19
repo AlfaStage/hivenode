@@ -37,9 +37,12 @@ export async function POST(request: Request) {
     }
     const device = await tx.smsPilotDevice.findFirst({ where: { id: data.deviceId, userId, revokedAt: null } });
     if (!device) return apiError("Aparelho não encontrado", 404);
-    if (!device.approvedBinding || !device.approvedAt || device.consentVersion !== consentVersion ||
+    if (!device.approvedBinding || !device.approvedAt ||
         device.destinationHash !== privateHash(["destination-v1", userId, data.destination])) {
       return apiError("A linha e este destino precisam estar aprovados para o piloto", 403);
+    }
+    if (device.consentVersion !== consentVersion) {
+      return apiError("Abra a tela SMS Beta no Android e selecione o SIM aprovado para retomar o envio.", 409);
     }
     const now = new Date();
     await expireMessages(tx, now, userId);

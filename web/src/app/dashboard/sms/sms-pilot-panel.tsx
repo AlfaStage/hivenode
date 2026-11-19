@@ -61,6 +61,7 @@ export function SmsPilotPanel({ administrator }: { administrator: boolean }) {
   const [verified, setVerified] = useState(false);
   const [reviewedDevice, setReviewedDevice] = useState("");
   const [feedback, setFeedback] = useState("");
+  const [sendFeedback, setSendFeedback] = useState("");
   const [busy, setBusy] = useState(false);
   const [refreshedAt, setRefreshedAt] = useState(0);
   const nextKey = useRef("");
@@ -86,14 +87,14 @@ export function SmsPilotPanel({ administrator }: { administrator: boolean }) {
     return () => window.clearInterval(timer);
   }, [refresh]);
 
-  async function mutate(task: () => Promise<void>) {
+  async function mutate(task: () => Promise<void>, report = setFeedback) {
     setBusy(true);
-    setFeedback("");
+    report("");
     try {
       await task();
-      await refresh();
+      await refresh().catch(error => setFeedback((error as Error).message));
     } catch (error) {
-      setFeedback((error as Error).message);
+      report((error as Error).message);
     } finally {
       setBusy(false);
     }
@@ -107,6 +108,7 @@ export function SmsPilotPanel({ administrator }: { administrator: boolean }) {
 
   const device = overview?.devices[0];
   const line = device?.bindings.find(binding => binding.id === device.selectedBinding);
+  const destination = number.trim().replace(/[\s().-]/g, "");
   const needsReview = Boolean(line && device?.approvedBinding !== line.id);
   const differentSimSelected = Boolean(device?.approvedBinding && line && device.approvedBinding !== line.id);
   const online = device?.lastSeenAt && refreshedAt - Date.parse(device.lastSeenAt) < 90_000;
@@ -115,14 +117,18 @@ export function SmsPilotPanel({ administrator }: { administrator: boolean }) {
 
   function send(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!device) return;
+    if (!device || busy) return;
+    if (!/^\+55[1-9]\d{9,10}$/.test(destination)) {
+      setSendFeedback("Informe o número de teste com +55, DDD e número, como +5562999999999.");
+      return;
+    }
     nextKey.current ||= crypto.randomUUID();
     void mutate(async () => {
-      await write(pilot + "/messages", { deviceId: device.id, destination: number, text: body }, "POST", nextKey.current);
+      await write(pilot + "/messages", { deviceId: device.id, destination, text: body }, "POST", nextKey.current);
       nextKey.current = "";
       setBody("");
-      setFeedback("Mensagem na fila. Acompanhe a resposta do Android abaixo.");
-    });
+      setSendFeedback("Mensagem na fila. Acompanhe a resposta do Android abaixo.");
+    }, setSendFeedback);
   }
 
   return (
@@ -142,7 +148,11 @@ export function SmsPilotPanel({ administrator }: { administrator: boolean }) {
           </div>}
         </> : <>
           <p className="text-sm">{device.label} · {online ? "App conectado" : "Abra o app no aparelho"}</p>
-          <ul className="grid gap-1 text-sm">{device.bindings.map(binding => <li key={binding.id}>SIM {binding.slot + 1} · {binding.label}{binding.id === device.selectedBinding ? " · selecionado no app" : ""}</li>)}</ul>
+          <ul className="grid gap-1 text-sm">{device.bindings.map(binding => <li key={binding.id}>
+            SIM {binding.slot + 1} · {binding.label}
+            {binding.id === device.approvedBinding && " · aprovado"}
+            {binding.id === device.selectedBinding && " · selecionado no app"}
+          </li>)}</ul>
           {device.approvedBinding && <p className="text-sm">Linha aprovada. Destino de teste {device.destinationMask}.</p>}
           {differentSimSelected && <p className="text-sm">Você selecionou outro chip. Solicite uma nova revisão para usá-lo. A solicitação cancela a fila da linha anterior.</p>}
           {device.pendingBinding && <p className="text-sm">Solicitação de {device.destinationMask} aguardando revisão.</p>}
@@ -158,7 +168,7 @@ export function SmsPilotPanel({ administrator }: { administrator: boolean }) {
           <div className="flex flex-wrap gap-2">
             {line && needsReview && <Button disabled={buttonDisabled || !verified || !online || !number} onClick={() => void mutate(async () => {
               await write(pilot, { action: "request-approval", deviceId: device.id, bindingId: line.id,
-                destination: number, verifiedByOwner: true, consentVersion: overview?.consentVersion });
+                destination, verifiedByOwner: true, consentVersion: overview?.consentVersion });
             })}>Solicitar aprovação</Button>}
             <Button variant="outline" disabled={buttonDisabled} onClick={() => void mutate(async () => { await write(pilot, { action: "revoke-device", deviceId: device.id }); })}>Desvincular aparelho</Button>
           </div>
@@ -185,11 +195,15 @@ export function SmsPilotPanel({ administrator }: { administrator: boolean }) {
       {device?.approvedBinding && <Card><CardHeader><CardTitle>Enviar SMS</CardTitle></CardHeader><CardContent>
         <form onSubmit={send} className="grid gap-3">
           <p className="text-sm text-muted-foreground">O envio usa a linha aprovada e pode consumir a franquia da operadora.</p>
+          {(!online || device.selectedBinding !== device.approvedBinding) && (
+            <p className="text-sm">Abra a tela SMS Beta no Android e selecione o SIM aprovado para processar a fila. Mantenha a tela aberta durante o envio.</p>
+          )}
           <label className="grid gap-1 text-sm" htmlFor="sms-pilot-body">Mensagem</label>
           <textarea id="sms-pilot-body" rows={3} maxLength={420} required value={body}
             onChange={event => { setBody(event.target.value); nextKey.current = ""; }}
             className="w-full rounded-md border bg-transparent p-2 text-sm" />
-          <Button className="w-fit" disabled={busy || !overview?.realSendEnabled || differentSimSelected || !number || !body.trim()}>Colocar na fila de envio</Button>
+          <Button type="submit" className="w-fit" disabled={busy || !overview?.realSendEnabled || differentSimSelected || !number || !body.trim()}>Colocar na fila de envio</Button>
+          <p role="status" aria-label="Resultado do envio" className="text-sm">{sendFeedback}</p>
         </form>
       </CardContent></Card>}
       <Card><CardHeader><CardTitle>Histórico</CardTitle></CardHeader><CardContent className="grid gap-3">

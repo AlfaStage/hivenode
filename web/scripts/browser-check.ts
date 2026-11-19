@@ -58,14 +58,67 @@ export async function checkBrowser(base: string, email: string, otherEmail: stri
       await page.goto(smsPath, { waitUntil: "domcontentloaded" });
       await expect(page.getByRole("heading", { name: "HiveNode SMS Beta" })).toBeVisible();
       await page.getByRole("button", { name: "Gerar código de vínculo" }).click();
-      await expect(page.getByLabel("Código de vínculo")).toHaveValue(/^smsp_[a-f0-9]{64}$/);
+      const pairingCode = page.getByLabel("Código de vínculo");
+      await expect(pairingCode).toHaveValue(/^smsp_[a-f0-9]{64}$/);
       await expect(page.getByText("Nenhum envio real registrado.")).toBeVisible();
       await expect(page.getByRole("button", { name: "Colocar na fila de envio" })).toHaveCount(0);
+
+      const pilotApi = base + "/api/sms/pilot";
+      const agentApi = base + "/api/sms/agent";
+      const paired = await page.request.post(agentApi, {
+        data: { action: "pair", code: await pairingCode.inputValue(), label: "Aparelho de teste do navegador" },
+      });
+      assert.equal(paired.status(), 201);
+      const { data: { id: deviceId, token } } = await paired.json();
+      const bindingId = randomUUID();
+      const consentVersion = "pilot-br-1";
+      const poll = { action: "poll", bindings: [{ id: bindingId, slot: 0, label: "Chip de teste" }],
+        activeBinding: bindingId, consentVersion };
+      const agentAuth = { authorization: "Bearer " + token };
+      assert.equal((await page.request.post(agentApi, { data: poll, headers: agentAuth })).status(), 200);
+      const ownerReview = await page.evaluate(async data => {
+        const response = await fetch("/api/sms/pilot", {
+          method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(data),
+        });
+        return response.status;
+      }, { action: "request-approval", deviceId, bindingId, consentVersion, verifiedByOwner: true, destination: "+5562999999999" });
+      assert.equal(ownerReview, 201);
+      const adminAuth = { authorization: "Bearer " + adminToken, origin: base };
+      const reviews = await adminPage.request.get(pilotApi + "/admin", { headers: adminAuth });
+      assert.equal(reviews.status(), 200);
+      const { data: { pending } } = await reviews.json();
+      const review = pending.find((item: { id: string }) => item.id === deviceId);
+      assert.ok(review);
+      const approved = await adminPage.request.post(pilotApi + "/admin", { headers: adminAuth, data: {
+        action: "approve", deviceId, bindingId, approvalToken: review.approvalToken, carrierReviewed: true,
+      } });
+      assert.equal(approved.status(), 200);
+      assert.equal((await page.request.post(agentApi, { data: { action: "pause" }, headers: agentAuth })).status(), 200);
+
+      await page.reload({ waitUntil: "domcontentloaded" });
+      await page.getByLabel("Número de teste com DDI").fill("+55 (62) 99999-9999");
+      await page.getByLabel("Mensagem", { exact: true }).fill("Teste isolado do formulário");
+      const sendButton = page.getByRole("button", { name: "Colocar na fila de envio" });
+      const sendResult = page.getByRole("status", { name: "Resultado do envio" });
+      const nextSend = () => page.waitForResponse(response => response.url() === pilotApi + "/messages" && response.request().method() === "POST");
+      const [pausedResponse] = await Promise.all([nextSend(), sendButton.click()]);
+      assert.equal(pausedResponse.status(), 409);
+      await expect(sendResult).toContainText("selecione o SIM aprovado");
+      assert.equal((await page.request.post(agentApi, { data: poll, headers: agentAuth })).status(), 200);
+      const [sentResponse] = await Promise.all([nextSend(), sendButton.click()]);
+      assert.equal(sentResponse.status(), 202);
+      const { data: { message } } = await sentResponse.json();
+      await expect(sendResult).toContainText("Mensagem na fila.");
+      await expect(page.getByText(message.id, { exact: true })).toBeVisible();
+      const dispatch = await page.request.post(agentApi, { data: poll, headers: agentAuth });
+      const { data: { grant } } = await dispatch.json();
+      assert.equal(JSON.parse(Buffer.from(grant.payload, "base64url").toString()).id, message.id);
+
       assert.equal((await other.goto(smsPath, { waitUntil: "domcontentloaded" }))?.status(), 404);
       await adminPage.getByRole("button", { name: "Revogar SMS", exact: true }).click();
       await expect(adminPage.getByRole("button", { name: "Liberar SMS", exact: true })).toBeVisible({ timeout: 15000 });
       assert.equal((await page.reload({ waitUntil: "domcontentloaded" }))?.status(), 404);
-      console.log("Browser: SMS admission, pairing code and revocation checked");
+      console.log("Browser: SMS admission, pairing, click-to-queue, SIM activation and revocation checked");
     }
 
     if (process.argv.includes("--sms-beta-only")) {
