@@ -65,7 +65,7 @@ export async function setAuthCookie(token: string) {
 export async function getAuthCookie() { return (await cookies()).get(cookieName)?.value; }
 export async function removeAuthCookie() { (await cookies()).delete(cookieName); }
 
-export async function getAuthenticatedUser(): Promise<(TokenPayload & { minerBetaAccess: boolean; smsBetaAccess: boolean }) | null> {
+export async function getAuthenticatedUser(): Promise<(TokenPayload & { accountRole: string; minerBetaAccess: boolean; smsBetaAccess: boolean }) | null> {
   try {
     const bearer = (await headers()).get("authorization");
     const token = bearer?.startsWith("Bearer ") ? bearer.slice(7) : await getAuthCookie();
@@ -75,7 +75,7 @@ export async function getAuthenticatedUser(): Promise<(TokenPayload & { minerBet
     const user = await prisma.user.findUnique({ where: { id: payload.userId },
       select: { role: true, sessionVersion: true, disabled: true, minerBetaAccess: true, smsBetaAccess: true } });
     if (!user || user.disabled || user.sessionVersion !== payload.version) return null;
-    return { ...payload, role: payload.scope === "device" ? "CUSTOMER" : user.role,
+    return { ...payload, role: payload.scope === "device" ? "CUSTOMER" : user.role, accountRole: user.role,
       minerBetaAccess: user.minerBetaAccess, smsBetaAccess: user.smsBetaAccess };
   } catch { return null; }
 }

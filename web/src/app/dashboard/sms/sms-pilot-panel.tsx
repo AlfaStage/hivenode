@@ -2,10 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
+import { ChevronDown, CirclePause, Clock3, Copy, CreditCard, History, Inbox, KeyRound, Link2, QrCode, Send, ShieldCheck, Smartphone, Unlink, type LucideIcon } from "lucide-react";
 import QRCode from "react-qr-code";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type Binding = { id: string; slot: number; label: string };
 type Device = {
@@ -50,12 +54,20 @@ async function call<T>(path: string, options?: RequestInit) {
   return json.data as T;
 }
 
+function Notice({ icon: Icon, children }: { icon: LucideIcon; children: React.ReactNode }) {
+  return <div className="flex items-start gap-2.5 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2.5 text-sm">
+    <Icon className="mt-0.5 size-4 shrink-0 text-amber-500" aria-hidden />
+    <p>{children}</p>
+  </div>;
+}
+
 export function SmsPilotPanel({ administrator }: { administrator: boolean }) {
   const [overview, setOverview] = useState<Overview>();
   const [messages, setMessages] = useState<Message[]>([]);
   const [pending, setPending] = useState<Pending[]>([]);
   const [pair, setPair] = useState<{ code: string; expiresAt: string }>();
   const [apiToken, setApiToken] = useState("");
+  const [apiOpen, setApiOpen] = useState(false);
   const [number, setNumber] = useState("");
   const [body, setBody] = useState("");
   const [verified, setVerified] = useState(false);
@@ -131,107 +143,235 @@ export function SmsPilotPanel({ administrator }: { administrator: boolean }) {
     }, setSendFeedback);
   }
 
+  const approved = Boolean(device?.approvedBinding);
+  const ready = Boolean(online && device?.selectedBinding && device.selectedBinding === device.approvedBinding);
+  const waitingForReview = Boolean(device?.pendingBinding && device.pendingBinding === line?.id);
+  const canRequestReview = needsReview && !waitingForReview;
+
+  function changeNumber(value: string) {
+    setNumber(value);
+    nextKey.current = "";
+    setSendFeedback("");
+  }
+
+  function requestReview() {
+    if (!device || !line) return;
+    void mutate(async () => {
+      await write(pilot, { action: "request-approval", deviceId: device.id, bindingId: line.id,
+        destination, verifiedByOwner: true, consentVersion: overview?.consentVersion });
+      setVerified(false);
+    });
+  }
+
+  async function copy(value: string, label: string) {
+    try { await navigator.clipboard.writeText(value); setFeedback(label + " copiado."); }
+    catch { setFeedback("Selecione o código e copie manualmente."); }
+  }
+
+  const numberField = (
+    <div className="flex flex-col gap-1.5">
+      <label className="text-sm font-medium" htmlFor="sms-pilot-number">Número de teste com DDI</label>
+      <Input id="sms-pilot-number" type="tel" autoComplete="tel" placeholder="+55 (00) 00000-0000" value={number}
+        onChange={event => changeNumber(event.target.value)} className="h-10" />
+    </div>
+  );
+
   return (
-    <div className="grid gap-4">
-      {overview && !overview.realSendEnabled && <p className="text-sm text-muted-foreground">Envio real pausado pela operação.</p>}
-      <p aria-live="polite" className="text-sm">{feedback}</p>
-      <Card><CardHeader><CardTitle>Aparelho e chip</CardTitle></CardHeader><CardContent className="grid gap-3">
-        {!device ? <>
-          <p className="text-sm text-muted-foreground">Abra SMS no app HiveNode para ler o código de vínculo.</p>
-          <Button className="w-fit" disabled={buttonDisabled} onClick={() => void mutate(async () => setPair(await write(pilot, { action: "pair" })))}>
-            Gerar código de vínculo
-          </Button>
-          {pairValid && <div className="grid gap-2">
-            <div className="w-fit rounded bg-white p-3"><QRCode value={pair.code} size={156} title="Código de vínculo do SMS" /></div>
-            <Input aria-label="Código de vínculo" value={pair.code} readOnly />
-            <Button className="w-fit" variant="outline" onClick={() => void navigator.clipboard.writeText(pair.code)}>Copiar código</Button>
-          </div>}
-        </> : <>
-          <p className="text-sm">{device.label} · {online ? "App conectado" : "Abra o app no aparelho"}</p>
-          <ul className="grid gap-1 text-sm">{device.bindings.map(binding => <li key={binding.id}>
-            SIM {binding.slot + 1} · {binding.label}
-            {binding.id === device.approvedBinding && " · aprovado"}
-            {binding.id === device.selectedBinding && " · selecionado no app"}
-          </li>)}</ul>
-          {device.approvedBinding && <p className="text-sm">Linha aprovada. Destino de teste {device.destinationMask}.</p>}
-          {differentSimSelected && <p className="text-sm">Você selecionou outro chip. Solicite uma nova revisão para usá-lo. A solicitação cancela a fila da linha anterior.</p>}
-          {device.pendingBinding && <p className="text-sm">Solicitação de {device.destinationMask} aguardando revisão.</p>}
-          <div className="grid gap-2">
-            <label className="grid gap-1 text-sm">Número de teste com DDI
-              <Input type="tel" placeholder="+5562999999999" value={number} onChange={event => { setNumber(event.target.value); nextKey.current = ""; }} />
+    <div className="grid min-w-0 gap-5">
+      {overview && !overview.realSendEnabled && <Notice icon={CirclePause}>Envio real pausado pela operação.</Notice>}
+      {feedback && <p role="status" className="rounded-lg border border-border bg-card px-4 py-3 text-sm">{feedback}</p>}
+
+      <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] xl:items-start">
+        <Card className="min-w-0 [--card-spacing:--spacing(5)]">
+          <CardHeader className="border-b border-border">
+            <CardTitle className="flex items-center gap-2 text-lg"><Send className="size-4 text-amber-500" aria-hidden /> Enviar SMS</CardTitle>
+            <CardDescription>O envio usa a franquia ou o saldo da linha aprovada.</CardDescription>
+            {ready && overview?.realSendEnabled && <CardAction><Badge variant="secondary">Pronto para enviar</Badge></CardAction>}
+          </CardHeader>
+          <CardContent>
+            {!overview ? <Skeleton className="h-28 w-full" /> : canRequestReview ? (
+              <div className="flex flex-col gap-4">
+                <Notice icon={ShieldCheck}>{differentSimSelected
+                  ? "Você selecionou outro chip. Pedir a aprovação dele cancela a fila da linha anterior."
+                  : "Solicite a aprovação deste chip e de um número de teste."}</Notice>
+                {numberField}
+                <label className="flex items-start gap-2.5 text-sm text-muted-foreground">
+                  <input className="mt-1 size-4 shrink-0 accent-amber-500" type="checkbox" checked={verified}
+                    onChange={event => setVerified(event.target.checked)} />
+                  Confirmo que controlo este número e solicitei à operadora autorização para este uso da linha.
+                </label>
+                <Button className="w-fit" disabled={buttonDisabled || !verified || !online || !number} onClick={requestReview}>
+                  <ShieldCheck data-icon="inline-start" /> Solicitar aprovação
+                </Button>
+              </div>
+            ) : waitingForReview || (!approved && device?.pendingBinding) ? (
+              <Notice icon={Clock3}>A aprovação de {device?.destinationMask} está em revisão.</Notice>
+            ) : approved && device ? (
+              <form onSubmit={send} className="flex flex-col gap-4">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                  <span className="text-muted-foreground">Destino aprovado</span>
+                  <span className="font-mono font-medium">{device.destinationMask}</span>
+                </div>
+                {!ready && <Notice icon={Smartphone}>Abra a tela SMS Beta no Android, selecione o SIM aprovado e mantenha a tela aberta.</Notice>}
+                {numberField}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium" htmlFor="sms-pilot-body">Mensagem</label>
+                  <textarea id="sms-pilot-body" rows={4} maxLength={420} required value={body} aria-describedby="sms-character-count"
+                    onChange={event => { setBody(event.target.value); nextKey.current = ""; setSendFeedback(""); }}
+                    placeholder="Escreva a mensagem de teste" className="min-h-28 w-full resize-y rounded-lg border border-input bg-background p-3 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring/50" />
+                  <p id="sms-character-count" className="text-right text-xs tabular-nums text-muted-foreground">{body.length}/420 caracteres</p>
+                </div>
+                <div className="flex flex-wrap items-center gap-3">
+                  <Button type="submit" className="min-h-10 w-full sm:w-fit"
+                    disabled={busy || !overview.realSendEnabled || differentSimSelected || !number || !body.trim()}>
+                    <Send data-icon="inline-start" /> Colocar na fila de envio
+                  </Button>
+                  <p role="status" aria-label="Resultado do envio" className="text-sm text-muted-foreground empty:hidden">{sendFeedback}</p>
+                </div>
+              </form>
+            ) : (
+              <Notice icon={device ? Smartphone : Link2}>
+                {device ? "Abra o SMS Beta no Android e selecione um SIM para solicitar a aprovação."
+                  : "Vincule um Android para configurar o chip de envio."}
+              </Notice>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="min-w-0 [--card-spacing:--spacing(5)]">
+          <CardHeader className="border-b border-border">
+            <CardTitle className="flex items-center gap-2 text-lg"><Smartphone className="size-4 text-amber-500" aria-hidden /> Aparelho e chip</CardTitle>
+            <CardDescription>{device?.label ?? "Seu Android é o remetente do SMS."}</CardDescription>
+            {device && <CardAction><Badge variant={online ? "secondary" : "outline"}>{online ? "App conectado" : "App desconectado"}</Badge></CardAction>}
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            {!overview ? <Skeleton className="h-20 w-full" /> : !device ? <>
+              <p className="text-sm text-muted-foreground">No app HiveNode, entre na mesma conta e abra SMS Beta para fazer o vínculo.</p>
+              <Button className="w-fit" disabled={buttonDisabled} onClick={() => void mutate(async () => setPair(await write(pilot, { action: "pair" })))}>
+                <QrCode data-icon="inline-start" /> Gerar código de vínculo
+              </Button>
+              {pairValid && <div className="flex min-w-0 flex-col items-start gap-3 rounded-lg border border-border bg-muted/40 p-3">
+                <div className="self-center rounded-lg bg-white p-3"><QRCode value={pair.code} size={144} title="QR de vínculo do SMS" /></div>
+                <p className="text-sm text-muted-foreground">Escaneie o QR ou cole o código no app. Ele é válido por 5 minutos.</p>
+                <Input aria-label="Código de vínculo" value={pair.code} readOnly className="font-mono" />
+                <Button variant="outline" size="sm" onClick={() => void copy(pair.code, "Código")}><Copy data-icon="inline-start" /> Copiar código</Button>
+              </div>}
+            </> : <>
+              {device.bindings.length ? <ul className="divide-y divide-border rounded-lg border border-border">
+                {device.bindings.map(binding => <li key={binding.id} className="flex flex-wrap items-center justify-between gap-2.5 px-3 py-3">
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <CreditCard className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium">SIM {binding.slot + 1}</p>
+                      <p className="break-words text-xs text-muted-foreground">{binding.label}</p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {binding.id === device.approvedBinding && <Badge variant="secondary">Aprovado</Badge>}
+                    {binding.id === device.selectedBinding && <Badge variant="outline">Selecionado</Badge>}
+                  </div>
+                </li>)}
+              </ul> : <p className="text-sm text-muted-foreground">O app ainda não informou chips disponíveis.</p>}
+              <Button className="w-fit" variant="outline" size="sm" disabled={buttonDisabled} onClick={() => void mutate(async () => {
+                await write(pilot, { action: "revoke-device", deviceId: device.id });
+              })}><Unlink data-icon="inline-start" /> Desvincular aparelho</Button>
+            </>}
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card className="min-w-0 [--card-spacing:--spacing(5)]">
+        <CardHeader className="border-b border-border">
+          <CardTitle className="flex items-center gap-2 text-lg"><History className="size-4 text-amber-500" aria-hidden /> Histórico</CardTitle>
+          <CardDescription>Veja o andamento e o retorno do Android para cada tentativa.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {!overview ? <Skeleton className="h-20 w-full" /> : !messages.length ? <div className="flex items-center gap-3 rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
+            <Inbox className="size-5 shrink-0" aria-hidden /> Nenhum envio real registrado.
+          </div> : <ul className="divide-y divide-border rounded-lg border border-border">
+            {messages.map(message => <li key={message.id} className="grid min-w-0 gap-2 px-3 py-3.5 md:grid-cols-[minmax(0,1fr)_auto] md:items-start sm:px-4">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                  <Badge variant={message.state === "FAILED" || message.state === "PARTIAL" ? "destructive" :
+                    message.state === "DELIVERED" || message.state === "SENT" ? "secondary" : "outline"}>{states[message.state] ?? message.state}</Badge>
+                  <p className="text-sm font-medium">{message.maskedDestination}</p>
+                  <time dateTime={message.createdAt} className="text-xs text-muted-foreground">{new Date(message.createdAt).toLocaleString("pt-BR")}</time>
+                </div>
+                <p className="mt-2 break-all font-mono text-xs text-muted-foreground">{message.id}</p>
+                {message.totalParts > 0 && <p className="mt-1 text-xs text-muted-foreground">{message.sentParts}/{message.totalParts} enviadas · {message.deliveredParts} entregues · {message.failedParts} falharam</p>}
+                {message.errorCode && <p className="mt-1 break-words text-sm">{diagnoses[message.errorCode] ?? message.errorCode} <span className="font-mono text-xs text-muted-foreground">{message.errorCode}</span></p>}
+              </div>
+              {message.state === "QUEUED" && <Button className="w-fit" variant="outline" size="sm" disabled={busy} onClick={() => void mutate(async () => {
+                await write(pilot + "/messages", { id: message.id, action: "cancel" }, "PATCH");
+              })}>Cancelar</Button>}
+            </li>)}
+          </ul>}
+        </CardContent>
+      </Card>
+
+      {administrator && pending.length > 0 && <Card className="min-w-0 [--card-spacing:--spacing(5)]">
+        <CardHeader className="border-b border-border">
+          <CardTitle className="flex items-center gap-2 text-lg"><ShieldCheck className="size-4 text-amber-500" aria-hidden /> Revisão administrativa</CardTitle>
+          <CardDescription>Confira se a operadora permite o uso da linha antes de aprovar.</CardDescription>
+          <CardAction><Badge variant="outline">{pending.length} pendente{pending.length > 1 ? "s" : ""}</Badge></CardAction>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3">
+          {pending.map(item => <div key={item.id} className="flex min-w-0 flex-col gap-3 rounded-lg border border-border p-3">
+            <div>
+              <p className="break-all text-sm font-medium">{item.user.email}</p>
+              <p className="break-words text-sm text-muted-foreground">{item.label} · {item.bindings.find(binding => binding.id === item.pendingBinding)?.label} · {item.destinationMask}</p>
+            </div>
+            <label className="flex items-start gap-2.5 text-sm">
+              <input className="mt-1 size-4 shrink-0 accent-amber-500" type="checkbox" checked={reviewedDevice === item.approvalToken}
+                onChange={event => setReviewedDevice(event.target.checked ? item.approvalToken : "")} />
+              Conferi a elegibilidade do plano desta linha.
             </label>
-            {needsReview && <label className="flex items-start gap-2 text-sm">
-              <input className="mt-1" type="checkbox" checked={verified} onChange={event => setVerified(event.target.checked)} />
-              Confirmo que controlo este número de teste e que solicitei à operadora autorização para este uso da linha.
-            </label>}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {line && needsReview && <Button disabled={buttonDisabled || !verified || !online || !number} onClick={() => void mutate(async () => {
-              await write(pilot, { action: "request-approval", deviceId: device.id, bindingId: line.id,
-                destination, verifiedByOwner: true, consentVersion: overview?.consentVersion });
-            })}>Solicitar aprovação</Button>}
-            <Button variant="outline" disabled={buttonDisabled} onClick={() => void mutate(async () => { await write(pilot, { action: "revoke-device", deviceId: device.id }); })}>Desvincular aparelho</Button>
-          </div>
-        </>}
-      </CardContent></Card>
-      {administrator && pending.length > 0 && <Card><CardHeader><CardTitle>Revisão administrativa</CardTitle></CardHeader><CardContent className="grid gap-4">
-        {pending.map(item => <div key={item.id} className="grid gap-2 border-b pb-3 text-sm">
-          <p>{item.user.email} · {item.label} · {item.bindings.find(binding => binding.id === item.pendingBinding)?.label} · {item.destinationMask}</p>
-          <label className="flex gap-2"><input type="checkbox" checked={reviewedDevice === item.approvalToken}
-            onChange={event => setReviewedDevice(event.target.checked ? item.approvalToken : "")} /> Conferi a elegibilidade do plano desta linha.</label>
-          <div className="flex gap-2">
-            <Button disabled={busy || reviewedDevice !== item.approvalToken} onClick={() => void mutate(async () => {
-              await write(pilot + "/admin", { deviceId: item.id, bindingId: item.pendingBinding, action: "approve",
-                approvalToken: item.approvalToken, carrierReviewed: true });
-              setReviewedDevice("");
-            })}>Aprovar linha</Button>
-            <Button variant="outline" disabled={busy} onClick={() => void mutate(async () => {
-              await write(pilot + "/admin", { deviceId: item.id, bindingId: item.pendingBinding, action: "decline",
-                approvalToken: item.approvalToken });
-            })}>Recusar</Button>
-          </div>
-        </div>)}
-      </CardContent></Card>}
-      {device?.approvedBinding && <Card><CardHeader><CardTitle>Enviar SMS</CardTitle></CardHeader><CardContent>
-        <form onSubmit={send} className="grid gap-3">
-          <p className="text-sm text-muted-foreground">O envio usa a linha aprovada e pode consumir a franquia da operadora.</p>
-          {(!online || device.selectedBinding !== device.approvedBinding) && (
-            <p className="text-sm">Abra a tela SMS Beta no Android e selecione o SIM aprovado para processar a fila. Mantenha a tela aberta durante o envio.</p>
-          )}
-          <label className="grid gap-1 text-sm" htmlFor="sms-pilot-body">Mensagem</label>
-          <textarea id="sms-pilot-body" rows={3} maxLength={420} required value={body}
-            onChange={event => { setBody(event.target.value); nextKey.current = ""; }}
-            className="w-full rounded-md border bg-transparent p-2 text-sm" />
-          <Button type="submit" className="w-fit" disabled={busy || !overview?.realSendEnabled || differentSimSelected || !number || !body.trim()}>Colocar na fila de envio</Button>
-          <p role="status" aria-label="Resultado do envio" className="text-sm">{sendFeedback}</p>
-        </form>
-      </CardContent></Card>}
-      <Card><CardHeader><CardTitle>Histórico</CardTitle></CardHeader><CardContent className="grid gap-3">
-        {!messages.length && <p className="text-sm text-muted-foreground">Nenhum envio real registrado.</p>}
-        {messages.map(message => <div key={message.id} className="grid gap-1 border-b pb-2 text-sm">
-          <p>{states[message.state] || message.state} · {message.maskedDestination} · {new Date(message.createdAt).toLocaleString("pt-BR")}</p>
-          <p className="font-mono text-xs break-all">{message.id}</p>
-          {message.totalParts > 0 && <p>{message.sentParts}/{message.totalParts} enviadas · {message.deliveredParts} entregues · {message.failedParts} falharam</p>}
-          {message.errorCode && <p>{diagnoses[message.errorCode] || message.errorCode} <span className="font-mono text-xs">{message.errorCode}</span></p>}
-          {message.state === "QUEUED" && <Button className="w-fit" variant="outline" disabled={busy} onClick={() => void mutate(async () => {
-            await write(pilot + "/messages", { id: message.id, action: "cancel" }, "PATCH");
-          })}>Cancelar</Button>}
-        </div>)}
-      </CardContent></Card>
-      <Card><CardHeader><CardTitle>Integração por API</CardTitle></CardHeader><CardContent className="grid gap-3">
-        <p className="text-sm text-muted-foreground">Uma chave ativa para consultar, enfileirar e cancelar mensagens desta conta.</p>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" disabled={buttonDisabled} onClick={() => void mutate(async () => {
-            const { token } = await write<{ token: string }>(pilot, { action: "issue-key" });
-            setApiToken(token);
-          })}>{overview?.key ? "Substituir chave" : "Gerar chave"}</Button>
-          {overview?.key && <Button variant="outline" disabled={buttonDisabled} onClick={() => void mutate(async () => {
-            await write(pilot, { action: "revoke-key" });
-            setApiToken("");
-          })}>Revogar chave</Button>}
-        </div>
-        {apiToken && <Input aria-label="Chave da API exibida uma vez" readOnly value={apiToken} />}
-      </CardContent></Card>
+            <div className="flex flex-wrap gap-2">
+              <Button disabled={busy || reviewedDevice !== item.approvalToken} onClick={() => void mutate(async () => {
+                await write(pilot + "/admin", { deviceId: item.id, bindingId: item.pendingBinding, action: "approve",
+                  approvalToken: item.approvalToken, carrierReviewed: true });
+                setReviewedDevice("");
+              })}>Aprovar linha</Button>
+              <Button variant="outline" disabled={busy} onClick={() => void mutate(async () => {
+                await write(pilot + "/admin", { deviceId: item.id, bindingId: item.pendingBinding, action: "decline",
+                  approvalToken: item.approvalToken });
+              })}>Recusar</Button>
+            </div>
+          </div>)}
+        </CardContent>
+      </Card>}
+
+      <Collapsible open={apiOpen} onOpenChange={setApiOpen}>
+        <Card className="min-w-0 [--card-spacing:--spacing(5)]">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg"><KeyRound className="size-4 text-amber-500" aria-hidden /> Integração por API</CardTitle>
+            <CardDescription>{overview?.key ? "Uma chave ativa nesta conta." : "Gerencie o acesso para integrações."}</CardDescription>
+            <CardAction><CollapsibleTrigger render={<Button variant="outline" size="sm" />}>
+              {apiOpen ? "Ocultar" : "Gerenciar"}<ChevronDown data-icon="inline-end" className={apiOpen ? "rotate-180" : ""} />
+            </CollapsibleTrigger></CardAction>
+          </CardHeader>
+          <CollapsibleContent>
+            <CardContent className="flex flex-col gap-3 border-t border-border pt-4">
+              <p className="text-sm text-muted-foreground">A chave permite consultar, enfileirar e cancelar mensagens da conta.</p>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" disabled={buttonDisabled} onClick={() => void mutate(async () => {
+                  const { token } = await write<{ token: string }>(pilot, { action: "issue-key" });
+                  setApiToken(token);
+                })}>{overview?.key ? "Substituir chave" : "Gerar chave"}</Button>
+                {overview?.key && <Button variant="outline" disabled={buttonDisabled} onClick={() => void mutate(async () => {
+                  await write(pilot, { action: "revoke-key" });
+                  setApiToken("");
+                })}>Revogar chave</Button>}
+              </div>
+              {apiToken && <div className="flex flex-col gap-1.5">
+                <label htmlFor="sms-api-key" className="text-sm font-medium">Chave da API exibida uma vez</label>
+                <Input id="sms-api-key" type="password" readOnly value={apiToken} />
+                <Button className="w-fit" variant="outline" size="sm" onClick={() => void copy(apiToken, "Código")}><Copy data-icon="inline-start" /> Copiar chave</Button>
+              </div>}
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
     </div>
   );
 }

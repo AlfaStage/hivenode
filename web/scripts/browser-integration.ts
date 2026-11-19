@@ -26,11 +26,15 @@ async function main() {
     const password = "Local-Test-Password-123!";
     const hash = await hashPassword(password);
     const email = randomUUID() + "@example.com";
-    await prisma.user.create({ data: { email, passwordHash: hash, hivePoints: 100 } });
+    const admitted = await prisma.user.create({ data: { email, passwordHash: hash, hivePoints: 100 } });
     const otherEmail = randomUUID() + "@example.com";
-    await prisma.user.create({ data: { email: otherEmail, passwordHash: hash, hivePoints: 100 } });
+    const other = await prisma.user.create({ data: { email: otherEmail, passwordHash: hash, hivePoints: 100 } });
     const admin = await prisma.user.create({ data: { email: randomUUID() + "@example.com", passwordHash: hash, role: "ADMIN" } });
-    await checkBrowser(base, email, otherEmail, password, await generateToken(admin.id, admin.role));
+    const [adminToken, admittedDevice, otherDevice, adminDevice] = await Promise.all([
+      generateToken(admin.id, admin.role), generateToken(admitted.id, "CUSTOMER", undefined, 0, "device"),
+      generateToken(other.id, "CUSTOMER", undefined, 0, "device"), generateToken(admin.id, "CUSTOMER", undefined, 0, "device"),
+    ]);
+    await checkBrowser(base, email, otherEmail, password, adminToken, { admittedDevice, otherDevice, adminDevice });
     console.log("BROWSER INTEGRATION: passed");
   } finally {
     if (next.pid && process.platform === "win32") spawn("taskkill", ["/PID", String(next.pid), "/T", "/F"], { stdio: "ignore" });

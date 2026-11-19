@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { chromium, expect, type Page } from "@playwright/test";
 
-export async function checkBrowser(base: string, email: string, otherEmail: string, password: string, adminToken: string) {
+export async function checkBrowser(base: string, email: string, otherEmail: string, password: string, adminToken: string,
+  deviceTokens?: { admittedDevice: string; otherDevice: string; adminDevice: string }) {
   const browser = await chromium.launch({ headless: true });
   const errors: string[] = [];
   try {
@@ -51,6 +52,15 @@ export async function checkBrowser(base: string, email: string, otherEmail: stri
     await adminPage.getByRole("button", { name: `Editar ${email}`, exact: true }).click();
     async function checkSmsBeta() {
       const smsPath = base + "/dashboard/sms";
+      const mobileAccess = base + "/api/sms/mobile-access";
+      const deviceAuth = (token: string) => ({ authorization: "Bearer " + token });
+      const readMobileAccess = (token: string) => page.request.get(mobileAccess, { headers: deviceAuth(token) });
+      assert.equal((await page.request.get(mobileAccess)).status(), 401);
+      if (deviceTokens) {
+        assert.deepEqual((await (await readMobileAccess(deviceTokens.admittedDevice)).json()).data, { allowed: false });
+        assert.equal((await (await readMobileAccess(deviceTokens.adminDevice)).json()).data.allowed, true);
+        assert.equal((await page.request.get(base + "/api/sms/pilot/admin", { headers: deviceAuth(deviceTokens.adminDevice) })).status(), 403);
+      }
       await expect(page.locator("a[href='/dashboard/sms']")).toHaveCount(0);
       assert.equal((await page.goto(smsPath, { waitUntil: "domcontentloaded" }))?.status(), 404);
       await adminPage.getByRole("button", { name: "Liberar SMS", exact: true }).click();
@@ -65,11 +75,20 @@ export async function checkBrowser(base: string, email: string, otherEmail: stri
 
       const pilotApi = base + "/api/sms/pilot";
       const agentApi = base + "/api/sms/agent";
-      const paired = await page.request.post(agentApi, {
-        data: { action: "pair", code: await pairingCode.inputValue(), label: "Aparelho de teste do navegador" },
-      });
+      const pairing = { action: "pair", code: await pairingCode.inputValue(), label: "Aparelho de teste do navegador" };
+      if (deviceTokens) {
+        assert.equal((await page.request.post(agentApi, { data: pairing, headers: deviceAuth(deviceTokens.otherDevice) })).status(), 404);
+      }
+      const paired = await page.request.post(agentApi, { data: pairing,
+        headers: deviceTokens ? deviceAuth(deviceTokens.admittedDevice) : undefined });
       assert.equal(paired.status(), 201);
       const { data: { id: deviceId, token } } = await paired.json();
+      if (deviceTokens) {
+        const { data: access } = await (await readMobileAccess(deviceTokens.admittedDevice)).json();
+        assert.equal(access.allowed, true);
+        assert.equal(access.pairedDeviceId, deviceId);
+        assert.deepEqual((await (await readMobileAccess(deviceTokens.otherDevice)).json()).data, { allowed: false });
+      }
       const bindingId = randomUUID();
       const consentVersion = "pilot-br-1";
       const poll = { action: "poll", bindings: [{ id: bindingId, slot: 0, label: "Chip de teste" }],
@@ -110,6 +129,15 @@ export async function checkBrowser(base: string, email: string, otherEmail: stri
       const { data: { message } } = await sentResponse.json();
       await expect(sendResult).toContainText("Mensagem na fila.");
       await expect(page.getByText(message.id, { exact: true })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Gerar chave" })).toHaveCount(0);
+      await page.getByRole("button", { name: "Gerenciar", exact: true }).click();
+      await expect(page.getByRole("button", { name: "Gerar chave" })).toBeVisible();
+      await page.getByRole("button", { name: "Ocultar", exact: true }).click();
+      if (process.argv.includes("--sms-beta-only")) await page.screenshot({ path: ".next/sms-beta-desktop.png", fullPage: true });
+      await page.setViewportSize({ width: 390, height: 844 });
+      await expect(sendButton).toBeVisible();
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
+      if (process.argv.includes("--sms-beta-only")) await page.screenshot({ path: ".next/sms-beta-mobile.png", fullPage: true });
       const dispatch = await page.request.post(agentApi, { data: poll, headers: agentAuth });
       const { data: { grant } } = await dispatch.json();
       assert.equal(JSON.parse(Buffer.from(grant.payload, "base64url").toString()).id, message.id);
@@ -117,6 +145,7 @@ export async function checkBrowser(base: string, email: string, otherEmail: stri
       assert.equal((await other.goto(smsPath, { waitUntil: "domcontentloaded" }))?.status(), 404);
       await adminPage.getByRole("button", { name: "Revogar SMS", exact: true }).click();
       await expect(adminPage.getByRole("button", { name: "Liberar SMS", exact: true })).toBeVisible({ timeout: 15000 });
+      if (deviceTokens) assert.deepEqual((await (await readMobileAccess(deviceTokens.admittedDevice)).json()).data, { allowed: false });
       assert.equal((await page.reload({ waitUntil: "domcontentloaded" }))?.status(), 404);
       console.log("Browser: SMS admission, pairing, click-to-queue, SIM activation and revocation checked");
     }

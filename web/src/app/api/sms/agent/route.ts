@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { apiError, apiSuccess, handleApiError } from "@/lib/api-utils";
+import { getAuthenticatedUser } from "@/lib/auth";
 import { decrypt } from "@/lib/crypto";
 import { prisma } from "@/lib/prisma";
 import {
@@ -26,10 +27,16 @@ export async function POST(request: Request) {
   try {
     const data = command.parse(await request.json());
     if (data.action === "pair") {
+      const profile = request.headers.has("authorization") ? await getAuthenticatedUser() : null;
+      if (request.headers.has("authorization") && !profile) return apiError("Faça login para continuar", 401);
       const codeHash = hashToken(data.code);
       return await prisma.$transaction(async tx => {
         const pair = await tx.smsPilotPair.findUnique({ where: { codeHash } });
-        if (!pair || !isAdmitted(await lockOwner(tx, pair.userId))) return apiError("Código inválido ou expirado", 404);
+        if (!pair || (profile && profile.userId !== pair.userId)) return apiError("Código inválido ou de outra conta", 404);
+        const owner = await lockOwner(tx, pair.userId);
+        if (!isAdmitted(owner) || (profile && profile.version !== owner?.sessionVersion)) {
+          return apiError("Código inválido ou expirado", 404);
+        }
         const used = await tx.smsPilotPair.deleteMany({ where: { codeHash, expiresAt: { gt: new Date() } } });
         if (!used.count) return apiError("Código inválido ou expirado", 404);
         if (await tx.smsPilotDevice.count({ where: { userId: pair.userId, revokedAt: null } })) {
