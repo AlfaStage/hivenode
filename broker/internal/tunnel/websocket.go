@@ -6,8 +6,10 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	"os"
@@ -33,6 +35,9 @@ type BroadcastEvent struct {
 	Time    string      `json:"time"`
 	UserID  string      `json:"-"`
 }
+
+const antennaPresenceTTL = 30 * time.Second
+
 type Device struct {
 	id, userID, visibility string
 	ws                     *websocket.Conn
@@ -58,7 +63,13 @@ func (tm *TunnelManager) publishTelemetry(d *Device) {
 	}
 	if tm.redisClient != nil {
 		encoded, _ := json.Marshal(payload)
+		tm.mu.RLock()
+		if tm.devices[d.id] != d {
+			tm.mu.RUnlock()
+			return
+		}
 		tm.redisClient.Set(context.Background(), "node:telemetry:"+d.id, string(encoded), 90*time.Second)
+		tm.mu.RUnlock()
 	}
 	tm.Broadcast(BroadcastEvent{Type: "TELEMETRY", NodeID: d.id, UserID: d.userID, Payload: payload})
 }
@@ -315,6 +326,8 @@ func (tm *TunnelManager) HandleWS(w http.ResponseWriter, r *http.Request) {
 	tm.devices[d.id] = d
 	tm.mu.Unlock()
 	if old != nil {
+		log.Printf("broker: tunnel connection replaced for node %s", d.id)
+		_ = old.ws.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "REPLACED"), time.Now().Add(time.Second))
 		old.close()
 	}
 	defer func() {
@@ -323,6 +336,9 @@ func (tm *TunnelManager) HandleWS(w http.ResponseWriter, r *http.Request) {
 		current := tm.devices[d.id] == d
 		if current {
 			delete(tm.devices, d.id)
+			if tm.redisClient != nil {
+				tm.redisClient.Del(context.Background(), "node:online:"+d.id, "node:telemetry:"+d.id)
+			}
 		}
 		pending := []*stream{}
 		for _, s := range tm.streams {
@@ -335,25 +351,27 @@ func (tm *TunnelManager) HandleWS(w http.ResponseWriter, r *http.Request) {
 			s.close()
 		}
 		if current {
-			if tm.redisClient != nil {
-				tm.redisClient.Del(context.Background(), "node:online:"+d.id)
+			if tm.device(d.id) == nil {
+				tm.Broadcast(BroadcastEvent{Type: "NODE_OFFLINE", NodeID: d.id, UserID: d.userID})
 			}
-			tm.Broadcast(BroadcastEvent{Type: "NODE_OFFLINE", NodeID: d.id, UserID: d.userID})
 		}
 	}()
 	ws.SetReadLimit(1024 * 1024)
-	ws.SetReadDeadline(time.Now().Add(75 * time.Second))
+	heartbeat := func() {
+		tm.mu.RLock()
+		defer tm.mu.RUnlock()
+		if tm.redisClient != nil && tm.devices[d.id] == d {
+			tm.redisClient.Set(context.Background(), "node:online:"+d.id, d.userID, antennaPresenceTTL)
+		}
+	}
+	ws.SetReadDeadline(time.Now().Add(antennaPresenceTTL))
 	ws.SetPongHandler(func(string) error {
 		if sent := d.pingAt.Load(); sent > 0 {
 			d.latency.Store(time.Now().UnixNano() - sent)
 		}
-		return ws.SetReadDeadline(time.Now().Add(75 * time.Second))
+		heartbeat()
+		return ws.SetReadDeadline(time.Now().Add(antennaPresenceTTL))
 	})
-	heartbeat := func() {
-		if tm.redisClient != nil {
-			tm.redisClient.Set(context.Background(), "node:online:"+d.id, d.userID, 75*time.Second)
-		}
-	}
 	heartbeat()
 	tm.Broadcast(BroadcastEvent{Type: "NODE_ONLINE", NodeID: d.id, UserID: d.userID})
 	go func() {
@@ -369,7 +387,6 @@ func (tm *TunnelManager) HandleWS(w http.ResponseWriter, r *http.Request) {
 					d.close()
 					return
 				}
-				heartbeat()
 				tm.publishTelemetry(d)
 			}
 		}
@@ -377,6 +394,14 @@ func (tm *TunnelManager) HandleWS(w http.ResponseWriter, r *http.Request) {
 	for {
 		kind, data, err := ws.ReadMessage()
 		if err != nil {
+			var closeError *websocket.CloseError
+			if !websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
+				if errors.As(err, &closeError) {
+					log.Printf("broker: tunnel closed for node %s with code %d", d.id, closeError.Code)
+				} else {
+					log.Printf("broker: tunnel ended for node %s", d.id)
+				}
+			}
 			return
 		}
 		if kind == websocket.BinaryMessage {
@@ -418,7 +443,8 @@ func (tm *TunnelManager) HandleWS(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		if message.Type == "PING" {
-			ws.SetReadDeadline(time.Now().Add(75 * time.Second))
+			heartbeat()
+			ws.SetReadDeadline(time.Now().Add(antennaPresenceTTL))
 			continue
 		}
 		if message.Type == "TELEMETRY" {

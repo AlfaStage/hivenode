@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import QRCode from "react-qr-code";
 import { subscribeDashboard } from "@/lib/dashboard-client";
@@ -32,6 +32,8 @@ export default function ProxiesPage() {
   const [nodes, setNodes] = useState<Node[]>([]);
   const [proxies, setProxies] = useState<Proxy[]>([]);
   const [loading, setLoading] = useState(true);
+  const latestSnapshot = useRef(0);
+  const presenceEvents = useRef(0);
 
   // Modals
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -75,22 +77,29 @@ export default function ProxiesPage() {
   const [logContext, setLogContext] = useState<{type: "node" | "proxy", title: string, id: string} | null>(null);
   const [liveLogs, setLiveLogs] = useState<{id?: string, time: string, msg: string, nodeId: string}[]>([]);
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
+  const fetchData = useCallback(async (showLoading = true) => {
+    const snapshot = ++latestSnapshot.current;
+    const observedPresence = presenceEvents.current;
+    if (showLoading) setLoading(true);
     try {
-      const [proxyRes, nodeRes] = await Promise.all([fetch("/api/proxies"), fetch("/api/nodes")]);
-      const proxyData = await proxyRes.json();
+      const [proxyRes, nodeRes] = await Promise.all([
+        fetch("/api/proxies", { cache: "no-store" }), fetch("/api/nodes", { cache: "no-store" }),
+      ]);
+      const [proxyData, nodeData] = await Promise.all([proxyRes.json(), nodeRes.json()]);
+      if (snapshot !== latestSnapshot.current) return;
       if (proxyRes.ok) setProxies(proxyData.data.proxies || []);
-
-      const nodeData = await nodeRes.json();
-      if (nodeRes.ok) {
-        setNodes(nodeData.data.nodes || []);
-        setNodeTelemetry(prev => ({...prev, ...Object.fromEntries((nodeData.data.nodes || []).filter((n: Node) => n.telemetry).map((n: Node) => [n.id, n.telemetry]))}));
+      if (nodeRes.ok && observedPresence === presenceEvents.current) {
+        const current: Node[] = nodeData.data.nodes || [];
+        setNodes(current);
+        setNodeTelemetry(prev => Object.fromEntries(current
+          .filter(node => node.status === "ONLINE" && (node.telemetry || prev[node.id]))
+          .map(node => [node.id, { ...prev[node.id], ...node.telemetry }])));
       }
     } catch (e) {
       console.error(e);
+    } finally {
+      if (snapshot === latestSnapshot.current) setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   useEffect(() => {
@@ -99,15 +108,20 @@ export default function ProxiesPage() {
 
     // Conecta no WebSocket do Go Broker usando o mesmo IP que o usuário digitou na URL
     const ws = { onmessage: (() => {}) as (event: MessageEvent) => void };
-    const unsubscribe = subscribeDashboard(event => ws.onmessage(event));
+    const unsubscribe = subscribeDashboard(event => ws.onmessage(event), connected => {
+      if (connected) void fetchData(false);
+    });
 
     ws.onmessage = (event) => {
       try {
         const msg = JSON.parse(event.data);
         if (msg.type === "NODE_ONLINE") {
-          setNodes(prev => prev.map(n => n.id === msg.nodeId ? { ...n, status: "ONLINE" } : n));
+          presenceEvents.current++;
+          setNodes(prev => prev.map(n => n.id === msg.nodeId && n.status !== "BLOCKED" ? { ...n, status: "ONLINE" } : n));
         } else if (msg.type === "NODE_OFFLINE") {
-          setNodes(prev => prev.map(n => n.id === msg.nodeId ? { ...n, status: "OFFLINE" } : n));
+          presenceEvents.current++;
+          setNodes(prev => prev.map(n => n.id === msg.nodeId && n.status !== "BLOCKED" ? { ...n, status: "OFFLINE" } : n));
+          setNodeTelemetry(prev => Object.fromEntries(Object.entries(prev).filter(([id]) => id !== msg.nodeId)));
         } else if (msg.type === "NODE_RENAMED") {
           const formattedName = msg.payload.startsWith("HiveNode ") ? msg.payload : `HiveNode ${msg.payload}`;
           setNodes(prev => prev.map(n => n.id === msg.nodeId ? { ...n, deviceModel: formattedName } : n));
@@ -133,14 +147,19 @@ export default function ProxiesPage() {
     }
     };
 
-    const refresh = setInterval(async () => {
-      if (document.visibilityState !== "visible") return;
-      try {
-        const response = await fetch("/api/proxies");
-        if (response.ok) { const json = await response.json(); setProxies(json.data.proxies || []); }
-      } catch { /* Keep the last valid data while offline. */ }
-    }, 10000);
-    return () => { clearInterval(refresh); unsubscribe(); };
+    const refreshVisible = () => {
+      if (document.visibilityState === "visible") void fetchData(false);
+    };
+    const refresh = setInterval(refreshVisible, 10000);
+    document.addEventListener("visibilitychange", refreshVisible);
+    return () => {
+      // Invalidate every pending request, including snapshots started after mount.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      latestSnapshot.current++;
+      clearInterval(refresh);
+      document.removeEventListener("visibilitychange", refreshVisible);
+      unsubscribe();
+    };
   }, [fetchData]);
 
   const handleGenerateQr = async () => {

@@ -1,6 +1,7 @@
 package tunnel
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -9,6 +10,51 @@ import (
 
 	"github.com/gorilla/websocket"
 )
+
+func TestReplacementAndManualDisconnect(t *testing.T) {
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"data":{"nodeId":"test-device","userId":"test-user","visibility":"PRIVATE"}}`))
+	}))
+	defer api.Close()
+	tm := NewTunnelManager(nil)
+	tm.webURL = api.URL
+	server := httptest.NewServer(http.HandlerFunc(tm.HandleWS))
+	defer server.Close()
+	url := "ws" + strings.TrimPrefix(server.URL, "http") + "/tunnel"
+
+	first, _, err := websocket.DefaultDialer.Dial(url, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer first.Close()
+	second, _, err := websocket.DefaultDialer.Dial(url, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer second.Close()
+	_ = first.SetReadDeadline(time.Now().Add(2 * time.Second))
+	_, _, err = first.ReadMessage()
+	var closed *websocket.CloseError
+	if !errors.As(err, &closed) || closed.Text != "REPLACED" {
+		t.Fatalf("replaced connection got %v, want REPLACED close", err)
+	}
+	if tm.device("test-device") == nil {
+		t.Fatal("replacement removed the active device")
+	}
+
+	if err := second.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "ANTENNA_STOPPED"), time.Now().Add(time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	_ = second.SetReadDeadline(time.Now().Add(2 * time.Second))
+	_, _, _ = second.ReadMessage()
+	deadline := time.Now().Add(time.Second)
+	for tm.device("test-device") != nil && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if tm.device("test-device") != nil {
+		t.Fatal("manually disconnected device is still present")
+	}
+}
 
 func TestDeviceWebSocketOrigin(t *testing.T) {
 	for _, tc := range []struct {
