@@ -10,20 +10,26 @@ import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle }
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SmsGatewayContacts } from "./sms-gateway-contacts";
 
 type Binding = { id: string; slot: number; label: string };
 type Destination = { id: string; mask: string };
+type GatewaySim = { simId: string; slot: number; carrier: string; phoneNumber: string | null;
+  deviceLabel: string; deviceId: string; enabled: boolean; online: boolean };
 type Device = {
   id: string; label: string; bindings: Binding[]; lastSeenAt: string | null;
   selectedBinding: string | null; approvedBinding: string | null; pendingBinding: string | null;
   destinationMask: string | null;
   approvedDestinations: Destination[];
+  gateway: boolean;
+  gatewayEnabled: boolean;
 };
 type Message = {
   id: string; maskedDestination: string; state: string; createdAt: string;
   sentParts: number; deliveredParts: number; failedParts: number; totalParts: number; errorCode: string | null;
 };
-type Overview = { devices: Device[]; key: { id: string } | null; realSendEnabled: boolean; consentVersion: string; maxApprovedDestinations: number };
+type Overview = { devices: Device[]; sims: GatewaySim[]; key: { id: string } | null; realSendEnabled: boolean;
+  consentVersion: string; maxApprovedDestinations: number };
 type Pending = Pick<Device, "id" | "label" | "pendingBinding" | "approvedBinding" | "destinationMask" | "bindings"> & {
   user: { email: string }; approvalToken: string;
 };
@@ -47,6 +53,7 @@ const diagnoses: Record<string, string> = {
   INVOCATION_UNCERTAIN: "Confira o histórico do celular e o recebimento antes de criar outro envio.",
   CALLBACK_TIMEOUT: "O aparelho não informou o resultado a tempo. Confira o histórico antes de enviar de novo.",
   QUEUE_EXPIRED: "A mensagem expirou enquanto aguardava o aparelho.",
+  OPTED_OUT: "O destinatário pediu para parar de receber SMS desta conta.",
 };
 
 async function call<T>(path: string, options?: RequestInit) {
@@ -71,6 +78,8 @@ export function SmsPilotPanel({ administrator }: { administrator: boolean }) {
   const [apiToken, setApiToken] = useState("");
   const [apiOpen, setApiOpen] = useState(false);
   const [number, setNumber] = useState("");
+  const [simChoice, setSimChoice] = useState("");
+  const [consentConfirmed, setConsentConfirmed] = useState(false);
   const [reviewNumber, setReviewNumber] = useState("");
   const [addingDestination, setAddingDestination] = useState(false);
   const [body, setBody] = useState("");
@@ -81,6 +90,7 @@ export function SmsPilotPanel({ administrator }: { administrator: boolean }) {
   const [busy, setBusy] = useState(false);
   const [refreshedAt, setRefreshedAt] = useState(0);
   const nextKey = useRef("");
+  const previousDeviceCount = useRef(0);
   const reviewField = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -96,7 +106,8 @@ export function SmsPilotPanel({ administrator }: { administrator: boolean }) {
     setMessages(results.messages);
     setPending(approvals.pending);
     setRefreshedAt(Date.now());
-    if (info.devices.length) setPair(undefined);
+    if (info.devices.length > previousDeviceCount.current) setPair(undefined);
+    previousDeviceCount.current = info.devices.length;
   }, [administrator]);
 
   useEffect(() => {
@@ -127,7 +138,10 @@ export function SmsPilotPanel({ administrator }: { administrator: boolean }) {
     return call<T>(path, { method, headers, body: JSON.stringify(payload) });
   }
 
-  const device = overview?.devices[0];
+  const device = overview?.devices.find(item => !item.gateway);
+  const gatewayMode = Boolean(overview?.devices.some(item => item.gateway));
+  const sims = overview?.sims ?? [];
+  const selectedSim = sims.find(sim => sim.simId === simChoice) ?? (sims.length === 1 ? sims[0] : undefined);
   const line = device?.bindings.find(binding => binding.id === device.selectedBinding);
   const destination = number.trim().replace(/[\s().-]/g, "");
   const differentSimSelected = Boolean(device?.approvedBinding && line && device.approvedBinding !== line.id);
@@ -137,16 +151,18 @@ export function SmsPilotPanel({ administrator }: { administrator: boolean }) {
 
   function send(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!device || busy) return;
+    if (busy || (gatewayMode ? !selectedSim?.enabled || !consentConfirmed : !device)) return;
     if (!/^\+55[1-9]\d{9,10}$/.test(destination)) {
       setSendFeedback("Informe o número de teste com +55, DDD e número, como +5562999999999.");
       return;
     }
     nextKey.current ||= crypto.randomUUID();
     void mutate(async () => {
-      await write(pilot + "/messages", { deviceId: device.id, destination, text: body }, "POST", nextKey.current);
+      const sender = gatewayMode ? { simId: selectedSim?.simId, consentConfirmed } : { deviceId: device?.id };
+      await write(pilot + "/messages", { ...sender, destination, text: body }, "POST", nextKey.current);
       nextKey.current = "";
       setBody("");
+      setConsentConfirmed(false);
       setSendFeedback("Mensagem na fila. Acompanhe a resposta do Android abaixo.");
     }, setSendFeedback);
   }
@@ -199,10 +215,48 @@ export function SmsPilotPanel({ administrator }: { administrator: boolean }) {
           <CardHeader className="border-b border-border">
             <CardTitle className="flex items-center gap-2 text-lg"><Send className="size-4 text-amber-500" aria-hidden /> Enviar SMS</CardTitle>
             <CardDescription>O envio usa a franquia ou o saldo da linha aprovada.</CardDescription>
-            {approved && ready && overview?.realSendEnabled && <CardAction><Badge variant="secondary">Pronto para enviar</Badge></CardAction>}
+            {(gatewayMode ? selectedSim?.enabled && selectedSim.online : approved && ready) && overview?.realSendEnabled &&
+              <CardAction><Badge variant="secondary">Pronto para enviar</Badge></CardAction>}
           </CardHeader>
           <CardContent>
-            {!overview ? <Skeleton className="h-28 w-full" /> : canRequestReview ? (
+            {!overview ? <Skeleton className="h-28 w-full" /> : gatewayMode ? (
+              <form onSubmit={send} className="flex flex-col gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium" htmlFor="sms-gateway-chip">Chip remetente</label>
+                  <select id="sms-gateway-chip" value={selectedSim?.simId ?? ""} onChange={event => {
+                    setSimChoice(event.target.value); nextKey.current = ""; setSendFeedback("");
+                  }} className="min-h-10 w-full rounded-lg border border-input bg-background p-2 text-sm">
+                    <option value="" disabled>Selecione um chip</option>
+                    {sims.map(sim => <option key={sim.simId} value={sim.simId}>
+                      {sim.phoneNumber ?? `SIM ${sim.slot + 1} · ${sim.carrier}`} · {sim.deviceLabel}{sim.enabled ? "" : " · pausado"}
+                    </option>)}
+                  </select>
+                  {selectedSim && (selectedSim.online ? (
+                    <p className="text-xs text-muted-foreground">SIM {selectedSim.slot + 1} · {selectedSim.carrier} · {selectedSim.phoneNumber ?? "número indisponível"}</p>
+                  ) : <Notice icon={Smartphone}>{selectedSim.enabled ? "Os envios aguardam o aparelho voltar a se conectar."
+                    : "Ative o gateway no Android para voltar a enviar por este chip."}</Notice>)}
+                </div>
+                {numberField}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium" htmlFor="sms-gateway-body">Mensagem</label>
+                  <textarea id="sms-gateway-body" rows={4} maxLength={420} required value={body}
+                    onChange={event => { setBody(event.target.value); nextKey.current = ""; setSendFeedback(""); }}
+                    className="min-h-28 w-full resize-y rounded-lg border border-input bg-background p-3 text-sm" />
+                </div>
+                <label className="flex items-start gap-2.5 text-sm text-muted-foreground">
+                  <input className="mt-1 size-4 shrink-0 accent-amber-500" type="checkbox" checked={consentConfirmed}
+                    onChange={event => setConsentConfirmed(event.target.checked)} required />
+                  Este destinatário autorizou o recebimento.
+                </label>
+                <div className="flex flex-wrap items-center gap-3">
+                  <Button type="submit" className="min-h-10 w-full sm:w-fit"
+                    disabled={busy || !overview.realSendEnabled || !selectedSim?.enabled || !consentConfirmed || !number || !body.trim()}>
+                    <Send data-icon="inline-start" /> Colocar na fila de envio
+                  </Button>
+                  <p role="status" aria-label="Resultado do envio" className="text-sm text-muted-foreground empty:hidden">{sendFeedback}</p>
+                </div>
+              </form>
+            ) : canRequestReview ? (
               <div className="flex flex-col gap-4">
                 <Notice icon={ShieldCheck}>{differentSimSelected
                   ? "Você selecionou outro chip. Pedir a aprovação dele cancela a fila da linha anterior."
@@ -260,11 +314,24 @@ export function SmsPilotPanel({ administrator }: { administrator: boolean }) {
         <Card className="min-w-0 [--card-spacing:--spacing(5)]">
           <CardHeader className="border-b border-border">
             <CardTitle className="flex items-center gap-2 text-lg"><Smartphone className="size-4 text-amber-500" aria-hidden /> Aparelho e chip</CardTitle>
-            <CardDescription>{device?.label ?? "Seu Android é o remetente do SMS."}</CardDescription>
-            {device && <CardAction><Badge variant={online ? "secondary" : "outline"}>{online ? "App conectado" : "App desconectado"}</Badge></CardAction>}
+            <CardDescription>{gatewayMode ? "Gerencie os Androids que enviam SMS." : device?.label ?? "Seu Android é o remetente do SMS."}</CardDescription>
+            {!gatewayMode && device && <CardAction><Badge variant={online ? "secondary" : "outline"}>{online ? "App conectado" : "App desconectado"}</Badge></CardAction>}
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
-            {!overview ? <Skeleton className="h-20 w-full" /> : !device ? <>
+            {!overview ? <Skeleton className="h-20 w-full" /> : gatewayMode || !device ? <>
+              {gatewayMode && <ul className="divide-y divide-border rounded-lg border border-border">
+                {overview.devices.map(item => <li key={item.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-3">
+                  <div className="min-w-0">
+                    <p className="break-words font-medium">{item.label}</p>
+                    <p className="text-xs text-muted-foreground">{item.gatewayEnabled ? "Gateway ativado" : "Gateway pausado ou aguardando ativação"}</p>
+                  </div>
+                  <Button variant="outline" size="sm" disabled={busy} onClick={() => {
+                    if (window.confirm("Desvincular este aparelho e cancelar a fila dele?")) void mutate(async () => {
+                      await write(pilot, { action: "revoke-device", deviceId: item.id });
+                    });
+                  }}>Desvincular</Button>
+                </li>)}
+              </ul>}
               <p className="text-sm text-muted-foreground">No app HiveNode, entre na mesma conta e abra SMS Beta para fazer o vínculo.</p>
               <Button className="w-fit" disabled={buttonDisabled} onClick={() => void mutate(async () => setPair(await write(pilot, { action: "pair" })))}>
                 <QrCode data-icon="inline-start" /> Gerar código de vínculo
@@ -319,6 +386,8 @@ export function SmsPilotPanel({ administrator }: { administrator: boolean }) {
           </CardContent>
         </Card>
       </div>
+
+      {gatewayMode && <SmsGatewayContacts simId={selectedSim?.simId} />}
 
       <Card className="min-w-0 [--card-spacing:--spacing(5)]">
         <CardHeader className="border-b border-border">

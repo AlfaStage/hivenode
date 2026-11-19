@@ -1,6 +1,8 @@
 # Piloto com chip real
 
-O piloto usa uma conta com acesso ao beta, um Android próprio com API 26 ou superior e um SIM físico ou eSIM ativo. Uma linha revisada por aparelho pode ter até cinco destinos brasileiros aprovados. Cada destino passa por revisão individual e cada chamada cria um único SMS. A fila aceita até cinco solicitações por conta numa janela móvel de 24 horas e o Android aceita até três partes por mensagem. Mantenha a tela SMS Beta aberta e o SIM aprovado selecionado durante o teste.
+O beta usa uma conta com acesso ao recurso, um Android próprio e SIM ou eSIM ativo. Para usar seleção de SIM pelo painel, envio em segundo plano e descadastro por resposta, siga a documentação do [gateway SMS](18-gateway-android.md).
+
+O modo legado continua disponível nos APKs anteriores. Uma linha revisada por aparelho pode ter até cinco destinos brasileiros aprovados. Cada destino passa por revisão individual e cada chamada cria um único SMS. A fila legada aceita até cinco solicitações por conta numa janela móvel de 24 horas e o Android aceita até três partes por mensagem. Nesse modo, mantenha a tela SMS Beta aberta e o SIM aprovado selecionado durante o teste.
 
 ## Homologação em dois celulares
 

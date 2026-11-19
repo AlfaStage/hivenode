@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { apiError, apiSuccess } from "@/lib/api-utils";
+import { visibleNumber } from "@/lib/sms-gateway";
 import {
   bindingId, bindingList, cancelPending, consentVersion, destination, hashToken,
   destinationFingerprint, maskPhone, maxApprovedDestinations, opaqueToken, realSendEnabled, reviewedDestinations, withPilotAccess,
@@ -20,7 +21,9 @@ export async function GET(request: Request) {
     const devices = await tx.smsPilotDevice.findMany({ where: { userId, revokedAt: null }, orderBy: { createdAt: "desc" },
       select: { id: true, label: true, bindings: true, approvedBinding: true, pendingBinding: true, approvedAt: true,
         consentVersion: true, selectedBinding: true, lastSeenAt: true, destinationHash: true, destinationMask: true,
-        approvedDestinations: true } });
+        approvedDestinations: true, gateway: true, gatewayEnabled: true,
+        gatewaySims: { where: { available: true }, orderBy: { slot: "asc" },
+          select: { id: true, label: true, slot: true, encryptedNumber: true } } } });
     const key = role === "API_KEY" ? null : await tx.smsPilotKey.findFirst({
       where: { userId, revokedAt: null }, select: { id: true, createdAt: true },
     });
@@ -29,9 +32,14 @@ export async function GET(request: Request) {
       const { id, label, bindings, approvedBinding, pendingBinding, approvedAt, consentVersion, selectedBinding, lastSeenAt, destinationMask } = device;
       return { id, label, bindings, approvedBinding, pendingBinding, approvedAt, consentVersion, selectedBinding, lastSeenAt,
         destinationMask: pendingBinding ? destinationMask : approved[0]?.mask ?? null,
-        approvedDestinations: approved };
+        approvedDestinations: approved, gateway: device.gateway, gatewayEnabled: device.gatewayEnabled };
     });
-    return apiSuccess({ devices: visibleDevices, key, canApprove: role === "ADMIN", realSendEnabled: realSendEnabled(),
+    const sims = devices.flatMap(device => device.gatewaySims.map(sim => ({
+      simId: sim.id, slot: sim.slot, carrier: sim.label, phoneNumber: visibleNumber(sim.encryptedNumber),
+      deviceLabel: device.label, deviceId: device.id, enabled: device.gatewayEnabled,
+      online: !!device.lastSeenAt && Date.now() - device.lastSeenAt.getTime() < 45_000,
+    })));
+    return apiSuccess({ devices: visibleDevices, sims, key, canApprove: role === "ADMIN", realSendEnabled: realSendEnabled(),
       consentVersion, maxApprovedDestinations });
   });
 }
@@ -42,8 +50,6 @@ export async function POST(request: Request) {
     const now = new Date();
     switch (data.action) {
       case "pair": {
-        const active = await tx.smsPilotDevice.count({ where: { userId, revokedAt: null } });
-        if (active) return apiError("Desvincule o aparelho anterior para parear outro", 409);
         const code = opaqueToken("smsp_");
         const expiresAt = new Date(now.getTime() + 300_000);
         await tx.smsPilotPair.deleteMany({ where: { userId } });
@@ -63,6 +69,7 @@ export async function POST(request: Request) {
         if (!process.env.SMS_PILOT_LOOKUP_KEY?.match(/^[a-f0-9]{64}$/i)) return apiError("A revisão de linha ainda está indisponível", 503);
         const device = await tx.smsPilotDevice.findFirst({ where: { id: data.deviceId, userId, revokedAt: null } });
         if (!device) return apiError("Aparelho não encontrado", 404);
+        if (device.gateway) return apiError("O gateway usa o consentimento informado no envio", 409);
         const bindings = bindingList.parse(device.bindings);
         if (!device.lastSeenAt || now.getTime() - device.lastSeenAt.getTime() > 90_000 ||
             device.consentVersion !== consentVersion || device.selectedBinding !== data.bindingId ||

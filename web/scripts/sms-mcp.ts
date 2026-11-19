@@ -33,7 +33,7 @@ async function api(path: string, method = "GET", body?: object, requestKey?: str
 }
 
 server.registerTool("listar_aparelhos_sms", {
-  description: "Veja o aparelho e as linhas disponíveis na conta HiveNode SMS.",
+  description: "Veja os aparelhos e os chips da conta. O campo sims informa o simId de cada chip no gateway.",
   inputSchema: {},
   annotations: { readOnlyHint: true },
 }, () => api(""));
@@ -45,14 +45,31 @@ server.registerTool("consultar_sms", {
 }, ({ id }) => api("/messages?id=" + encodeURIComponent(id)));
 
 server.registerTool("enfileirar_sms", {
-  description: "Após confirmação explícita do usuário, prepare um SMS real pelo chip aprovado. A fila ainda aguarda o Android.",
+  description: "Após confirmação explícita do usuário, enfileire um SMS real. No gateway informe simId e consentConfirmed=true.",
   inputSchema: {
-    deviceId: z.uuid(), destination: z.string().regex(/^\+55[1-9]\d{9,10}$/),
+    deviceId: z.uuid().optional(), simId: z.uuid().optional(), consentConfirmed: z.literal(true).optional(),
+    destination: z.string().regex(/^\+55[1-9]\d{9,10}$/),
     text: z.string().trim().min(1).max(420), idempotencyKey: z.string().regex(/^[a-zA-Z0-9_-]{16,128}$/),
     confirmed: z.literal(true),
   },
   annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
-}, ({ deviceId, destination, text, idempotencyKey }) => api("/messages", "POST", { deviceId, destination, text }, idempotencyKey));
+}, ({ deviceId, simId, consentConfirmed, destination, text, idempotencyKey }) => {
+  if (simId && !deviceId && consentConfirmed) return api("/messages", "POST", { simId, consentConfirmed, destination, text }, idempotencyKey);
+  if (deviceId && !simId) return api("/messages", "POST", { deviceId, destination, text }, idempotencyKey);
+  return { isError: true, content: [{ type: "text" as const, text: "Informe simId e consentConfirmed=true para o gateway." }] };
+});
+
+server.registerTool("listar_contatos_sms", {
+  description: "Consulte os contatos que receberam SMS de um chip ou os descadastros da conta.",
+  inputSchema: { simId: z.uuid().optional(), optedOut: z.literal(true).optional(), after: z.uuid().optional() },
+  annotations: { readOnlyHint: true },
+}, ({ simId, optedOut, after }) => {
+  const query = new URLSearchParams();
+  if (simId) query.set("simId", simId);
+  if (optedOut) query.set("optedOut", "true");
+  if (after) query.set("after", after);
+  return api("/contacts?" + query.toString());
+});
 
 server.registerTool("cancelar_sms", {
   description: "Cancele um SMS que ainda está na fila. Um envio já autorizado não pode ser cancelado.",

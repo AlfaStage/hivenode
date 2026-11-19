@@ -206,12 +206,75 @@ export async function checkBrowser(base: string, email: string, otherEmail: stri
       assert.equal((await sendWithKey("+5562999999999", randomUUID())).status(), 202);
       assert.equal((await sendWithKey("+5562999999999", randomUUID())).status(), 429);
 
+      assert.equal((await page.request.post(agentApi, {
+        data: { ...event, messageId: secondMessage.id }, headers: agentAuth,
+      })).status(), 200);
+      const simA = randomUUID();
+      const simB = randomUUID();
+      const gatewayPoll = { action: "gateway-sync", consentVersion: "gateway-br-1", optOuts: [], sims: [
+        { id: simA, slot: 0, label: "Linha A", phoneNumber: "+5562988880000" },
+        { id: simB, slot: 1, label: "Linha B", phoneNumber: null },
+      ] };
+      const observeGateway = async (data: object = gatewayPoll) => {
+        const response = await page.request.post(agentApi, { data, headers: agentAuth });
+        assert.equal(response.status(), 200, await response.text());
+        return (await response.json()).data;
+      };
+      assert.equal((await observeGateway()).grant, null);
+      const publicGateway = await page.request.get(pilotApi, { headers: deviceAuth(key) });
+      const { data: { sims } } = await publicGateway.json();
+      assert.equal(sims.find((sim: { simId: string }) => sim.simId === simA).phoneNumber, "+5562988880000");
+      assert.equal(sims.find((sim: { simId: string }) => sim.simId === simB).phoneNumber, null);
+      await page.reload({ waitUntil: "domcontentloaded" });
+      const chip = page.getByLabel("Chip remetente");
+      await chip.selectOption(simB);
+      const gatewayTarget = "+5562977777777";
+      await page.getByLabel("Número de teste com DDI").fill(gatewayTarget);
+      await page.getByLabel("Mensagem", { exact: true }).fill("Gateway pelo chip B");
+      await page.getByRole("checkbox", { name: "Este destinatário autorizou o recebimento." }).check();
+      const [gatewayResponse] = await Promise.all([nextSend(), sendButton.click()]);
+      assert.equal(gatewayResponse.status(), 202);
+      const firstGatewayId = (await gatewayResponse.json()).data.message.id;
+      const firstGatewayGrant = (await observeGateway()).grant;
+      const firstGatewayPayload = JSON.parse(Buffer.from(firstGatewayGrant.payload, "base64url").toString());
+      assert.equal(firstGatewayPayload.id, firstGatewayId);
+      assert.equal(firstGatewayPayload.bindingId, simB);
+      assert.equal(firstGatewayPayload.to, gatewayTarget);
+      assert.equal((await page.request.post(agentApi, {
+        data: { ...event, messageId: firstGatewayId }, headers: agentAuth,
+      })).status(), 200);
+
+      const gatewaySend = (simId: string, destination: string, consentConfirmed = true) => page.request.post(pilotApi + "/messages", {
+        data: { simId, destination, text: "Fila isolada do gateway", consentConfirmed },
+        headers: { ...deviceAuth(key), "Idempotency-Key": randomUUID() },
+      });
+      assert.equal((await gatewaySend(simA, gatewayTarget, false)).status(), 400);
+      assert.equal((await gatewaySend(randomUUID(), gatewayTarget)).status(), 404);
+      const requests = await Promise.all(Array.from({ length: 7 }, (_, index) => gatewaySend(index % 2 ? simB : simA, gatewayTarget)));
+      assert.deepEqual(requests.map(response => response.status()), Array(7).fill(202));
+      assert.equal((await observeGateway({ ...gatewayPoll, optOuts: [{ destination: gatewayTarget, keyword: "SAIR" }] })).grant, null);
+      for (const request of requests) {
+        const id = (await request.json()).data.message.id;
+        const status = await page.request.get(pilotApi + "/messages?id=" + id, { headers: deviceAuth(key) });
+        const canceled = (await status.json()).data.message;
+        assert.equal(canceled.state, "CANCELED");
+        assert.equal(canceled.errorCode, "OPTED_OUT");
+      }
+      assert.equal((await gatewaySend(simA, gatewayTarget)).status(), 403);
+      assert.equal((await gatewaySend(simB, gatewayTarget)).status(), 403);
+      const seen = await page.request.get(pilotApi + "/contacts?simId=" + simB, { headers: deviceAuth(key) });
+      const stopped = await page.request.get(pilotApi + "/contacts?optedOut=true", { headers: deviceAuth(key) });
+      assert.equal((await seen.json()).data.contacts[0].phoneNumber, gatewayTarget);
+      assert.equal((await stopped.json()).data.contacts[0].optOutKeyword, "SAIR");
+      await page.getByRole("button", { name: "Descadastros da conta" }).click();
+      await expect(page.getByText(gatewayTarget, { exact: true })).toBeVisible();
+
       assert.equal((await other.goto(smsPath, { waitUntil: "domcontentloaded" }))?.status(), 404);
       await adminPage.getByRole("button", { name: "Revogar SMS", exact: true }).click();
       await expect(adminPage.getByRole("button", { name: "Liberar SMS", exact: true })).toBeVisible({ timeout: 15000 });
       if (deviceTokens) assert.deepEqual((await (await readMobileAccess(deviceTokens.admittedDevice)).json()).data, { allowed: false });
       assert.equal((await page.reload({ waitUntil: "domcontentloaded" }))?.status(), 404);
-      console.log("Browser: pairing, SIM activation, two approved destinations, queued grants and individual revocation checked");
+      console.log("Browser: legacy compatibility, gateway routing, consent, contact history and account-wide opt-out checked");
     }
 
     if (process.argv.includes("--sms-beta-only")) {

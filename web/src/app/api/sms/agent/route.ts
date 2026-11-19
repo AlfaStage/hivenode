@@ -3,6 +3,7 @@ import { apiError, apiSuccess, handleApiError } from "@/lib/api-utils";
 import { getAuthenticatedUser } from "@/lib/auth";
 import { decrypt } from "@/lib/crypto";
 import { prisma } from "@/lib/prisma";
+import { gatewayConsentVersion, gatewayOptOuts, gatewaySims, optOutKnownContacts, recordGatewaySend, updateGatewaySims } from "@/lib/sms-gateway";
 import {
   bindingId, bindingList, cancelPending, consentVersion, destinationFingerprint, expireMessages, hashToken,
   isAdmitted, lockOwner, opaqueToken, realSendEnabled, reviewedDestinations, signGrant,
@@ -10,12 +11,14 @@ import {
 
 const eventCode = z.enum([
   "PERMISSION_REQUIRED", "SIM_UNAVAILABLE", "RADIO_OFF", "NO_SERVICE", "NETWORK_REJECTED",
-  "PLATFORM_LIMIT", "PREMIUM_BLOCKED", "MODEM_ERROR", "MESSAGE_TOO_LONG", "INVOCATION_UNCERTAIN",
+  "PLATFORM_LIMIT", "PREMIUM_BLOCKED", "MODEM_ERROR", "MESSAGE_TOO_LONG", "INVOCATION_UNCERTAIN", "OPTED_OUT",
 ]);
 const command = z.discriminatedUnion("action", [
   z.strictObject({ action: z.literal("pair"), code: z.string().regex(/^smsp_[a-f0-9]{64}$/), label: z.string().trim().min(1).max(60) }),
   z.strictObject({ action: z.literal("poll"), bindings: bindingList, activeBinding: bindingId.nullable(),
     consentVersion: z.literal(consentVersion).nullable() }),
+  z.strictObject({ action: z.literal("gateway-sync"), sims: gatewaySims, optOuts: gatewayOptOuts,
+    consentVersion: z.literal(gatewayConsentVersion) }),
   z.strictObject({ action: z.literal("pause") }),
   z.strictObject({ action: z.literal("event"), messageId: z.uuid(), version: z.number().int().min(1).max(30),
     total: z.number().int().min(0).max(3), sent: z.number().int().min(0).max(3),
@@ -39,9 +42,6 @@ export async function POST(request: Request) {
         }
         const used = await tx.smsPilotPair.deleteMany({ where: { codeHash, expiresAt: { gt: new Date() } } });
         if (!used.count) return apiError("Código inválido ou expirado", 404);
-        if (await tx.smsPilotDevice.count({ where: { userId: pair.userId, revokedAt: null } })) {
-          return apiError("Esta conta já tem um aparelho no piloto", 409);
-        }
         const token = opaqueToken("smsd_");
         const device = await tx.smsPilotDevice.create({
           data: { userId: pair.userId, label: data.label, tokenHash: hashToken(token) }, select: { id: true },
@@ -71,7 +71,8 @@ export async function POST(request: Request) {
           return apiError("O relato anterior já contém contagens mais recentes", 409);
         }
         const allCallbacks = data.total > 0 && data.sent + data.failed === data.total;
-        const state = data.total > 0 && data.delivered === data.total ? "DELIVERED"
+        const state = data.code === "OPTED_OUT" && data.total === 0 ? "CANCELED"
+          : data.total > 0 && data.delivered === data.total ? "DELIVERED"
           : allCallbacks && data.sent === data.total ? "SENT"
           : allCallbacks && data.sent > 0 ? "PARTIAL"
           : allCallbacks || (data.total === 0 && data.code && data.code !== "INVOCATION_UNCERTAIN") ? "FAILED"
@@ -81,6 +82,9 @@ export async function POST(request: Request) {
           state, sentParts: data.sent, deliveredParts: data.delivered, failedParts: data.failed,
           totalParts: data.total, errorCode: data.code, eventVersion: data.version,
         } });
+        if (device.gateway && !message.sentParts && data.sent > 0 && message.destinationHash) {
+          await recordGatewaySend(tx, device.userId, device.id, message.bindingId, message.destinationHash, new Date());
+        }
         if (state !== message.state) await tx.auditLog.create({ data: { actorId: device.userId,
           action: "sms_pilot.agent_event", targetId: message.id, metadata: { state, version: data.version } } });
         return apiSuccess({ received: true });
@@ -88,41 +92,61 @@ export async function POST(request: Request) {
 
       if (!isAdmitted(owner) || device.revokedAt) return apiError("Aparelho ou conta sem acesso", 403);
       if (data.action === "pause") {
-        await tx.smsPilotDevice.update({ where: { id: device.id }, data: { consentVersion: null, selectedBinding: null, lastSeenAt: null } });
-        await cancelPending(tx, device.userId, device.id);
+        await tx.smsPilotDevice.update({ where: { id: device.id }, data: { consentVersion: null, selectedBinding: null, lastSeenAt: null,
+          gatewayEnabled: false } });
+        if (!device.gateway) await cancelPending(tx, device.userId, device.id);
         return apiSuccess({ paused: true });
       }
 
       const now = new Date();
-      const missing = (id: string | null) => id !== null && !data.bindings.some(line => line.id === id);
-      const inventoryChanged = missing(device.approvedBinding) || missing(device.pendingBinding);
-      await tx.smsPilotDevice.update({ where: { id: device.id }, data: {
-        lastSeenAt: now, bindings: data.bindings, consentVersion: data.consentVersion, selectedBinding: data.activeBinding,
-        ...(inventoryChanged ? { approvedBinding: null, approvedAt: null, pendingBinding: null,
-          destinationHash: null, destinationMask: null, approvedDestinations: [] } : {}),
-      } });
-      if (inventoryChanged) await cancelPending(tx, device.userId, device.id);
+      let allowedBindings: string[];
+      let approved: ReturnType<typeof reviewedDestinations> = [];
+      const gateway = data.action === "gateway-sync";
+      if (gateway) {
+        if (!device.gateway) await cancelPending(tx, device.userId, device.id);
+        await updateGatewaySims(tx, device.id, device.userId, data.sims);
+        await optOutKnownContacts(tx, device.userId, data.optOuts, now);
+        await tx.smsPilotDevice.update({ where: { id: device.id }, data: { gateway: true, gatewayEnabled: true, lastSeenAt: now } });
+        allowedBindings = data.sims.map(sim => sim.id);
+      } else {
+        if (device.gateway) return apiSuccess({ status: "SERVICE_PAUSED", grant: null });
+        const missing = (id: string | null) => id !== null && !data.bindings.some(line => line.id === id);
+        const inventoryChanged = missing(device.approvedBinding) || missing(device.pendingBinding);
+        await tx.smsPilotDevice.update({ where: { id: device.id }, data: {
+          lastSeenAt: now, bindings: data.bindings, consentVersion: data.consentVersion, selectedBinding: data.activeBinding,
+          ...(inventoryChanged ? { approvedBinding: null, approvedAt: null, pendingBinding: null,
+            destinationHash: null, destinationMask: null, approvedDestinations: [] } : {}),
+        } });
+        if (inventoryChanged) await cancelPending(tx, device.userId, device.id);
 
-      const approved = inventoryChanged ? [] : reviewedDestinations(device);
-      let status = "READY";
-      if (!realSendEnabled()) status = "SERVICE_PAUSED";
-      else if (!approved.length) status = "APPROVAL_REQUIRED";
-      else if (data.consentVersion !== consentVersion || device.approvedBinding !== data.activeBinding || missing(data.activeBinding)) status = "SIM_NOT_SELECTED";
-      if (status !== "READY") return apiSuccess({ status, grant: null });
+        approved = inventoryChanged ? [] : reviewedDestinations(device);
+        if (!realSendEnabled()) return apiSuccess({ status: "SERVICE_PAUSED", grant: null });
+        if (!approved.length) return apiSuccess({ status: "APPROVAL_REQUIRED", grant: null });
+        if (data.consentVersion !== consentVersion || !data.activeBinding || device.approvedBinding !== data.activeBinding || missing(data.activeBinding)) {
+          return apiSuccess({ status: "SIM_NOT_SELECTED", grant: null });
+        }
+        allowedBindings = [data.activeBinding];
+      }
+      if (!realSendEnabled()) return apiSuccess({ status: "SERVICE_PAUSED", grant: null });
+      if (!allowedBindings.length) return apiSuccess({ status: "SIM_UNAVAILABLE", grant: null });
 
       await expireMessages(tx, now, device.userId);
       const outstanding = await tx.smsPilotMessage.findFirst({ where: { deviceId: device.id, state: "AUTHORIZED" }, select: { id: true } });
       if (outstanding) return apiSuccess({ status: "WAITING_MODEM", grant: null });
       const message = await tx.smsPilotMessage.findFirst({
-        where: { deviceId: device.id, userId: device.userId, state: "QUEUED", expiresAt: { gt: now }, bindingId: device.approvedBinding! },
+        where: { deviceId: device.id, userId: device.userId, state: "QUEUED", expiresAt: { gt: now }, bindingId: { in: allowedBindings } },
         orderBy: [{ createdAt: "asc" }, { id: "asc" }],
       });
-      if (!message?.encryptedPayload) return apiSuccess({ status, grant: null });
+      if (!message?.encryptedPayload) return apiSuccess({ status: "READY", grant: null });
       const { to, text } = z.object({ to: z.string(), text: z.string() }).parse(JSON.parse(decrypt(message.encryptedPayload)));
       const hash = destinationFingerprint(device.userId, to);
-      if (!approved.some(item => item.hash === hash)) {
-        await tx.smsPilotMessage.update({ where: { id: message.id }, data: { state: "CANCELED", encryptedPayload: null } });
-        return apiSuccess({ status, grant: null });
+      const contact = await tx.smsGatewayContact.findUnique({
+        where: { userId_destinationHash: { userId: device.userId, destinationHash: hash } }, select: { optedOutAt: true },
+      });
+      if (contact?.optedOutAt || (gateway ? !contact : !approved.some(item => item.hash === hash))) {
+        await tx.smsPilotMessage.update({ where: { id: message.id }, data: { state: "CANCELED", encryptedPayload: null,
+          ...(contact?.optedOutAt ? { errorCode: "OPTED_OUT" } : {}) } });
+        return apiSuccess({ status: "READY", grant: null });
       }
       const grantExpiresAt = new Date(now.getTime() + 30_000);
       const payload = Buffer.from(JSON.stringify({ id: message.id, deviceId: device.id, bindingId: message.bindingId, to, text,
@@ -131,10 +155,10 @@ export async function POST(request: Request) {
         where: { id: message.id, state: "QUEUED", expiresAt: { gt: new Date() } },
         data: { state: "AUTHORIZED", grantExpiresAt, encryptedPayload: null },
       });
-      if (!claimed.count) return apiSuccess({ status, grant: null });
+      if (!claimed.count) return apiSuccess({ status: "READY", grant: null });
       await tx.auditLog.create({ data: { actorId: device.userId, action: "sms_pilot.authorize", targetId: message.id,
         metadata: { deviceId: device.id, bindingId: message.bindingId } } });
-      return apiSuccess({ status, grant: { payload, signature: signGrant(agentToken, payload) } });
+      return apiSuccess({ status: "READY", grant: { payload, signature: signGrant(agentToken, payload) } });
     });
   } catch (error) {
     return handleApiError(error);

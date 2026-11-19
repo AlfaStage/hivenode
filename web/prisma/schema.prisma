@@ -30,6 +30,7 @@ model User {
   smsPilotDevices  SmsPilotDevice[]
   smsPilotPairs    SmsPilotPair[]
   smsPilotKeys     SmsPilotKey[]
+  smsGatewayContacts SmsGatewayContact[]
   betaApplication  BetaApplication?
   
   // Integração Web3 & Tokenomics
@@ -103,11 +104,58 @@ model SmsPilotDevice {
   destinationMask String?
   approvedDestinations Json @default("[]")
   approvedAt      DateTime?
+  gateway         Boolean @default(false)
+  gatewayEnabled  Boolean @default(false)
   createdAt       DateTime @default(now())
   messages        SmsPilotMessage[]
+  gatewaySims     SmsGatewaySim[]
 
   @@index([userId, revokedAt])
   @@map("sms_pilot_devices")
+}
+
+model SmsGatewaySim {
+  id              String @id
+  deviceId        String
+  device          SmsPilotDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  slot            Int
+  label           String
+  encryptedNumber String?
+  numberHash      String?
+  available       Boolean @default(true)
+  contacts        SmsGatewayActivity[]
+
+  @@index([deviceId, available])
+  @@map("sms_gateway_sims")
+}
+
+model SmsGatewayContact {
+  id                String @id @default(uuid())
+  userId            String
+  user              User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  destinationHash   String
+  maskedNumber      String
+  encryptedNumber   String?
+  lastConsentAt     DateTime?
+  optedOutAt        DateTime?
+  optOutKeyword     String?
+  activity          SmsGatewayActivity[]
+
+  @@unique([userId, destinationHash])
+  @@index([userId, optedOutAt, id])
+  @@map("sms_gateway_contacts")
+}
+
+model SmsGatewayActivity {
+  simId       String
+  sim         SmsGatewaySim @relation(fields: [simId], references: [id], onDelete: Cascade)
+  contactId   String
+  contact     SmsGatewayContact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  lastSentAt  DateTime
+
+  @@id([simId, contactId])
+  @@index([simId, lastSentAt])
+  @@map("sms_gateway_activity")
 }
 
 model SmsPilotKey {
@@ -149,6 +197,7 @@ model SmsPilotMessage {
   @@index([userId, createdAt])
   @@index([deviceId, state, createdAt])
   @@index([state, expiresAt])
+  @@index([userId, destinationHash, state])
   @@map("sms_pilot_messages")
 }
 
