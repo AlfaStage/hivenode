@@ -107,6 +107,8 @@ export function SmsPilotPanel({ administrator }: { administrator: boolean }) {
 
   const device = overview?.devices[0];
   const line = device?.bindings.find(binding => binding.id === device.selectedBinding);
+  const needsReview = Boolean(line && device?.approvedBinding !== line.id);
+  const differentSimSelected = Boolean(device?.approvedBinding && line && device.approvedBinding !== line.id);
   const online = device?.lastSeenAt && refreshedAt - Date.parse(device.lastSeenAt) < 90_000;
   const pairValid = pair && refreshedAt < Date.parse(pair.expiresAt);
   const buttonDisabled = busy || !overview;
@@ -142,18 +144,19 @@ export function SmsPilotPanel({ administrator }: { administrator: boolean }) {
           <p className="text-sm">{device.label} · {online ? "App conectado" : "Abra o app no aparelho"}</p>
           <ul className="grid gap-1 text-sm">{device.bindings.map(binding => <li key={binding.id}>SIM {binding.slot + 1} · {binding.label}{binding.id === device.selectedBinding ? " · selecionado no app" : ""}</li>)}</ul>
           {device.approvedBinding && <p className="text-sm">Linha aprovada. Destino de teste {device.destinationMask}.</p>}
+          {differentSimSelected && <p className="text-sm">Você selecionou outro chip. Solicite uma nova revisão para usá-lo. A solicitação cancela a fila da linha anterior.</p>}
           {device.pendingBinding && <p className="text-sm">Solicitação de {device.destinationMask} aguardando revisão.</p>}
           <div className="grid gap-2">
             <label className="grid gap-1 text-sm">Número de teste com DDI
               <Input type="tel" placeholder="+5562999999999" value={number} onChange={event => { setNumber(event.target.value); nextKey.current = ""; }} />
             </label>
-            {line && !device.approvedBinding && <label className="flex items-start gap-2 text-sm">
+            {needsReview && <label className="flex items-start gap-2 text-sm">
               <input className="mt-1" type="checkbox" checked={verified} onChange={event => setVerified(event.target.checked)} />
               Confirmo que controlo este número de teste e que solicitei à operadora autorização para este uso da linha.
             </label>}
           </div>
           <div className="flex flex-wrap gap-2">
-            {line && !device.approvedBinding && <Button disabled={buttonDisabled || !verified || !online || !number} onClick={() => void mutate(async () => {
+            {line && needsReview && <Button disabled={buttonDisabled || !verified || !online || !number} onClick={() => void mutate(async () => {
               await write(pilot, { action: "request-approval", deviceId: device.id, bindingId: line.id,
                 destination: number, verifiedByOwner: true, consentVersion: overview?.consentVersion });
             })}>Solicitar aprovação</Button>}
@@ -186,7 +189,7 @@ export function SmsPilotPanel({ administrator }: { administrator: boolean }) {
           <textarea id="sms-pilot-body" rows={3} maxLength={420} required value={body}
             onChange={event => { setBody(event.target.value); nextKey.current = ""; }}
             className="w-full rounded-md border bg-transparent p-2 text-sm" />
-          <Button className="w-fit" disabled={busy || !overview?.realSendEnabled || !number || !body.trim()}>Colocar na fila de envio</Button>
+          <Button className="w-fit" disabled={busy || !overview?.realSendEnabled || differentSimSelected || !number || !body.trim()}>Colocar na fila de envio</Button>
         </form>
       </CardContent></Card>}
       <Card><CardHeader><CardTitle>Histórico</CardTitle></CardHeader><CardContent className="grid gap-3">
