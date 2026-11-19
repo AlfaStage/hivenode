@@ -57,17 +57,15 @@ export async function checkBrowser(base: string, email: string, otherEmail: stri
       await expect(adminPage.getByRole("button", { name: "Revogar SMS", exact: true })).toBeVisible({ timeout: 15000 });
       await page.goto(smsPath, { waitUntil: "domcontentloaded" });
       await expect(page.getByRole("heading", { name: "HiveNode SMS Beta" })).toBeVisible();
-      await page.getByLabel("Destino fictício").fill("+5511999999999");
-      await page.getByLabel("Mensagem de teste").fill("Fluxo de simulação do navegador");
-      await page.getByLabel("Resultado simulado").selectOption("UNKNOWN");
-      await page.getByRole("button", { name: "Colocar na fila de testes" }).click();
-      await page.getByRole("button", { name: "Simular resultado desconhecido" }).click();
-      await expect(page.getByText("Resultado desconhecido", { exact: true }).last()).toBeVisible();
+      await page.getByRole("button", { name: "Gerar código de vínculo" }).click();
+      await expect(page.getByLabel("Código de vínculo")).toHaveValue(/^smsp_[a-f0-9]{64}$/);
+      await expect(page.getByText("Nenhum envio real registrado.")).toBeVisible();
+      await expect(page.getByRole("button", { name: "Colocar na fila de envio" })).toHaveCount(0);
       assert.equal((await other.goto(smsPath, { waitUntil: "domcontentloaded" }))?.status(), 404);
       await adminPage.getByRole("button", { name: "Revogar SMS", exact: true }).click();
       await expect(adminPage.getByRole("button", { name: "Liberar SMS", exact: true })).toBeVisible({ timeout: 15000 });
       assert.equal((await page.reload({ waitUntil: "domcontentloaded" }))?.status(), 404);
-      console.log("Browser: SMS admission, simulation and revocation checked");
+      console.log("Browser: SMS admission, pairing code and revocation checked");
     }
 
     if (process.argv.includes("--sms-beta-only")) {

@@ -8,4 +8,5 @@ Object.assign(process.env, {
   BROKER_API_URL: "http://127.0.0.1:11001", WEB_API_URL: "http://127.0.0.1:3100",
   WEB_ORIGIN: "http://127.0.0.1:3100", SOCKS5_PORT: "11000", TUNNEL_PORT: "11001",
   APP_ENV: "test", ALLOW_PRIVATE_TARGETS: "true", NODE_ENV: "development",
+  SMS_REAL_SEND_ENABLED: "true", SMS_PILOT_LOOKUP_KEY: "31".repeat(32),
 });

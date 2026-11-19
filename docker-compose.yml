@@ -45,6 +45,8 @@ services:
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
       SMTP_FROM: ${SMTP_FROM:-}
+      SMS_REAL_SEND_ENABLED: ${SMS_REAL_SEND_ENABLED:-false}
+      SMS_PILOT_LOOKUP_KEY: ${SMS_PILOT_LOOKUP_KEY:-}
     command: [npx, prisma, migrate, deploy]
     restart: "no"
     depends_on:

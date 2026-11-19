@@ -21,6 +21,7 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:browser": "cross-env TEST_PRODUCTION_BUILD=true tsx scripts/browser-integration.ts",
+    "sms:mcp": "tsx scripts/sms-mcp.ts",
     "nodes:dump": "npx tsx src/lib/nodes-dump.ts",
     "grant:gb": "npx tsx src/lib/grant-gb.ts"
   },
@@ -59,6 +60,7 @@
     "eslint-config-next": "16.2.10"
   },
   "devDependencies": {
+    "@modelcontextprotocol/sdk": "1.29.0",
     "@playwright/test": "^1.61.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",

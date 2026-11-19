@@ -2,21 +2,13 @@
 
 O beta de SMS tem admissão separada do HiveMiner. Administradores têm acesso pela função administrativa. Para liberar uma conta de cliente, abrir **Administração → Usuários**, editar a conta e selecionar **Liberar SMS**. O mesmo local oferece **Revogar SMS**. A alteração fica na auditoria. Novas contas começam sem acesso.
 
-O acesso é consultado no servidor. A página e a API verificam a sessão, e cada operação da API confirma a permissão de novo dentro da transação. Uma sessão de aparelho não pode usar a interface de pessoa. Revogação bloqueia a próxima operação mesmo com sessão aberta e cancela simulações em fila da conta. O histórico pertence à conta que criou cada teste, inclusive para administradores que usem o beta.
+O acesso é consultado no servidor. A página e a API verificam a sessão, e cada operação confirma a permissão de novo dentro da transação. Uma sessão de Proxy ou Miner não é válida no SMS. Revogação bloqueia novas operações, revoga a chave e o aparelho SMS do cliente e cancela os envios pendentes. Eventos de tentativa já iniciada ainda podem ser conciliados.
 
-## Primeiro fluxo disponível no código
+## Envio por chip
 
-Após aplicar a migração, pessoas admitidas têm **SMS Beta** no painel. O ambiente usa uma fila persistente de simulações. É possível criar um teste com número fictício, cancelar o pendente ou simular entrega, envio sem recibo, falha ou resultado desconhecido. O servidor guarda destino mascarado e fingerprint do pedido. O texto de teste não é armazenado. O histórico de simulação é limitado aos últimos 30 dias e 50 registros por consulta. O worker faz a remoção dos dados vencidos.
+Participantes admitidos pareiam o app Android em **SMS Beta**, escolhem uma linha ativa no aparelho e solicitam a revisão de um destino de teste próprio. Administradores aprovam a linha depois de revisar a permissão da operadora. O envio usa `SmsManager` para aquela assinatura móvel. O servidor apaga o conteúdo cifrado quando emite a autorização e mantém registros mascarados por 30 dias. O painel permite cancelar enquanto a mensagem ainda está em fila.
 
-API de simulação `/api/sms/beta/messages`.
-
-| Método | Operação |
-|---|---|
-| GET | Lista o histórico da própria conta |
-| POST | Cria teste com `destination`, `text` e `scenario`. Requer `Idempotency-Key` entre 16 e 128 caracteres |
-| PATCH | Recebe `id` e `action` igual a `simulate` ou `cancel` |
-
-`scenario` aceita `DELIVERED`, `SENT`, `FAILED` e `UNKNOWN`. A API aceita sessão web ou bearer da mesma sessão. Rotas mutáveis em navegador conferem `Origin` com `NEXT_PUBLIC_APP_URL`. Status 401 indica ausência de sessão, 404 cobre conta sem beta ou recurso fora dela e 409 cobre conflito de chave ou estado. O caminho de simulação é separado dos contratos planejados de envio real.
+O roteiro físico, a API do piloto e as responsabilidades de ativação estão em [Piloto com chip real](17-piloto-real.md).
 
 ## Aceite do beta com envio real
 
@@ -26,6 +18,6 @@ API de simulação `/api/sms/beta/messages`.
 
 ## Verificação local
 
-Aplicar `npm run db:migrate:deploy` ao PostgreSQL isolado conforme o [plano de testes](11-testes.md) e executar `npm run test:integration` em `web`. A integração verifica administrador, cliente comum, cliente autorizado, token de aparelho, isolamento, idempotência, revogação na sessão existente e auditoria. A homologação de modem continua dependendo de APK, telefone e linha reais.
+Aplicar `npm run db:migrate:deploy` ao PostgreSQL isolado conforme o [plano de testes](11-testes.md) e executar `npm run test:integration` em `web`. A integração verifica administrador, cliente comum, cliente autorizado, credenciais de chave e aparelho, aprovação de linha, isolamento, idempotência, concessão única de autorização, reconciliação, revogação e auditoria. A homologação de modem depende do APK instalado, do telefone e da linha real.
 
-Com o Chromium do Playwright instalado, em `web`, executar `npx tsx scripts/browser-integration.ts --sms-beta-only` para verificar liberação, simulação e revogação no navegador.
+Com o Chromium do Playwright instalado, em `web`, executar `npx tsx scripts/browser-integration.ts --sms-beta-only` para verificar liberação, código de vínculo e revogação no navegador.

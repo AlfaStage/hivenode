@@ -5,6 +5,7 @@ import { apiError, apiSuccess, handleApiError } from "@/lib/api-utils";
 import { brokerCommand } from "@/lib/broker";
 import { z } from "zod";
 import { isSmsBetaSameOrigin } from "@/lib/sms-beta-origin";
+import { cancelPending } from "@/lib/sms-pilot";
 
 export async function PATCH(
   request: Request,
@@ -27,6 +28,10 @@ export async function PATCH(
           action: smsBetaAccess ? "sms_beta.grant" : "sms_beta.revoke" } });
         if (!smsBetaAccess && user.role !== "ADMIN") {
           await tx.smsBetaMessage.updateMany({ where: { userId: id, state: "QUEUED" }, data: { state: "CANCELED" } });
+          await cancelPending(tx, id);
+          await tx.smsPilotPair.deleteMany({ where: { userId: id } });
+          await tx.smsPilotKey.updateMany({ where: { userId: id, revokedAt: null }, data: { revokedAt: new Date() } });
+          await tx.smsPilotDevice.updateMany({ where: { userId: id, revokedAt: null }, data: { revokedAt: new Date() } });
         }
         return apiSuccess({ smsBetaAccess });
       });

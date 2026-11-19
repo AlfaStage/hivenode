@@ -104,7 +104,9 @@ async function main() {
     check("administrative mutation endpoints preserve HTTP authorization semantics");
     const admin = await prisma.user.create({ data: { email: `${run}-admin@example.com`, passwordHash: await hashPassword(password), role: "ADMIN" } });
     const login = await request("/api/auth/login", "POST", { email: admin.email, password });
-    const sms = "/api/sms/beta/messages";
+    const pilot = "/api/sms/pilot";
+    const sms = pilot + "/messages";
+    const agent = "/api/sms/agent";
     const adminUser = `/api/admin/users/${a.user.id}`;
     await request(sms, "GET", undefined, undefined, 401);
     await request(sms, "GET", undefined, a.token, 404);
@@ -116,30 +118,89 @@ async function main() {
     await request(sms, "GET", undefined, deviceToken, 404);
     check("SMS beta grants require an admin and never elevate device tokens");
 
-    const smsPayload = { destination: "+5511999999999", text: "Conteúdo fictício", scenario: "UNKNOWN" };
+    const pair = await request(pilot, "POST", { action: "pair" }, a.token, 201);
+    const node = await request(agent, "POST", { action: "pair", code: pair.code, label: "Integração HTTP SMS" }, undefined, 201);
+    await request(agent, "POST", { action: "pair", code: pair.code, label: "Segundo aparelho" }, undefined, 404);
+    await request(sms, "GET", undefined, node.token, 401);
+    const bindingId = randomUUID();
+    const secondBinding = randomUUID();
+    const consentVersion = "pilot-br-1";
+    const status = { action: "poll", bindings: [
+      { id: bindingId, slot: 0, label: "Linha de teste 1" }, { id: secondBinding, slot: 1, label: "Linha de teste 2" },
+    ], activeBinding: bindingId, consentVersion };
+    const smsPayload = { deviceId: node.id, destination: "+5511999999999", text: "Integração isolada sem modem" };
+    await request(sms, "POST", smsPayload, a.token, 403, { "Idempotency-Key": randomUUID() });
+    await request(agent, "POST", status, node.token);
+    const approval = { action: "request-approval", deviceId: node.id, bindingId, destination: smsPayload.destination,
+      verifiedByOwner: true, consentVersion };
+    await request(pilot, "POST", { ...approval, bindingId: secondBinding }, a.token, 409);
+    await request(pilot, "POST", approval, a.token, 201);
+    const review = await request(pilot + "/admin", "GET", undefined, login.token);
+    const currentReview = review.pending.find((item: { id: string }) => item.id === node.id);
+    const approve = { action: "approve", deviceId: node.id, bindingId, carrierReviewed: true, approvalToken: currentReview.approvalToken };
+    await request(pilot + "/admin", "POST", approve, a.token, 403);
+    await request(pilot + "/admin", "POST", { ...approve, carrierReviewed: false }, login.token, 400);
+    await request(pilot + "/admin", "POST", { ...approve, approvalToken: "00".repeat(32) }, login.token, 409);
+    await request(pilot + "/admin", "POST", approve, login.token);
+    await request(sms, "POST", { ...smsPayload, destination: "+5511888888888" }, a.token, 403, { "Idempotency-Key": randomUUID() });
+    check("SMS agent credentials are separate and approval fixes one selected SIM and a reviewed destination");
+
+    const apiKey = await request(pilot, "POST", { action: "issue-key" }, a.token, 201);
+    await request(pilot, "POST", { action: "pair" }, apiKey.token, 401);
     const smsHeaders = { "Idempotency-Key": randomUUID() };
     const queued = await request(sms, "POST", smsPayload, a.token, 202, smsHeaders);
-    const replay = await request(sms, "POST", smsPayload, a.token, 200, smsHeaders);
+    const replay = await request(sms, "POST", smsPayload, apiKey.token, 200, smsHeaders);
     assert.equal(replay.message.id, queued.message.id);
-    assert.equal(queued.message.maskedDestination, "•••• 9999");
+    assert.equal(queued.message.maskedDestination, "+55 •••• 9999");
     assert(!JSON.stringify(queued).includes(smsPayload.text));
     await request(sms, "POST", { ...smsPayload, text: "Alteração" }, a.token, 409, smsHeaders);
     await request(`/api/admin/users/${b.user.id}`, "PATCH", { smsBetaAccess: true }, login.token);
     assert.deepEqual((await request(sms, "GET", undefined, b.token)).messages, []);
-    await request(sms, "PATCH", { id: queued.message.id, action: "simulate" }, b.token, 404);
-    const outcome = await request(sms, "PATCH", { id: queued.message.id, action: "simulate" }, a.token);
-    assert.equal(outcome.message.state, "UNKNOWN");
+    await request(sms, "PATCH", { id: queued.message.id, action: "cancel" }, b.token, 404);
+    assert.equal((await request(agent, "POST", { ...status, activeBinding: secondBinding }, node.token)).grant, null);
+    const attempts = await Promise.all(Array.from({ length: 3 }, () => request(agent, "POST", status, node.token)));
+    const grants = attempts.flatMap(attempt => attempt.grant ? [attempt.grant] : []);
+    assert.equal(grants.length, 1);
+    const [grant] = grants;
+    assert.equal(grant.signature, createHmac("sha256", node.token).update("hivenode-sms-grant-v1." + grant.payload).digest("hex"));
+    assert.equal(JSON.parse(Buffer.from(grant.payload, "base64url").toString()).bindingId, bindingId);
+    assert.equal((await prisma.smsPilotMessage.findUnique({ where: { id: queued.message.id } }))?.encryptedPayload, null);
     await request(sms, "PATCH", { id: queued.message.id, action: "cancel" }, a.token, 409);
-    check("SMS queue isolates accounts, deduplicates requests and records simulated outcomes");
+    check("SMS queue isolates accounts, deduplicates requests and issues exactly one signed grant");
+
+    await prisma.smsPilotMessage.update({ where: { id: queued.message.id }, data: { grantExpiresAt: new Date(Date.now() - 121_000) } });
+    const timedOut = await request(sms + "?id=" + queued.message.id, "GET", undefined, apiKey.token);
+    assert.equal(timedOut.message.state, "UNKNOWN");
+    assert.equal((await request(agent, "POST", status, node.token)).grant, null);
+    const event = { action: "event", messageId: queued.message.id, version: 1, total: 1,
+      sent: 1, delivered: 0, failed: 0, code: null };
+    await request(agent, "POST", event, node.token);
+    await request(agent, "POST", event, node.token);
+    assert.equal((await request(sms + "?id=" + queued.message.id, "GET", undefined, apiKey.token)).message.state, "SENT");
+    await request(agent, "POST", { ...event, version: 2, delivered: 1 }, node.token);
+    assert.equal((await request(sms + "?id=" + queued.message.id, "GET", undefined, apiKey.token)).message.state, "DELIVERED");
+    check("SMS receipt protocol reconciles ambiguous timeouts without retrying a modem invocation");
+
+    const beforeSwap = await request(sms, "POST", smsPayload, a.token, 202, { "Idempotency-Key": randomUUID() });
+    const afterSwap = { ...status, bindings: [status.bindings[1]], activeBinding: secondBinding };
+    assert.equal((await request(agent, "POST", afterSwap, node.token)).grant, null);
+    assert.equal((await request(sms + "?id=" + beforeSwap.message.id, "GET", undefined, a.token)).message.state, "CANCELED");
+    await request(sms, "POST", smsPayload, a.token, 403, { "Idempotency-Key": randomUUID() });
+    await request(pilot, "POST", { ...approval, bindingId: secondBinding }, a.token, 201);
+    const replacementReview = (await request(pilot + "/admin", "GET", undefined, login.token)).pending
+      .find((item: { id: string }) => item.id === node.id);
+    await request(pilot + "/admin", "POST", { ...approve, bindingId: secondBinding, approvalToken: replacementReview.approvalToken }, login.token);
+    check("SMS SIM removal cancels the queue and requires renewed review for the replacement");
 
     const pending = await request(sms, "POST", smsPayload, a.token, 202, { "Idempotency-Key": randomUUID() });
     await request(adminUser, "PATCH", { smsBetaAccess: false }, login.token);
-    await request(sms, "PATCH", { id: pending.message.id, action: "simulate" }, a.token, 404);
+    await request(agent, "POST", status, node.token, 403);
     await request(sms, "GET", undefined, a.token, 404);
-    assert.equal((await prisma.smsBetaMessage.findUnique({ where: { id: pending.message.id } }))?.state, "CANCELED");
+    await request(sms, "GET", undefined, apiKey.token, 401);
+    assert.equal((await prisma.smsPilotMessage.findUnique({ where: { id: pending.message.id } }))?.state, "CANCELED");
     assert.deepEqual((await prisma.auditLog.findMany({ where: { actorId: admin.id, targetId: a.user.id, action: { startsWith: "sms_beta." } }, orderBy: { createdAt: "asc" } })).map(event => event.action),
       ["sms_beta.grant", "sms_beta.revoke"]);
-    check("SMS revocation takes effect on the existing session and cancels pending simulations with audit");
+    check("SMS revocation cancels the pending queue and revokes agent and API credentials with audit");
     const plan = await prisma.plan.create({ data: { slug: `${run}-private`, name: "Local test fleet", category: "PRIVATE_FLEET", maxDevices: 2, maxProxies: 4, priceInCents: 1000, isRecurring: true } });
     for (const user of [a.user, b.user]) await prisma.subscription.create({ data: { userId: user.id, planId: plan.id, planType: "STARTER", planCategory: "PRIVATE_FLEET", currentPeriodEnd: new Date(Date.now() + 86400000) } });
     const pairing = await request("/api/auth/device-code/generate", "POST", { type: "miner" });

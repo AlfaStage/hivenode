@@ -27,6 +27,9 @@ model User {
   minerBetaAccess  Boolean        @default(false)
   smsBetaAccess    Boolean        @default(false)
   smsBetaMessages  SmsBetaMessage[]
+  smsPilotDevices  SmsPilotDevice[]
+  smsPilotPairs    SmsPilotPair[]
+  smsPilotKeys     SmsPilotKey[]
   betaApplication  BetaApplication?
   
   // Integração Web3 & Tokenomics
@@ -70,6 +73,93 @@ model SmsBetaMessage {
   @@index([userId, createdAt, id])
   @@index([createdAt])
   @@map("sms_beta_messages")
+}
+
+model SmsPilotPair {
+  codeHash  String   @id
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sms_pilot_pairs")
+}
+
+model SmsPilotDevice {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label          String
+  tokenHash      String   @unique
+  revokedAt      DateTime?
+  lastSeenAt     DateTime?
+  bindings       Json     @default("[]")
+  consentVersion String?
+  selectedBinding String?
+  approvedBinding String?
+  pendingBinding  String?
+  destinationHash String?
+  destinationMask String?
+  approvedAt      DateTime?
+  createdAt       DateTime @default(now())
+  messages        SmsPilotMessage[]
+
+  @@index([userId, revokedAt])
+  @@map("sms_pilot_devices")
+}
+
+model SmsPilotKey {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  createdAt DateTime @default(now())
+  revokedAt DateTime?
+
+  @@index([userId, revokedAt])
+  @@map("sms_pilot_keys")
+}
+
+model SmsPilotMessage {
+  id               String        @id @default(uuid())
+  deviceId         String
+  device           SmsPilotDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  userId           String
+  bindingId        String
+  idempotencyKey   String
+  fingerprint      String
+  maskedDestination String
+  encryptedPayload String?
+  state            SmsPilotState @default(QUEUED)
+  expiresAt        DateTime
+  grantExpiresAt   DateTime?
+  eventVersion     Int           @default(0)
+  sentParts        Int           @default(0)
+  deliveredParts   Int           @default(0)
+  failedParts      Int           @default(0)
+  totalParts       Int           @default(0)
+  errorCode        String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  @@unique([userId, idempotencyKey])
+  @@index([userId, createdAt])
+  @@index([deviceId, state, createdAt])
+  @@index([state, expiresAt])
+  @@map("sms_pilot_messages")
+}
+
+enum SmsPilotState {
+  QUEUED
+  AUTHORIZED
+  SENT
+  DELIVERED
+  FAILED
+  PARTIAL
+  UNKNOWN
+  CANCELED
+  EXPIRED
 }
 
 enum SmsBetaScenario {
