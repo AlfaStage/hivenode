@@ -42,9 +42,6 @@ export async function checkBrowser(base: string, email: string, otherEmail: stri
     const page = await login(email);
     const other = await login(otherEmail);
     await other.setViewportSize({ width: 390, height: 844 });
-    await expectMinerHidden(page);
-    await expectMinerHidden(other);
-
     const admin = await browser.newContext();
     await admin.addCookies([{ name: "hivenode-token", value: adminToken, url: base }]);
     const adminPage = await admin.newPage();
@@ -52,8 +49,37 @@ export async function checkBrowser(base: string, email: string, otherEmail: stri
     adminPage.setDefaultTimeout(60000);
     await adminPage.goto(base + "/dashboard/admin/users");
     await adminPage.getByRole("button", { name: `Editar ${email}`, exact: true }).click();
+    async function checkSmsBeta() {
+      const smsPath = base + "/dashboard/sms";
+      await expect(page.locator("a[href='/dashboard/sms']")).toHaveCount(0);
+      assert.equal((await page.goto(smsPath, { waitUntil: "domcontentloaded" }))?.status(), 404);
+      await adminPage.getByRole("button", { name: "Liberar SMS", exact: true }).click();
+      await expect(adminPage.getByRole("button", { name: "Revogar SMS", exact: true })).toBeVisible({ timeout: 15000 });
+      await page.goto(smsPath, { waitUntil: "domcontentloaded" });
+      await expect(page.getByRole("heading", { name: "HiveNode SMS Beta" })).toBeVisible();
+      await page.getByLabel("Destino fictício").fill("+5511999999999");
+      await page.getByLabel("Mensagem de teste").fill("Fluxo de simulação do navegador");
+      await page.getByLabel("Resultado simulado").selectOption("UNKNOWN");
+      await page.getByRole("button", { name: "Colocar na fila de testes" }).click();
+      await page.getByRole("button", { name: "Simular resultado desconhecido" }).click();
+      await expect(page.getByText("Resultado desconhecido", { exact: true }).last()).toBeVisible();
+      assert.equal((await other.goto(smsPath, { waitUntil: "domcontentloaded" }))?.status(), 404);
+      await adminPage.getByRole("button", { name: "Revogar SMS", exact: true }).click();
+      await expect(adminPage.getByRole("button", { name: "Liberar SMS", exact: true })).toBeVisible({ timeout: 15000 });
+      assert.equal((await page.reload({ waitUntil: "domcontentloaded" }))?.status(), 404);
+      console.log("Browser: SMS admission, simulation and revocation checked");
+    }
+
+    if (process.argv.includes("--sms-beta-only")) {
+      await checkSmsBeta();
+      assert.deepEqual(errors, [], "browser runtime errors");
+      return;
+    }
+
+    await expectMinerHidden(page);
+    await expectMinerHidden(other);
     await adminPage.getByRole("button", { name: "Liberar acesso", exact: true }).click();
-    await expect(adminPage.getByText("Acesso liberado", { exact: true })).toBeVisible();
+    await expect(adminPage.getByText("Acesso liberado", { exact: true })).toBeVisible({ timeout: 15000 });
 
     await page.goto(base + "/dashboard");
     await expect(page.getByRole("link", { name: "HiveMiner", exact: true })).toBeVisible();
@@ -71,10 +97,12 @@ export async function checkBrowser(base: string, email: string, otherEmail: stri
     await expectMinerHidden(other);
     const { data: { linkToken } } = await page.evaluate(async () => (await fetch("/api/auth/qr-link?type=miner")).json());
     await adminPage.getByRole("button", { name: "Revogar acesso", exact: true }).click();
-    await expect(adminPage.getByText("Acesso desativado", { exact: true })).toBeVisible();
+    await expect(adminPage.getByText("Acesso desativado", { exact: true })).toBeVisible({ timeout: 15000 });
     await expectMinerHidden(page);
     assert.equal((await page.request.post(base + "/api/auth/qr-login", { data: { linkToken } })).status(), 404);
     console.log("Browser: Miner hidden by default, grant isolated to the selected account, and revocation enforced");
+
+    await checkSmsBeta();
 
     await page.goto(base + "/beta");
     await expect(page.getByText(email, { exact: true })).toBeVisible();

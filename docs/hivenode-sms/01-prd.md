@@ -8,7 +8,20 @@ O HiveNode vende gestão e infraestrutura de software. O cliente contrata e paga
 
 Públicos: pessoas físicas, pequenas empresas, desenvolvedores, agências e empresas. Agências acessam contas separadas dos seus clientes por convite; nunca usam um pool de chips compartilhado entre essas contas. Suporte dedicado e necessidades fora dos limites publicados exigem orçamento.
 
-## Escopo do lançamento
+## Escopo por etapa
+
+| Etapa | Entrega e critério de avanço |
+|---|---|
+| Viabilidade | Provar instalação e concessão de SMS no canal previsto, primeiro envio controlado em linha elegível e um ciclo de cobrança no sandbox. Preparar o simulador em paralelo. |
+| Piloto assistido | Beta fechado para administradores e contas liberadas por um administrador. Empresas convidadas com uso transacional, um proprietário, um Android principal e SIM selecionado. Pareamento SMS-only, inventário, envio individual pelo painel e API, consulta, cancelamento pendente, pausa e diagnóstico. Destinos previamente aprovados para o piloto. |
+| Piloto pago | Após homologar o envio e pagamentos, ativar o plano Inicial com um meio mensal, ciclo pago e cancelamento de renovação. O usuário pode testar gratuitamente após confirmação de prontidão. |
+| Expansão | Equipes compartilhadas, migração de proxy, demais planos, agendamento, modelos, lotes, webhooks, exportação, MCP local, marketing e Light entram em entregas próprias. MCP remoto tem validação independente. |
+
+O piloto usa sessão de envio visível iniciada no aparelho. A disponibilidade e a latência anunciadas derivam da homologação. A primeira ativação conclui diagnóstico gratuito e comprovação da linha antes do período de teste ou da cobrança. A entrega completa preserva os requisitos abaixo.
+
+Beta fechado controla acesso, sem reduzir a entrega aprovada. Administradores e testadores autorizados terão os recursos da versão que já passaram por homologação dentro do beta. Manter cada capacidade nova em teste interno até passar seus critérios. Administrador pode testar com recursos da própria conta. Para acessar recursos de outra conta, valem as mesmas regras de isolamento. Durante o beta, criação de conta, liberação do Miner ou compra de plano nunca concedem acesso ao SMS por consequência. A configuração operacional de acesso está em [Beta privado](16-beta-privado.md).
+
+## Escopo do produto completo
 
 - Equipes, convites, papéis e autorização por serviço/recurso em toda a plataforma.
 - Migração compatível das contas individuais e do proxy atual.
@@ -36,7 +49,7 @@ Não inclui: gateway automático iOS, leitura geral da caixa de entrada, respost
 | R07 | Envio simples e idempotente | Repetir chave/corpo retorna mesma mensagem; mesma chave/corpo diferente resulta 409 |
 | R08 | Lote e agenda | Cada destinatário tem ID/estado próprio; agenda conserva instante UTC e fuso de apresentação |
 | R09 | Estados verdadeiros | Enviado, entregue, parcialmente enviado e desconhecido são distintos; ausência de recibo não vira falha |
-| R10 | Recuperação segura | Queda após início não reenvia sozinha; retry exige evidência de nenhum segmento aceito |
+| R10 | Recuperação segura | Retry automático exige prova de que a chamada ao Android não ocorreu. Resultado incerto fica bloqueado contra reenvio automático |
 | R11 | Diagnóstico | Exibe código bruto seguro, categoria, certeza e próxima ação; hipótese não é fato |
 | R12 | Painel acessível | Usuário acompanha, filtra, cancela pendentes, pausa e exporta somente dados autorizados |
 | R13 | API e credenciais | Chaves têm conta fixa, escopos, recursos, criador, revogação e segredo exibido uma única vez |
@@ -56,7 +69,7 @@ Segurança: negar acesso por padrão, isolamento por conta em todas as consultas
 
 Consistência: banco é fonte de verdade; filas podem perder/repetir notificações sem perder mensagens persistidas. Não prometer exatamente um envio físico em todas as falhas.
 
-Metas iniciais de engenharia, não SLA comercial: em staging com simulador, 10 requisições/s por conta durante 10 minutos, p95 de aceite <1 s, sem vazamento entre contas e sem criação duplicada para chaves repetidas. Medir ambiente, número de destinatários e tamanho do payload. Velocidade de modem não é essa meta.
+Meta de engenharia em staging com simulador: 10 escritas/s agregadas durante 10 minutos, p95 de aceite <1 s. Distribuir 60/min em cada uma de 10 contas e 10/min em cada uma de seis chaves por conta, uniformemente, respeitando as janelas de limite. Medir 429 em teste separado. Registrar tamanho do payload, duplicações e isolamento. Medir latência do modem e consultas ociosas do agente separadamente.
 
 Disponibilidade: SMS não depende de assinatura proxy; pode manter controle sem túnel proxy. Se banco, autorização ou conformidade não puderem ser verificados, bloquear novas autorizações de envio.
 
@@ -64,14 +77,16 @@ UX: português brasileiro, teclado e leitores de tela, erros com ação, número
 
 ## Jornadas principais
 
-1. Proprietário cria conta/aceita termos, contrata/testa, habilita aparelho, seleciona linha, fornece condições contratuais e autoriza localmente.
+1. Proprietário cria conta, aceita os termos e pareia por QR. Confirma o chip localmente e informa condições contratuais para revisão. Depois da aprovação e teste controlado, ativa o teste gratuito ou contrata.
 2. Operador autorizado envia para número próprio de teste; recebe ID e acompanha as evidências de envio e entrega.
 3. Desenvolvedor cria chave restrita, solicita envio e consulta resultado/webhook; uma segunda chamada idêntica não duplica.
 4. Administrador convida membro somente SMS; esse membro não visualiza credenciais proxy nem cobrança.
 5. Aparelho fica offline; fila aguarda dentro da validade. Após envio iniciado e desconexão, conciliação substitui retry cego.
 6. Cliente cancela SMS: mantém período pago, depois novos envios param; proxy permanece conforme sua própria assinatura.
 
-## Definition of Done do produto
+## Aceite do piloto e do produto completo
+
+O piloto exige HNS-34 e seus pré-requisitos. O Light e a migração de proxy possuem aceites independentes. O teste físico registra build, instalador, aparelho, Android, SIM e linha, sem data presumida. O piloto pago também exige evidência do pagamento, do cancelamento e da validade paga.
 
 - R01–R22 possuem evidências de aceite ou dependência de gate físico explicitamente pendente.
 - Migração e rollback ensaiados com dados representativos e backup restaurado.

@@ -47,13 +47,13 @@ const testPlan = read('11-testes.md');
 const requirementIds = [...new Set([...prd.matchAll(/\| (R\d{2}) \|/g)].map(m => m[1]))];
 const testIds = [...new Set([...testPlan.matchAll(/\| (T\d{2}) \|/g)].map(m => m[1]))];
 const byId = new Map(issues.map(issue => [issue.id, issue]));
-check('34 issues únicas', () => {
-  assert.equal(issues.length, 34);
-  assert.equal(byId.size, 34);
+check('38 issues únicas', () => {
+  assert.equal(issues.length, 38);
+  assert.equal(byId.size, 38);
 });
-check('22 requisitos e 54 casos de teste', () => {
+check('22 requisitos e 61 casos de teste', () => {
   assert.equal(requirementIds.length, 22);
-  assert.equal(testIds.length, 54);
+  assert.equal(testIds.length, 61);
 });
 for (const issue of issues) {
   check(`Issue ${issue.id}`, () => {
@@ -82,6 +82,15 @@ check('Grafo de dependências sem ciclos', () => {
     done.add(id);
   }
   for (const id of byId.keys()) visit(id);
+});
+check('Fases respeitam dependências e Light é independente', () => {
+  const phases = ['VIABILIDADE', 'FLUXO_VERTICAL', 'PILOTO_ASSISTIDO', 'PILOTO_PAGO', 'EXPANSAO'];
+  for (const issue of issues) {
+    assert(phases.includes(issue.phase), issue.id);
+    for (const id of issue.dependencies) assert(phases.indexOf(byId.get(id).phase) <= phases.indexOf(issue.phase), `${issue.id} depende de fase futura ${id}`);
+  }
+  assert(byId.get('HNS-36').dependencies.includes('HNS-25'));
+  assert.deepEqual(byId.get('HNS-35').dependencies, []);
 });
 check('Requisitos cobertos por issues e testes', () => {
   for (const id of requirementIds) {
@@ -123,7 +132,17 @@ check('OpenAPI estrutura e refs internos', () => {
       }
     }
   }
-  assert.equal(operations.size, 52);
+  assert.equal(operations.size, 61);
+});
+check('Autorização humana, bootstrap do aparelho e replay explícitos', () => {
+  const operations = new Map(Object.values(api.paths).flatMap(methods => Object.values(methods)).map(op => [op.operationId, op]));
+  for (const name of ['acceptSmsTerms', 'decideSmsPolicy', 'transferOwnership', 'changeBilling', 'cancelBilling']) {
+    assert.deepEqual(operations.get(name).security, [{sessionCookie: []}], name);
+    assert.equal(operations.get(name)['x-hivenode-recent-auth-seconds'], 300, name);
+  }
+  assert.deepEqual(operations.get('redeemSmsEnrollment').security, []);
+  assert.deepEqual(operations.get('setSmsPresence').security, [{deviceSignature: []}]);
+  assert(Object.hasOwn(operations.get('sendSms').responses['200'].headers, 'Idempotency-Replayed'));
 });
 const graph = json('contracts/sms-state-machine.json');
 check('Estados alinhados ao OpenAPI e invariantes de execução', () => {
@@ -137,6 +156,8 @@ check('Estados alinhados ao OpenAPI e invariantes de execução', () => {
   }
   assert(!graph.transitions.UNKNOWN.includes('QUEUED'));
   assert(!graph.transitions.PARTIAL.includes('QUEUED'));
+  assert(graph.transitions.LEASED.includes('SUPPRESSED'));
+  assert.equal(graph.limits.maxPhysicalAttempts, 1);
 });
 check('Cenários simulados válidos, sem modem real', () => {
   const scenarios = json('contracts/simulator-scenarios.json').scenarios;
@@ -149,6 +170,7 @@ check('Cenários simulados válidos, sem modem real', () => {
   }
   assert.equal(scenarios.find(s => s.id === 'crash_after_modem').expectedFakeModemCalls, 1);
   assert.equal(scenarios.find(s => s.id === 'crash_after_modem').expectedState, 'UNKNOWN');
+  assert(scenarios.every(s => s.expectedFakeModemCalls <= graph.limits.maxPhysicalAttempts));
 });
 check('Gates físicos e produto não são declarados prontos', () => {
   const status = json('validation-status.json');

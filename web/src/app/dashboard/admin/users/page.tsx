@@ -58,19 +58,19 @@ export default function AdminUsersPage() {
           });
   };
 
-  async function toggleMinerBetaAccess(user: AdminUser) {
+  async function toggleBetaAccess(user: AdminUser, field: "minerBetaAccess" | "smsBetaAccess") {
     setSavingBetaAccess(true);
     setBetaError("");
     try {
       const response = await fetch(`/api/admin/users/${user.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ minerBetaAccess: !user.minerBetaAccess }),
+        body: JSON.stringify({ [field]: !user[field] }),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error);
       setEditingUser(current => current?.id === user.id
-        ? { ...current, minerBetaAccess: result.data.minerBetaAccess }
+        ? { ...current, [field]: result.data[field] }
         : current);
       await fetchUsers();
     } catch (error) {
@@ -277,11 +277,24 @@ export default function AdminUsersPage() {
                   </p>
                 </div>
                 <Button type="button" variant="outline" size="sm" disabled={savingBetaAccess || saving}
-                  onClick={() => void toggleMinerBetaAccess(editingUser)}>
+                  onClick={() => void toggleBetaAccess(editingUser, "minerBetaAccess")}>
                   {editingUser.minerBetaAccess ? "Revogar acesso" : "Liberar acesso"}
                 </Button>
-                {betaError && <p className="w-full text-sm text-destructive" role="alert">{betaError}</p>}
               </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3">
+                <div>
+                  <p className="text-sm font-semibold">Beta do HiveNode SMS</p>
+                  <p className="text-xs text-muted-foreground" role="status">
+                    {editingUser.role === "ADMIN" ? "Acesso de administrador" : editingUser.smsBetaAccess ? "SMS liberado" : "SMS desativado"}
+                  </p>
+                </div>
+                {editingUser.role !== "ADMIN" && <Button type="button" variant="outline" size="sm"
+                  disabled={savingBetaAccess || saving} onClick={() => void toggleBetaAccess(editingUser, "smsBetaAccess")}>
+                  {editingUser.smsBetaAccess ? "Revogar SMS" : "Liberar SMS"}
+                </Button>}
+              </div>
+              {betaError && <p className="text-sm text-destructive" role="alert">{betaError}</p>}
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">

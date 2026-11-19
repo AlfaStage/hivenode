@@ -1,28 +1,28 @@
 # HNS-03 — Preparar harness isolado, fixtures e simulador SMS
 
-Prioridade: P0 • Situação: TODO • Responsável sugerido: Backend/QA
+Prioridade P0 · TODO · Fase VIABILIDADE · Responsável sugerido Backend/QA
 
 ## Contexto e objetivo
 
-Implementar esta parte do HiveNode SMS/equipes conforme as especificações vinculadas. Este arquivo é uma issue local pronta para importar; não foi publicado em tracker externo. Não confundir TODO com funcionalidade existente.
+Entregar esta parte conforme o [PRD](../01-prd.md) e a [sequência de execução](../12-entrega-operacao.md).
 
 ## Dependências
 
-- Sem dependência de código novo; usar a baseline documental e preservar alterações existentes.
+- Pode iniciar com a documentação e o ambiente de teste.
 
 ## Requisitos e leitura obrigatória
 
-Requisitos: R20, R21. Ver [PRD](../01-prd.md).
+R20, R21
 
 - [11-testes.md](../11-testes.md)
 - [07-fila-protocolo.md](../07-fila-protocolo.md)
 
 ## Onde trabalhar
 
-- `docker-compose.test.yml` (conferir existência; caminhos de módulos novos são alvos A CRIAR).
-- `web/scripts/test-env.ts` (conferir existência; caminhos de módulos novos são alvos A CRIAR).
-- `web/scripts/local-integration.ts` (conferir existência; caminhos de módulos novos são alvos A CRIAR).
-- `web/package.json` (conferir existência; caminhos de módulos novos são alvos A CRIAR).
+- `docker-compose.test.yml`
+- `web/scripts/test-env.ts`
+- `web/scripts/local-integration.ts`
+- `web/package.json`
 
 ## Passos de implementação
 
@@ -36,13 +36,12 @@ Requisitos: R20, R21. Ver [PRD](../01-prd.md).
 - [ ] Simulador recusa APP_ENV=production e toda evidência é SIMULATED.
 - [ ] Execução repete sem contaminar outras fixtures; secrets locais não alcançam produção.
 - [ ] Scripts novos são documentados como existentes somente após commit.
-- [ ] Evidências e limitações anexadas ao PR; revisão das áreas críticas feita pelo responsável.
+- [ ] Evidência, limitações e riscos registrados no PR.
 
 ## Testes e evidências
 
-Executar T20, T24, T25, T27, T42 conforme [plano de testes](../11-testes.md). Para cada caso registrar ambiente, commit/build, entrada, esperado/observado e status. Caso físico ou comercial não disponível fica BLOQUEADO/NAO_EXECUTADO com responsável, nunca PASSOU.
+Executar T20, T24, T25, T27, T42 conforme o [plano de testes](../11-testes.md). Se o caso pertence à expansão ou a aparelho real, registrar a condição e a evidência disponível.
 
 ## Como revisar e entregar
 
-PR pequeno com problema/resultado, critérios de aceite e testes relevantes. Não copiar secrets, contatos reais ou corpo de SMS para logs. Para billing/migração/auth/modem, solicitar revisão experiente. Feature flag desligada e compatibilidade preservada quando gate posterior não estiver concluído. Atualizar o estado desta issue e a matriz de rastreabilidade após revisão.
-
+Referenciar esta issue, anexar os testes e registrar compatibilidade e rollback aplicáveis. Marcar a entrega concluída após revisão e atualizar a fase no backlog.

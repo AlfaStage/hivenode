@@ -4,15 +4,15 @@
 
 O pedido atual entregou documentação e backlog. A implementação começa pelas issues e deve ser revisada em etapas. Não tente implementar todos os arquivos de uma vez nem iniciar pelo botão de envio: migração, autorização e execução segura são pré-requisitos.
 
-Escolha a primeira issue liberada por dependências em [backlog](issues/README.md). HNS-01/HNS-02/HNS-03 podem começar sem schema SMS. Depois HNS-04 → HNS-05 → HNS-06 → HNS-08 → HNS-07. A numeração não substitui o grafo.
+Comece por HNS-01, HNS-02, HNS-03 e HNS-35 no [backlog](issues/README.md). Para o fluxo vertical, siga HNS-04 → HNS-06 → HNS-08/HNS-10 → HNS-11/HNS-13 → HNS-15. Backfill e equipe completa pertencem à expansão.
 
 ## Exemplo de trabalho: HNS-15
 
-1. Confirme que HNS-10/11/13/14 e suas dependências passaram revisão.
+1. Confirme HNS-10/HNS-13 e dependências revisadas.
 2. Leia PRD R06/R07/R08/R13/R17, [API](06-api-mcp.md), [protocolo](07-fila-protocolo.md) e OpenAPI sendSms.
-3. Liste invariantes antes de editar: conta fixa, nó/SIM próprios, membro/chave com permissão, linha elegível, supressão, agenda, idempotência e outbox atômica.
-4. Crie teste de caso negativo primeiro: conta A pede nó B →404, mensagem/outbox zero. Use fixture de test, nunca node real.
-5. Crie teste de duas chamadas paralelas com mesma chave → mesmo ID, uma mensagem, uma outbox. Diferente texto →409 sem segunda intenção.
+3. Liste conta fixa, nó/SIM próprios, ator autorizado, linha elegível, finalidade transacional e idempotência na mesma transação da intenção.
+4. Teste conta A pedindo nó B. Deve retornar 404 com zero mensagens criadas, em ambiente de teste.
+5. Dispare duas chamadas paralelas com a mesma chave. Deve haver um ID e uma mensagem. Alterar o texto deve retornar 409 sem criar outra intenção.
 6. Implemente função de domínio independente do handler HTTP. Handler só autentica, valida contrato, chama a função e transforma resposta.
 7. Não acople criação da mensagem ao modem: a saída 202 é persistência da intenção.
 8. Rode testes específicos, typecheck, lint e integração relevante. Só ampliar testes por nova mudança/risco.

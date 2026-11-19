@@ -11,15 +11,18 @@ Não copiar esta tabela como uma migração automática. Traduzir para Prisma + 
 | MembershipGrant | membershipId, service, permission, nodeId? | grant canônico unique; node da mesma conta |
 | WorkspaceInvitation | id, workspaceId, emailNormalized, tokenHash, expiresAt, status, role, grantsSnapshot | tokenHash unique; convites pendentes por conta/email |
 | DeviceService | nodeId, workspaceId, service, enabled, enabledAt, policyVersion | nodeId+service unique; conta+serviço+enabled |
+| SmsEnrollment | workspaceId, actorId, tokenHash, installationChallenge, expiresAt, consumedAt | tokenHash unique, consumo transacional |
+| SmsInstallation | workspaceId, nodeId, installationEpoch, deviceKeyCiphertext, status, lastSeenAt | node+epoch unique, credencial própria de SMS |
 | SimBinding | id, workspaceId, nodeId, installationEpoch, localBindingId, inventoryVersion, label, carrierName?, slot?, subscriptionId?, status, verifiedNumberCiphertext?, numberLookupHash? | node+epoch+localBindingId unique; conta+status |
-| SimPolicy | id, simBindingId, version, eligible, allowedPurposes, segmentRate, periodCap?, roamingAllowed, evidenceRef?, approvedBy, expiresAt? | sim+version unique; política não é parecer automático |
+| SimPolicy | id, simBindingId, version, status PENDING/APPROVED/REJECTED/REVOKED, allowedPurposes, segmentRate, periodCap?, roamingAllowed, evidenceRef?, decidedBy?, expiresAt? | sim+version unique, decisão auditada |
+| SimConsent | workspaceId, simBindingId, installationEpoch, policyVersion, consentedAt, revokedAt? | revisão+instalação+SIM unique |
 | TermsAcceptance | id, workspaceId, userId, documentVersion, documentHash, acceptedAt, evidenceMetadata | conta+user+version unique |
 | ApiCredential | id, workspaceId, createdByMembershipId, tokenHash, prefix, scopes, allowedNodeIds, expiresAt?, revokedAt? | tokenHash unique; conta+prefix |
 | SmsMessage | id, workspaceId, nodeId, simBindingId, purpose, recipientCiphertext, recipientLookupHash, bodyCiphertext, state, stateVersion, scheduledAt, expiresAt, actorMembershipId?, credentialId?, createdAt, terminalAt?, bodyPurgeAt | conta+createdAt+id; sim+state+scheduledAt |
 | SmsBatch | id, workspaceId, actor, schedule, createdAt | conta+createdAt |
 | SmsBatchItem | batchId, messageId, clientItemId | batch+clientItemId unique; message unique |
 | IdempotencyRecord | workspaceId, operation, keyHash, requestFingerprint, resourceId, createdAt, expiresAt | conta+operação+keyHash unique |
-| SmsAttempt | id, messageId, workspaceId, nodeId, simBindingId, index, state, executionMode REAL/SIMULATED, leaseTokenHash, fencingToken, grantId?, segmentCount?, dispatchStartedAt?, lastEventAt, retrySafe? | message+index unique; grantId unique |
+| SmsAttempt | id, messageId, workspaceId, nodeId, simBindingId, index, state, executionMode REAL/SIMULATED, leaseTokenHash, leaseTokenCiphertext?, leaseExpiresAt, fencingToken, grantId?, policyVersion?, segmentCount?, dispatchStartedAt?, lastEventAt, retrySafe? | message+index unique, grantId unique |
 | SmsSegmentResult | attemptId, segmentIndex, sendState, deliveryState, platformResultCode?, occurredAt | attempt+segmentIndex unique; índice começa em 0 |
 | SmsDeviceEvent | id, workspaceId, nodeId, attemptId?, installationEpoch, eventType, deviceSequence, receivedAt, metadataRedacted | node+epoch+deviceSequence unique; id unique |
 | SmsSuppression | workspaceId, recipientLookupHash, purpose MARKETING, source, createdAt | conta+destinatário+purpose unique |
@@ -33,6 +36,7 @@ Não copiar esta tabela como uma migração automática. Traduzir para Prisma + 
 | SmsTemplate | id, workspaceId, name, version, textCiphertext, purpose, variables, active | conta+name+version unique |
 | SmsExport | id, workspaceId, actorMembershipId, filtersRedacted, includeContent, state, objectRef?, expiresAt | conta+createdAt; storage referência protegida |
 | WorkspaceBillingAccount | workspaceId, providerCustomerId?, balanceGB, ownerBillingContactId | workspace unique; customerId unique quando aplicável |
+| SmsBillingIntent e SmsBillingCharge | conta+serviço, referência local, snapshot, checkoutId, subscriptionId, chargeId, paidThrough, cancelamento, disputa | uma intenção aberta por conta+serviço, chargeId único por ambiente/gateway |
 | Subscription/Payment/AuditLog | adicionar workspaceId, serviço/snapshot/ator conforme contexto | preservar IDs externos únicos e histórico |
 
 `purpose` distingue MARKETING, TRANSACTIONAL e INTERNAL; seleção não torna finalidade lícita. Textos de template também são cifrados e têm limite/tamanho. Número de destino normalizado E.164, hash HMAC com chave própria para lookup; hash simples de telefone facilita enumeração. Não usar ICCID/IMEI como identidade obrigatória nem armazenar identificadores restritos sem necessidade.
@@ -51,6 +55,8 @@ Não copiar esta tabela como uma migração automática. Traduzir para Prisma + 
 10. Nenhuma exclusão de User deve apagar cascata de dados de uma empresa onde existam outros membros. Trocar FKs/cascades com revisão.
 
 ## Migração expand → backfill → transição → contract
+
+No piloto, criar Workspace e OWNER aditivamente para as contas participantes. SMS-owned resources já nascem com `workspaceId` obrigatório. Um nó privado legado pode ser adaptado apenas após conferir titularidade na conta e opt-in. Criar nós SMS-only sem exigir plano proxy ou gerar chave de túnel. A migração de saldo, shares, credenciais e permissões proxy começa na expansão. Manter testes de regressão de frota pública, Miner beta e clientes legados. FKs compostas conferem a combinação exata conta, aparelho e SIM, também nos itens, tentativas, resultados e eventos. Índice parcial limita a um OWNER ativo e transferência/exclusão transacional preserva pelo menos um.
 
 ### A. Preparar
 

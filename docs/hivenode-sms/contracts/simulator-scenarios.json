@@ -1,5 +1,5 @@
 {
-  "version": "1.0.0",
+  "version": "1.1.0",
   "implementationStatus": "PROPOSED_NOT_IMPLEMENTED",
   "scenarios": [
     {
@@ -157,7 +157,7 @@
     },
     {
       "id": "redis_outage",
-      "fault": "outbox commit then Redis outage, recovered",
+      "fault": "Redis indisponível após persistir a pendência; novos grants aguardam verificação e PostgreSQL preserva fila",
       "expectedState": "DELIVERED",
       "expectedFakeModemCalls": 1,
       "tests": [
@@ -187,9 +187,51 @@
     },
     {
       "id": "safe_retry",
-      "fault": "confirmed no segments accepted on first two attempts, third succeeds",
+      "fault": "duas pré-checagens transitórias comprovadas, terceira tentativa chama o modem",
       "expectedState": "DELIVERED",
-      "expectedFakeModemCalls": 3,
+      "expectedFakeModemCalls": 1,
+      "tests": [
+        "T26"
+      ],
+      "realSendAllowed": false
+    },
+    {
+      "id": "suppressed_after_claim",
+      "fault": "descadastro depois do lease e antes do grant",
+      "expectedState": "SUPPRESSED",
+      "expectedFakeModemCalls": 0,
+      "tests": [
+        "T18"
+      ],
+      "realSendAllowed": false
+    },
+    {
+      "id": "db_down_before_event_ack",
+      "fault": "DB fora antes de commit; aparelho conserva e reenvia evento",
+      "expectedState": "SENT",
+      "expectedFakeModemCalls": 1,
+      "tests": [
+        "T41",
+        "T58"
+      ],
+      "realSendAllowed": false
+    },
+    {
+      "id": "unknown_frees_device_slot",
+      "fault": "prazo de conciliação acaba; mensagem incerta permanece sem retry",
+      "expectedState": "UNKNOWN",
+      "expectedFakeModemCalls": 1,
+      "tests": [
+        "T24",
+        "T58"
+      ],
+      "realSendAllowed": false
+    },
+    {
+      "id": "post_invoke_failure",
+      "fault": "erro de envio após chamada ao Android sem nova invocação",
+      "expectedState": "FAILED",
+      "expectedFakeModemCalls": 1,
       "tests": [
         "T26"
       ],

@@ -1,30 +1,30 @@
 # HNS-25 — Modernizar Light e integrar SMS compatível sem perder proxy antigo
 
-Prioridade: P1 • Situação: TODO • Responsável sugerido: Mobile/Go
+Prioridade P1 · TODO · Fase EXPANSAO · Responsável sugerido Mobile/Go
 
 ## Contexto e objetivo
 
-Implementar esta parte do HiveNode SMS/equipes conforme as especificações vinculadas. Este arquivo é uma issue local pronta para importar; não foi publicado em tracker externo. Não confundir TODO com funcionalidade existente.
+Entregar esta parte conforme o [PRD](../01-prd.md) e a [sequência de execução](../12-entrega-operacao.md).
 
 ## Dependências
 
-- [HNS-02](HNS-02.md) concluída e contratos revisados.
-- [HNS-17](HNS-17.md) concluída e contratos revisados.
-- [HNS-18](HNS-18.md) concluída e contratos revisados.
-- [HNS-23](HNS-23.md) concluída e contratos revisados.
+- [HNS-02](HNS-02.md)
+- [HNS-17](HNS-17.md)
+- [HNS-18](HNS-18.md)
+- [HNS-23](HNS-23.md)
 
 ## Requisitos e leitura obrigatória
 
-Requisitos: R05, R18, R22. Ver [PRD](../01-prd.md).
+R05, R18, R22
 
 - [08-android.md](../08-android.md)
 - [03-arquitetura.md](../03-arquitetura.md)
 
 ## Onde trabalhar
 
-- `hivenode-light/android-app` (conferir existência; caminhos de módulos novos são alvos A CRIAR).
-- `hivenode-light/native-go/mobile` (conferir existência; caminhos de módulos novos são alvos A CRIAR).
-- `hivenode-light/native-go/tunnel` (conferir existência; caminhos de módulos novos são alvos A CRIAR).
+- `hivenode-light/android-app`
+- `hivenode-light/native-go/mobile`
+- `hivenode-light/native-go/tunnel`
 
 ## Passos de implementação
 
@@ -38,13 +38,12 @@ Requisitos: R05, R18, R22. Ver [PRD](../01-prd.md).
 - [ ] Não usar hack private dual SIM para API antiga.
 - [ ] Principal e Light convergem em state/protocol.
 - [ ] Light não homologado mantém SMS flag desligada e proxy disponível.
-- [ ] Evidências e limitações anexadas ao PR; revisão das áreas críticas feita pelo responsável.
+- [ ] Evidência, limitações e riscos registrados no PR.
 
 ## Testes e evidências
 
-Executar T30, T44, T49, T50 conforme [plano de testes](../11-testes.md). Para cada caso registrar ambiente, commit/build, entrada, esperado/observado e status. Caso físico ou comercial não disponível fica BLOQUEADO/NAO_EXECUTADO com responsável, nunca PASSOU.
+Executar T30, T44, T49, T50 conforme o [plano de testes](../11-testes.md). Se o caso pertence à expansão ou a aparelho real, registrar a condição e a evidência disponível.
 
 ## Como revisar e entregar
 
-PR pequeno com problema/resultado, critérios de aceite e testes relevantes. Não copiar secrets, contatos reais ou corpo de SMS para logs. Para billing/migração/auth/modem, solicitar revisão experiente. Feature flag desligada e compatibilidade preservada quando gate posterior não estiver concluído. Atualizar o estado desta issue e a matriz de rastreabilidade após revisão.
-
+Referenciar esta issue, anexar os testes e registrar compatibilidade e rollback aplicáveis. Marcar a entrega concluída após revisão e atualizar a fase no backlog.

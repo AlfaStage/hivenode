@@ -1,48 +1,47 @@
 # HNS-18 — Implementar eventos, state machine, diagnóstico e reconciliação
 
-Prioridade: P0 • Situação: TODO • Responsável sugerido: Backend com revisão de execução
+Prioridade P0 · TODO · Fase FLUXO_VERTICAL · Responsável sugerido Backend com revisão de execução
 
 ## Contexto e objetivo
 
-Implementar esta parte do HiveNode SMS/equipes conforme as especificações vinculadas. Este arquivo é uma issue local pronta para importar; não foi publicado em tracker externo. Não confundir TODO com funcionalidade existente.
+Entregar esta parte conforme o [PRD](../01-prd.md) e a [sequência de execução](../12-entrega-operacao.md).
 
 ## Dependências
 
-- [HNS-03](HNS-03.md) concluída e contratos revisados.
-- [HNS-17](HNS-17.md) concluída e contratos revisados.
+- [HNS-03](HNS-03.md)
+- [HNS-17](HNS-17.md)
 
 ## Requisitos e leitura obrigatória
 
-Requisitos: R09, R10, R11, R15. Ver [PRD](../01-prd.md).
+R09, R10, R11, R15
 
 - [07-fila-protocolo.md](../07-fila-protocolo.md)
 - [11-testes.md](../11-testes.md)
 
 ## Onde trabalhar
 
-- `web/src/lib/sms/state-machine` (conferir existência; caminhos de módulos novos são alvos A CRIAR).
-- `web/src/lib/sms/diagnostics` (conferir existência; caminhos de módulos novos são alvos A CRIAR).
-- `web/src/workers` (conferir existência; caminhos de módulos novos são alvos A CRIAR).
+- `web/src/lib/sms/state-machine`
+- `web/src/lib/sms/diagnostics`
+- `web/src/workers`
 
 ## Passos de implementação
 
-1. Persistir/deduplicar eventos por eventId e node+epoch+sequence; ACK após commit.
-2. Agregar resultado por segmento sem regredir estados com eventos fora de ordem.
-3. Mapear certeza/categoria/retrySafe; UNKNOWN/PARTIAL nunca retry integral cego.
-4. Implementar até3 tentativas só quando zero segmentos aceitos é comprovado, e reconciliar receipts tardios.
+1. Gravar eventos e responder por ID com aceite, duplicata, rejeição permanente ou retry.
+2. Tipar pré-checagem antes de INVOKING, resultado de envio e interpretação do recibo.
+3. Conciliar fora de ordem, liberar vaga do aparelho no resultado ou prazo e bloquear retry de UNKNOWN/PARTIAL.
+4. Aceitar retry automático só em pré-checagem transitória comprovada antes da chamada nativa.
 
 ## Critérios de aceite
 
 - [ ] SENT sem receipt continua enviado com entrega não confirmada.
 - [ ] Evento repetido não reconta trial nem invoca modem.
 - [ ] Generic failure não vira falta de crédito confirmada.
-- [ ] Evidências e limitações anexadas ao PR; revisão das áreas críticas feita pelo responsável.
+- [ ] Evidência, limitações e riscos registrados no PR.
 
 ## Testes e evidências
 
-Executar T24, T25, T26, T27, T28, T29, T31 conforme [plano de testes](../11-testes.md). Para cada caso registrar ambiente, commit/build, entrada, esperado/observado e status. Caso físico ou comercial não disponível fica BLOQUEADO/NAO_EXECUTADO com responsável, nunca PASSOU.
+Executar T24, T25, T26, T27, T28, T29, T31, T41, T58 conforme o [plano de testes](../11-testes.md). Se o caso pertence à expansão ou a aparelho real, registrar a condição e a evidência disponível.
 
 ## Como revisar e entregar
 
-PR pequeno com problema/resultado, critérios de aceite e testes relevantes. Não copiar secrets, contatos reais ou corpo de SMS para logs. Para billing/migração/auth/modem, solicitar revisão experiente. Feature flag desligada e compatibilidade preservada quando gate posterior não estiver concluído. Atualizar o estado desta issue e a matriz de rastreabilidade após revisão.
-
+Referenciar esta issue, anexar os testes e registrar compatibilidade e rollback aplicáveis. Marcar a entrega concluída após revisão e atualizar a fase no backlog.

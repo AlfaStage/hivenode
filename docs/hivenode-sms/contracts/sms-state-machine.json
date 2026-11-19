@@ -1,5 +1,5 @@
 {
-  "version": "1.0.0",
+  "version": "1.1.0",
   "status": "PROPOSED_NOT_IMPLEMENTED",
   "states": [
     "QUEUED",
@@ -30,7 +30,8 @@
       "SUSPENDED",
       "CANCELED",
       "EXPIRED",
-      "FAILED"
+      "FAILED",
+      "SUPPRESSED"
     ],
     "AUTHORIZED": [
       "SENDING",
@@ -72,19 +73,20 @@
     "SUPPRESSED": []
   },
   "guards": {
-    "FAILED->QUEUED": "retrySafe=true; zero segments accepted confirmed; attemptCount<3; permissions/policy/entitlement/expiry revalidated",
+    "FAILED->QUEUED": "piloto: NETWORK_UNAVAILABLE_BEFORE_INVOKE autenticado, sem INVOKING, até 3 tentativas, direito/linha/validade revalidados; nenhum histórico UNKNOWN/PARTIAL ou invocação",
     "PARTIAL->SENT": "new evidence confirms every segment sent; no new physical invocation",
     "PARTIAL->DELIVERED": "new evidence confirms every segment delivered; no new physical invocation",
     "PARTIAL->FAILED": "correction by evidence proving zero segments accepted; reviewed and audited; no automatic retry",
-    "UNKNOWN->FAILED": "evidence proving zero segments accepted; retrySafe evaluated separately",
+    "UNKNOWN->FAILED": "nova evidência conclusiva; sem retry automático",
     "LEASED->QUEUED": "grant never issued and native INVOKING never happened",
     "SUSPENDED->QUEUED": "explicit authorized review; message not expired; actor/resource valid",
-    "SENT->DELIVERED": "delivery success confirmed for every segment"
+    "SENT->DELIVERED": "delivery success confirmed for every segment",
+    "LEASED->SUPPRESSED": "supressão confirmada na mesma transação da decisão de grant"
   },
   "limits": {
     "leaseSeconds": 120,
     "grantSeconds": 30,
-    "maxPhysicalAttempts": 3,
+    "maxPhysicalAttempts": 1,
     "retryDelaysSeconds": [
       30,
       120
@@ -92,13 +94,16 @@
     "maxSegments": 8,
     "maxBatchRecipients": 100,
     "deliveryWaitHours": 24,
-    "idempotencyRetentionDays": 180
+    "idempotencyRetentionDays": 180,
+    "maxAttempts": 3,
+    "releaseSlotAfterGrantExpirySeconds": 120
   },
   "invariants": [
     "No automatic retry from PARTIAL or UNKNOWN",
     "No cancel/expiry transition after grant",
     "One active dispatch per node",
     "SMS send and delivery are distinct",
-    "Replaying events/webhooks never sends SMS again"
+    "Replaying events/webhooks never sends SMS again",
+    "A physical invocation is never retried automatically in the pilot"
   ]
 }

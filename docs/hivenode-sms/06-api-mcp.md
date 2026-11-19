@@ -8,6 +8,8 @@ Resposta de sucesso: `{ "data": ..., "requestId": "uuid" }`. Erro: `{ "error": {
 
 Autenticação: cookie de pessoa ou bearer API key em REST; navegador usa verificação de Origin e token CSRF para mutações. Serviço e credencial têm escopos próprios. Device HMAC é outra fronteira. Endpoint público de descadastro usa token opaco específico, não credencial de envio. CORS allowlist explícita; `*` não concede permissão.
 
+O OpenAPI marca operações com `x-hivenode-phase`. No piloto, priorizar pareamento, política, sessões, inventário, envio individual, consulta, cancelamento, pausa e chaves de uso limitado. Cadastro, aceite, faturamento e gestão de acessos exigem sessão humana. Para atos que exigem confirmação recente, usar reautenticação com verificação de até cinco minutos. A revisão de linha exige papel de revisor autorizado. O contrato de expansão mantém as mesmas regras de domínio.
+
 | HTTP | Uso |
 |---|---|
 | 200/201 | Leitura/atualização/criação de cadastro |
@@ -40,7 +42,7 @@ Autenticação: cookie de pessoa ou bearer API key em REST; navegador usa verifi
 
 Exemplo usa destinatário fictício; trocar somente por número controlado e autorizado em teste real. Response 202: `{data:{id, state:"QUEUED", nodeId, simBindingId, scheduledAt, expiresAt},requestId}`. GET devolve diagnóstico/segmentos agregados, remetente mascarado e conteúdo apenas com permissão e dentro da retenção.
 
-Chave única por conta+operação; fingerprint HMAC do JSON normalizado inclui destino, texto final, purpose, node/SIM, agenda e validade. Mesmo key+fingerprint retorna mesmo ID e HTTP 200 com `Idempotency-Replayed:true`; key diferente é solicitação diferente mesmo com conteúdo igual. Fingerprint diferente resulta 409 `IDEMPOTENCY_CONFLICT`. Tombstone e keyHash permanecem 180 dias; documentar essa janela. Após expirar a janela, consumidor deve usar novas chaves e não esperar dedup histórico eterno.
+Chave única por conta+operação. Fingerprint HMAC da intenção canônica inclui destino, texto solicitado, finalidade, aparelho, SIM e agenda/validade explícitas. Omitidos têm representação estável. Gerar datas implícitas, links e payload final uma vez na transação de criação. Mesmo key+fingerprint retorna ID e estado com HTTP 200 e `Idempotency-Replayed: true`, depois de revalidar o acesso atual ao recurso. Key diferente é outra solicitação. Fingerprint diferente retorna 409 `IDEMPOTENCY_CONFLICT`. Tombstone e keyHash duram 180 dias.
 
 Defaults de agenda dependem do instante do primeiro aceite; retry sem agenda explícita reaproveita o mesmo recurso. Não recalcular `now` antes de comparar idempotência. Requests rejeitados antes de persistir não consomem chave; resultado UNKNOWN já persistido nunca cria nova execução ao repetir POST.
 
@@ -62,6 +64,12 @@ Prefixo W = `/api/v1/workspaces/{workspaceId}`.
 | PUT W`/sms/devices/{nodeId}` | enabled e política; capacidade sob lock |
 | GET W`/sms/devices/{nodeId}/sims` | Inventário autorizado |
 | PUT W`/sms/sims/{simBindingId}/policy` | Nova versão da política; nunca editar histórico |
+| POST W`/sms/sims/{simBindingId}/policy/{version}/decision` | Revisor humano, reautenticação e motivo. Aprova, rejeita ou revoga versão |
+| POST W`/sms/enrollments` | Proprietário gera código QR curto, de uso único, vinculado ao desafio da instalação |
+| POST W`/sms/enrollments/{enrollmentId}/revoke` | Encerrar convite aberto |
+| GET W`/sms/readiness` | Consultar diagnóstico, teste disponível e próxima ação |
+| POST W`/sms/readiness/test` | Solicitar teste único para destino controlado configurado pelo servidor |
+| POST W`/sms/trial` | Iniciar sete dias após prontidão e ação do proprietário |
 | POST W`/sms/terms/accept` | Pessoa aceita versão/hash vigente |
 | POST/GET W`/sms/messages` | Enviar / listar por cursor/filtros |
 | GET W`/sms/messages/{messageId}` | Estado e dados permitidos |
@@ -96,11 +104,14 @@ Prefixo D = `/api/device/v1`.
 | Método/rota | Entrada e efeito |
 |---|---|
 | POST D`/capabilities` | node/epoch autenticados; Android, appVersion, smsSupported, permissões e disponibilidade |
+| POST D`/sms/enrollments/redeem` | Código de pareamento + prova do desafio local. Única rota anterior à emissão de identidade do agente |
+| POST D`/sms/sims/{simBindingId}/consent` | Consentimento local autenticado por instalação e revisão |
+| POST D`/sms/presence` | Heartbeat da sessão visível, com validade e horário do servidor |
 | POST D`/sms/inventory` | inventoryVersion, linhas ativas localBindingId/subscriptionId/slot/carrier; invalida vínculos removidos |
 | POST D`/sms/claim` | Nó pede trabalho; 200 com attempt ou data:null; lease 120s |
 | POST D`/sms/attempts/{attemptId}/grant` | leaseToken, inventoryVersion, segments, previewFingerprint; reserva e grant único |
 | GET D`/sms/attempts/{attemptId}` | Estado/grant previamente emitido; só tentativa desse nó |
-| POST D`/sms/events` | Até 100 eventos; ACK por eventId após persistência |
+| POST D`/sms/events` | Até 100 eventos. `ACCEPTED`, `DUPLICATE`, `PERMANENT_REJECT` ou `RETRY` por ID. Com DB indisponível, 503 sem ACK |
 
 Claim/grant/events utilizam contratos estritos, autenticação HMAC e replay protection. Claim repetido para tentativa em curso devolve a mesma tentativa. Eventos enviados após suspensão podem registrar resultados prévios; não concedem grant novo. `smsSupported=false` impede execução e permite ainda o proxy.
 

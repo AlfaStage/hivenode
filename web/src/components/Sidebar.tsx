@@ -5,16 +5,17 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { 
   LayoutDashboard, Server, Shield, CreditCard, ShieldCheck, 
-  Users, Pickaxe, ChevronDown, ChevronRight, Zap, Coins, Settings 
+  Users, Pickaxe, ChevronDown, ChevronRight, Zap, Coins, Settings, MessageSquare
 } from "lucide-react";
 
-export function Sidebar({ role, minerBetaAccess }: { role: string; minerBetaAccess: boolean }) {
+export function Sidebar({ role, minerBetaAccess, smsBetaAccess }: { role: string; minerBetaAccess: boolean; smsBetaAccess: boolean }) {
   const pathname = usePathname();
   const [isAdminOpen, setIsAdminOpen] = useState(pathname?.startsWith("/dashboard/admin") ?? false);
 
   const links = [
     { href: "/dashboard", label: "Visão Geral", icon: LayoutDashboard },
-    { href: "/dashboard/miner", label: "HiveMiner", icon: Pickaxe },
+    { href: "/dashboard/miner", label: "HiveMiner", icon: Pickaxe, visible: minerBetaAccess, prefetch: false },
+    { href: "/dashboard/sms", label: "SMS Beta", icon: MessageSquare, visible: smsBetaAccess, prefetch: false },
     { href: "/dashboard/proxies", label: "Meus Proxies", icon: Shield },
     { href: "/dashboard/billing", label: "Faturamento", icon: CreditCard },
   ];
@@ -42,7 +43,7 @@ export function Sidebar({ role, minerBetaAccess }: { role: string; minerBetaAcce
       <nav className="flex-1 space-y-2">
         <div className="mb-4">
           <p className="px-4 text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Painel do Usuário</p>
-          {links.filter(link => minerBetaAccess || link.href !== "/dashboard/miner").map((link) => {
+          {links.filter(link => link.visible !== false).map((link) => {
             const isActive = pathname === link.href;
             const Icon = link.icon;
 
@@ -50,7 +51,7 @@ export function Sidebar({ role, minerBetaAccess }: { role: string; minerBetaAcce
               <Link
                 key={link.href}
                 href={link.href}
-                prefetch={link.href === "/dashboard/miner" ? false : undefined}
+                prefetch={link.prefetch}
                 className={`group flex items-center gap-3.5 px-4 py-3.5 rounded-2xl text-sm font-semibold transition-all duration-300 mb-1 ${
                   isActive
                     ? "bg-primary text-primary-foreground shadow-md shadow-primary/20"

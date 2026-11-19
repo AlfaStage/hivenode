@@ -1,53 +1,50 @@
-# HNS-26 — Criar painel SMS, jornada de envio e resultados
+# HNS-26 — Criar painel do piloto com diagnóstico e envio individual
 
-Prioridade: P1 • Situação: TODO • Responsável sugerido: Web
+Prioridade P1 · TODO · Fase FLUXO_VERTICAL · Responsável sugerido Web
 
 ## Contexto e objetivo
 
-Implementar esta parte do HiveNode SMS/equipes conforme as especificações vinculadas. Este arquivo é uma issue local pronta para importar; não foi publicado em tracker externo. Não confundir TODO com funcionalidade existente.
+Entregar esta parte conforme o [PRD](../01-prd.md) e a [sequência de execução](../12-entrega-operacao.md).
 
 ## Dependências
 
-- [HNS-06](HNS-06.md) concluída e contratos revisados.
-- [HNS-13](HNS-13.md) concluída e contratos revisados.
-- [HNS-15](HNS-15.md) concluída e contratos revisados.
-- [HNS-18](HNS-18.md) concluída e contratos revisados.
-- [HNS-19](HNS-19.md) concluída e contratos revisados.
-- [HNS-20](HNS-20.md) concluída e contratos revisados.
-- [HNS-21](HNS-21.md) concluída e contratos revisados.
+- [HNS-06](HNS-06.md)
+- [HNS-13](HNS-13.md)
+- [HNS-15](HNS-15.md)
+- [HNS-18](HNS-18.md)
+- [HNS-24](HNS-24.md)
 
 ## Requisitos e leitura obrigatória
 
-Requisitos: R12, R05, R09, R11. Ver [PRD](../01-prd.md).
+R12, R05, R09, R11
 
 - [09-painel-jornadas.md](../09-painel-jornadas.md)
 - [06-api-mcp.md](../06-api-mcp.md)
 
 ## Onde trabalhar
 
-- `web/src/app/dashboard/sms` (conferir existência; caminhos de módulos novos são alvos A CRIAR).
-- `web/src/hooks` (conferir existência; caminhos de módulos novos são alvos A CRIAR).
-- `web/src/components` (conferir existência; caminhos de módulos novos são alvos A CRIAR).
+- `web/src/app/dashboard/sms`
+- `web/src/hooks`
+- `web/src/components`
 
 ## Passos de implementação
 
-1. Criar overview/devices/SIMs/compose/lote/templates/history/details/integrations.
-2. Mostrar contagem/agenda/remetente/optout e confirmação antes de lote.
-3. Distinguir SENT/DELIVERED/PARTIAL/UNKNOWN e ações de cancelamento/reenvio realistas.
-4. Implementar acesso por grants, acessibilidade, cursor e states de carga/erro/purge.
+1. Construir jornada diagnóstico, termos, QR, chip, aprovação, teste controlado e prontidão.
+2. Exibir último contato, bloqueio e próxima ação antes de permitir envio.
+3. Mostrar remetente, destino mascarado, segmentos e distinção de envio e entrega.
+4. Adicionar pausa/cancelamento pendente, consulta acessível e acesso por conta.
 
 ## Critérios de aceite
 
-- [ ] Membro não vê aparelhos/dados da conta anterior.
-- [ ] Texto de diagnóstico expressa certeza e ação.
-- [ ] Sem uso de admin global como atalho no teste de cliente.
-- [ ] Evidências e limitações anexadas ao PR; revisão das áreas críticas feita pelo responsável.
+- [ ] Conta SMS-only conclui fluxo sem tela de compra de proxy.
+- [ ] Resultado desconhecido ou parcial tem instrução clara.
+- [ ] Teste começa apenas após prontidão e ativação.
+- [ ] Evidência, limitações e riscos registrados no PR.
 
 ## Testes e evidências
 
-Executar T02, T33, T39, T54 conforme [plano de testes](../11-testes.md). Para cada caso registrar ambiente, commit/build, entrada, esperado/observado e status. Caso físico ou comercial não disponível fica BLOQUEADO/NAO_EXECUTADO com responsável, nunca PASSOU.
+Executar T02, T33, T54, T55, T56, T61 conforme o [plano de testes](../11-testes.md). Se o caso pertence à expansão ou a aparelho real, registrar a condição e a evidência disponível.
 
 ## Como revisar e entregar
 
-PR pequeno com problema/resultado, critérios de aceite e testes relevantes. Não copiar secrets, contatos reais ou corpo de SMS para logs. Para billing/migração/auth/modem, solicitar revisão experiente. Feature flag desligada e compatibilidade preservada quando gate posterior não estiver concluído. Atualizar o estado desta issue e a matriz de rastreabilidade após revisão.
-
+Referenciar esta issue, anexar os testes e registrar compatibilidade e rollback aplicáveis. Marcar a entrega concluída após revisão e atualizar a fase no backlog.

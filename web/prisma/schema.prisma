@@ -25,6 +25,8 @@ model User {
   sessionVersion   Int            @default(0)
   disabled         Boolean        @default(false)
   minerBetaAccess  Boolean        @default(false)
+  smsBetaAccess    Boolean        @default(false)
+  smsBetaMessages  SmsBetaMessage[]
   betaApplication  BetaApplication?
   
   // Integração Web3 & Tokenomics
@@ -50,6 +52,40 @@ model User {
   updatedAt        DateTime       @updatedAt
 
   @@map("users")
+}
+
+model SmsBetaMessage {
+  id                String             @id @default(uuid())
+  userId            String
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  idempotencyKey    String
+  requestFingerprint String
+  maskedDestination String
+  scenario          SmsBetaScenario
+  state             SmsBetaState       @default(QUEUED)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  @@unique([userId, idempotencyKey])
+  @@index([userId, createdAt, id])
+  @@index([createdAt])
+  @@map("sms_beta_messages")
+}
+
+enum SmsBetaScenario {
+  DELIVERED
+  SENT
+  FAILED
+  UNKNOWN
+}
+
+enum SmsBetaState {
+  QUEUED
+  DELIVERED
+  SENT
+  FAILED
+  UNKNOWN
+  CANCELED
 }
 
 model BetaApplication {

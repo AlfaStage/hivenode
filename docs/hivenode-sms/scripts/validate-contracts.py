@@ -39,6 +39,8 @@ def validator(name):
 node = "11111111-1111-4111-8111-111111111111"
 sim = "22222222-2222-4222-8222-222222222222"
 message = {"nodeId": node, "simBindingId": sim, "purpose": "TRANSACTIONAL", "to": "+5511999999999", "text": "Teste fictício sem modem."}
+grant = {"leaseToken": "fake", "inventoryVersion": 1, "policyVersion": 1, "activeSessionId": node, "segments": 2, "previewFingerprint": "a" * 64}
+event = {"eventId": node, "attemptId": sim, "deviceSequence": 1, "occurredAt": "2026-11-18T15:00:00Z"}
 examples = [
     ("MessageRequest", message, True),
     ("MessageRequest", {**message, "to": "11999999999"}, False),
@@ -47,13 +49,22 @@ examples = [
     ("MessageRequest", {**message, "scheduledAt": "amanhã"}, False),
     ("ResendRequest", {"acknowledgeDuplicateRisk": True}, True),
     ("ResendRequest", {"acknowledgeDuplicateRisk": False}, False),
-    ("GrantRequest", {"leaseToken": "fake", "inventoryVersion": 1, "segments": 2, "previewFingerprint": "a" * 64}, True),
-    ("GrantRequest", {"leaseToken": "fake", "inventoryVersion": 1, "segments": 9, "previewFingerprint": "a" * 64}, False),
+    ("GrantRequest", grant, True),
+    ("GrantRequest", {**grant, "segments": 9}, False),
+    ("GrantRequest", {k: v for k, v in grant.items() if k != "policyVersion"}, False),
     ("BatchRequest", {"nodeId": node, "simBindingId": sim, "purpose": "INTERNAL", "items": []}, False),
     ("InviteRequest", {"email": "junior@example.com", "role": "OPERATOR", "grants": []}, True),
     ("InviteRequest", {"email": "junior@example.com", "role": "OWNER", "grants": []}, False),
     ("DeviceEvents", {"events": [{"eventId": node, "eventType": "INVOKING", "attemptId": sim, "deviceSequence": 1, "occurredAt": "2026-10-13T15:00:00Z"}]}, True),
     ("DeviceEvents", {"events": [{"eventId": node, "eventType": "SEND_AGAIN_ALWAYS", "attemptId": sim, "deviceSequence": 1, "occurredAt": "2026-10-13T15:00:00Z"}]}, False),
+    ("RedeemEnrollment", {"code": "a" * 32, "installationVerifier": "b" * 43, "localConfirmation": True}, True),
+    ("RedeemEnrollment", {"code": "a" * 32, "installationVerifier": "b" * 43, "localConfirmation": False}, False),
+    ("PolicyDecision", {"decision": "APPROVED", "reason": "Contrato revisado"}, True),
+    ("PolicyDecision", {"decision": "APPROVED", "reason": ""}, False),
+    ("DeviceEvent", {**event, "eventType": "SEGMENT_DELIVERED", "segmentIndex": 0, "deliveryReport": "CONFIRMED_DELIVERED"}, True),
+    ("DeviceEvent", {**event, "eventType": "SEGMENT_DELIVERED", "segmentIndex": 0, "deliveryReport": "UNAVAILABLE"}, False),
+    ("DeviceEvent", {**event, "eventType": "PRECHECK_FAILED"}, False),
+    ("EventAcks", {"results": [{"eventId": node, "status": "RETRY"}]}, True),
 ]
 for index, (name, payload, expected) in enumerate(examples, start=1):
     errors = list(validator(name).iter_errors(payload))

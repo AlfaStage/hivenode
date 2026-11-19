@@ -35,8 +35,8 @@ async function waitHealth(url: string) {
   }
   throw new Error(`Health timeout: ${url}\n${outputTail.join("")}`);
 }
-async function request(route: string, method = "GET", body?: unknown, token?: string, expected = 200) {
-  const response = await fetch(base + route, { method, headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+async function request(route: string, method = "GET", body?: unknown, token?: string, expected = 200, headers?: Record<string, string>) {
+  const response = await fetch(base + route, { method, headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}), ...headers },
     body: body === undefined ? undefined : JSON.stringify(body) });
   const result = await response.json();
   assert.equal(response.status, expected, `${method} ${route}: ${JSON.stringify(result)}`);
@@ -84,7 +84,7 @@ async function device(node: { id: string }, secret: string, marker: string) {
 
 async function main() {
   const { prisma } = await import("../src/lib/prisma");
-  const { hashPassword, generatePasswordResetToken } = await import("../src/lib/auth");
+  const { hashPassword, generatePasswordResetToken, generateToken } = await import("../src/lib/auth");
   const { processPaymentEvent } = await import("../src/lib/payment-events");
   try {
     launch(process.execPath, ["node_modules/next/dist/bin/next", "dev", "--port", "3100", "--hostname", "127.0.0.1"], process.cwd());
@@ -104,6 +104,42 @@ async function main() {
     check("administrative mutation endpoints preserve HTTP authorization semantics");
     const admin = await prisma.user.create({ data: { email: `${run}-admin@example.com`, passwordHash: await hashPassword(password), role: "ADMIN" } });
     const login = await request("/api/auth/login", "POST", { email: admin.email, password });
+    const sms = "/api/sms/beta/messages";
+    const adminUser = `/api/admin/users/${a.user.id}`;
+    await request(sms, "GET", undefined, undefined, 401);
+    await request(sms, "GET", undefined, a.token, 404);
+    await request(sms, "GET", undefined, login.token);
+    await request(adminUser, "PATCH", { smsBetaAccess: true }, a.token, 403);
+    await request(adminUser, "PATCH", { smsBetaAccess: true }, login.token, 403, { Origin: "https://example.com" });
+    await request(adminUser, "PATCH", { smsBetaAccess: true }, login.token);
+    const deviceToken = await generateToken(a.user.id, "CUSTOMER", undefined, 0, "device");
+    await request(sms, "GET", undefined, deviceToken, 404);
+    check("SMS beta grants require an admin and never elevate device tokens");
+
+    const smsPayload = { destination: "+5511999999999", text: "Conteúdo fictício", scenario: "UNKNOWN" };
+    const smsHeaders = { "Idempotency-Key": randomUUID() };
+    const queued = await request(sms, "POST", smsPayload, a.token, 202, smsHeaders);
+    const replay = await request(sms, "POST", smsPayload, a.token, 200, smsHeaders);
+    assert.equal(replay.message.id, queued.message.id);
+    assert.equal(queued.message.maskedDestination, "•••• 9999");
+    assert(!JSON.stringify(queued).includes(smsPayload.text));
+    await request(sms, "POST", { ...smsPayload, text: "Alteração" }, a.token, 409, smsHeaders);
+    await request(`/api/admin/users/${b.user.id}`, "PATCH", { smsBetaAccess: true }, login.token);
+    assert.deepEqual((await request(sms, "GET", undefined, b.token)).messages, []);
+    await request(sms, "PATCH", { id: queued.message.id, action: "simulate" }, b.token, 404);
+    const outcome = await request(sms, "PATCH", { id: queued.message.id, action: "simulate" }, a.token);
+    assert.equal(outcome.message.state, "UNKNOWN");
+    await request(sms, "PATCH", { id: queued.message.id, action: "cancel" }, a.token, 409);
+    check("SMS queue isolates accounts, deduplicates requests and records simulated outcomes");
+
+    const pending = await request(sms, "POST", smsPayload, a.token, 202, { "Idempotency-Key": randomUUID() });
+    await request(adminUser, "PATCH", { smsBetaAccess: false }, login.token);
+    await request(sms, "PATCH", { id: pending.message.id, action: "simulate" }, a.token, 404);
+    await request(sms, "GET", undefined, a.token, 404);
+    assert.equal((await prisma.smsBetaMessage.findUnique({ where: { id: pending.message.id } }))?.state, "CANCELED");
+    assert.deepEqual((await prisma.auditLog.findMany({ where: { actorId: admin.id, targetId: a.user.id, action: { startsWith: "sms_beta." } }, orderBy: { createdAt: "asc" } })).map(event => event.action),
+      ["sms_beta.grant", "sms_beta.revoke"]);
+    check("SMS revocation takes effect on the existing session and cancels pending simulations with audit");
     const plan = await prisma.plan.create({ data: { slug: `${run}-private`, name: "Local test fleet", category: "PRIVATE_FLEET", maxDevices: 2, maxProxies: 4, priceInCents: 1000, isRecurring: true } });
     for (const user of [a.user, b.user]) await prisma.subscription.create({ data: { userId: user.id, planId: plan.id, planType: "STARTER", planCategory: "PRIVATE_FLEET", currentPeriodEnd: new Date(Date.now() + 86400000) } });
     const pairing = await request("/api/auth/device-code/generate", "POST", { type: "miner" });
@@ -169,8 +205,10 @@ async function main() {
     assert.equal(await prisma.payment.count({ where: { abacateSubId: subscription.abacatePaySubId } }), 2); check("multiple renewals recorded once each");
     const usage = await prisma.usageEvent.findMany({ where: { proxyId: proxy.proxy.id } }); assert(usage.length > 0);
     const measured = await prisma.proxyCredential.findUniqueOrThrow({ where: { id: proxy.proxy.id } });
-    assert.equal(measured.totalBytesRx, BigInt(22));
-    assert.equal(measured.totalBytesTx, BigInt(32));
+    // The SOCKS client receives four 7-byte replies and one 4-byte reply.
+    // It sends four 5-byte requests and one 2-byte request.
+    assert.equal(measured.totalBytesRx, BigInt(32));
+    assert.equal(measured.totalBytesTx, BigInt(22));
     check("proxy consumption persisted with exact per-credential byte totals");
     console.log(`LOCAL INTEGRATION: ${checks} checks passed`);
   } finally {

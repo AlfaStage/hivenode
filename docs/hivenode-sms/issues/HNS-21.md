@@ -1,29 +1,29 @@
 # HNS-21 — Implementar exportação, retenção e exclusão segura
 
-Prioridade: P1 • Situação: TODO • Responsável sugerido: Backend/infra com privacy
+Prioridade P1 · TODO · Fase EXPANSAO · Responsável sugerido Backend/infra com privacy
 
 ## Contexto e objetivo
 
-Implementar esta parte do HiveNode SMS/equipes conforme as especificações vinculadas. Este arquivo é uma issue local pronta para importar; não foi publicado em tracker externo. Não confundir TODO com funcionalidade existente.
+Entregar esta parte conforme o [PRD](../01-prd.md) e a [sequência de execução](../12-entrega-operacao.md).
 
 ## Dependências
 
-- [HNS-10](HNS-10.md) concluída e contratos revisados.
-- [HNS-18](HNS-18.md) concluída e contratos revisados.
-- [HNS-20](HNS-20.md) concluída e contratos revisados.
+- [HNS-10](HNS-10.md)
+- [HNS-18](HNS-18.md)
+- [HNS-37](HNS-37.md)
 
 ## Requisitos e leitura obrigatória
 
-Requisitos: R12, R16, R17. Ver [PRD](../01-prd.md).
+R12, R16, R17
 
 - [10-seguranca-conformidade.md](../10-seguranca-conformidade.md)
 - [06-api-mcp.md](../06-api-mcp.md)
 
 ## Onde trabalhar
 
-- `web/src/lib/sms/jobs` (conferir existência; caminhos de módulos novos são alvos A CRIAR).
-- `web/src/app/api/v1` (conferir existência; caminhos de módulos novos são alvos A CRIAR).
-- `web/src/workers` (conferir existência; caminhos de módulos novos são alvos A CRIAR).
+- `web/src/lib/sms/jobs`
+- `web/src/app/api/v1`
+- `web/src/workers`
 
 ## Passos de implementação
 
@@ -37,13 +37,12 @@ Requisitos: R12, R16, R17. Ver [PRD](../01-prd.md).
 - [ ] Conteúdo purgado não continua exportável.
 - [ ] Revogação bloqueia download antes de expiração do link.
 - [ ] Histórico180d não retém texto por180d.
-- [ ] Evidências e limitações anexadas ao PR; revisão das áreas críticas feita pelo responsável.
+- [ ] Evidência, limitações e riscos registrados no PR.
 
 ## Testes e evidências
 
-Executar T39, T40, T53 conforme [plano de testes](../11-testes.md). Para cada caso registrar ambiente, commit/build, entrada, esperado/observado e status. Caso físico ou comercial não disponível fica BLOQUEADO/NAO_EXECUTADO com responsável, nunca PASSOU.
+Executar T39, T40, T53 conforme o [plano de testes](../11-testes.md). Se o caso pertence à expansão ou a aparelho real, registrar a condição e a evidência disponível.
 
 ## Como revisar e entregar
 
-PR pequeno com problema/resultado, critérios de aceite e testes relevantes. Não copiar secrets, contatos reais ou corpo de SMS para logs. Para billing/migração/auth/modem, solicitar revisão experiente. Feature flag desligada e compatibilidade preservada quando gate posterior não estiver concluído. Atualizar o estado desta issue e a matriz de rastreabilidade após revisão.
-
+Referenciar esta issue, anexar os testes e registrar compatibilidade e rollback aplicáveis. Marcar a entrega concluída após revisão e atualizar a fase no backlog.

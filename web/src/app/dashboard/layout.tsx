@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { Sidebar } from "@/components/Sidebar";
 import { Header } from "@/components/Header";
 import { getGravatarProfile } from "@/lib/gravatar";
+import { canAccessSmsBeta } from "@/lib/sms-beta-access";
 
 export const dynamic = "force-dynamic";
 
@@ -40,7 +41,7 @@ export default async function DashboardLayout({
   return (
     <div className="min-h-screen bg-background flex">
       {/* Sidebar remodelada */}
-      <Sidebar role={user.role} minerBetaAccess={user.minerBetaAccess} />
+      <Sidebar role={user.role} minerBetaAccess={user.minerBetaAccess} smsBetaAccess={canAccessSmsBeta(user)} />
 
       {/* Main content */}
       <main className="min-w-0 flex-1 overflow-x-hidden flex flex-col bg-muted/20">
@@ -55,6 +56,9 @@ export default async function DashboardLayout({
           <Link className="rounded-md px-3 py-2 hover:bg-muted" href="/dashboard/proxies">Proxies</Link>
           {user.minerBetaAccess && (
             <Link className="rounded-md px-3 py-2 hover:bg-muted" href="/dashboard/miner" prefetch={false}>HiveMiner</Link>
+          )}
+          {canAccessSmsBeta(user) && (
+            <Link className="rounded-md px-3 py-2 hover:bg-muted" href="/dashboard/sms" prefetch={false}>SMS Beta</Link>
           )}
           <Link className="rounded-md px-3 py-2 hover:bg-muted" href="/dashboard/billing">Faturamento</Link>
         </nav>

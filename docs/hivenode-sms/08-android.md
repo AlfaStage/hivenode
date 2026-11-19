@@ -2,6 +2,8 @@
 
 ## Plataformas e distribuição
 
+A primeira prova usa APK assinado do Android principal e o canal de instalação previsto. Confirmar no aparelho permissões, seleção de SIM e um envio controlado em linha elegível. `SEND_SMS` é restrita pelo instalador. Distinguir permissão recusada, instalada por canal incompatível e telephony indisponível. Na distribuição no Brasil, validar a exigência de verificação de desenvolvedor conforme o canal. O build de proxy pode manter manifesto sem `SEND_SMS` se o canal do piloto exigir variante. [Permissão SEND_SMS](https://developer.android.com/reference/android/Manifest.permission#SEND_SMS) e [verificação de desenvolvedor](https://developer.android.com/developer-verification).
+
 HiveNode principal permanece Expo SDK 54/RN 0.81, módulo local `hivenode-sms` com executor Kotlin e persistência nativa. O target gerado deve ser inspecionado e documentado na issue; referência SDK54 indica compile/target 36, mínimo Android 7. SMS do produto será habilitado somente Android 8/API26 ou superior no piloto. Não é necessário elevar mínimo de todo o proxy para habilitar SMS. [Expo SDK54](https://docs.expo.dev/versions/v54.0.0/).
 
 Não usar `expo-sms` como gateway silencioso: o recurso necessário é execução nativa pela telephony API. Criar módulo via Expo Modules API e build próprio; não validar modem usando Expo Go. [Módulos locais](https://docs.expo.dev/modules/get-started/).
@@ -61,4 +63,8 @@ Não degradar o proxy com lock de modem, trabalho de banco na UI ou interrupçã
 
 Unitários de executor com fake modem, banco temporário e callbacks sintéticos; negar permissão, troca de binding, replay, fence antigo, kill entre persistência/chamada, evento repetido e multipart. Compilar módulo/APKs, testar bridge e UI em emulador. Esses testes comprovam lógica/build, não entrega de operadora.
 
-O proprietário fará homologação física daqui a alguns dias, sem data inventada. Até isso, status é `PENDENTE_APARELHO` e `SMS_REAL_SEND_ENABLED=false` em produção. Roteiro está em [testes](11-testes.md).
+HNS-32 homologa o Android principal com build, instalador, responsável, modelo e linha registrados. HNS-36 homologa o Light separadamente. Até o aceite do principal, manter envio de produção desligado. O roteiro está em [testes](11-testes.md).
+
+Na sessão ativa, começar com heartbeat a cada 30s e presença válida por 90s no servidor como defaults de piloto. O agente pode consultar trabalho a cada 15s durante sessão visível, com espera crescente até 60s quando ocioso. Presença vencida ou força de parada mostram “Abra o app no aparelho”. Medir bateria, temperatura, tráfego e latência antes de publicar a faixa suportada. Reboot ou reinstalação exigem retomar a sessão e obter nova referência de horário. No Android 15, force-stop pode cancelar os `PendingIntent`. [Comportamento do Android 15](https://developer.android.com/about/versions/15/behavior-changes-all).
+
+Explicar que o Android pode gravar uma cópia no histórico local e que respostas chegam à linha do cliente. Excluir identidade SMS, credenciais, inbox e fila de eventos da transferência e do backup do app. A restauração em outro aparelho exige pareamento novo e nunca invoca fila restaurada. [Backup Android](https://developer.android.com/identity/data/autobackup) e [SmsManager](https://developer.android.com/reference/android/telephony/SmsManager).

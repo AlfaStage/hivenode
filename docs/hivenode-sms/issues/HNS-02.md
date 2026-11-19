@@ -1,47 +1,46 @@
 # HNS-02 — Investigar Android, foreground service e canal de distribuição
 
-Prioridade: P0 • Situação: TODO • Responsável sugerido: Mobile com revisão sênior
+Prioridade P0 · TODO · Fase VIABILIDADE · Responsável sugerido Mobile com revisão sênior
 
 ## Contexto e objetivo
 
-Implementar esta parte do HiveNode SMS/equipes conforme as especificações vinculadas. Este arquivo é uma issue local pronta para importar; não foi publicado em tracker externo. Não confundir TODO com funcionalidade existente.
+Entregar esta parte conforme o [PRD](../01-prd.md) e a [sequência de execução](../12-entrega-operacao.md).
 
 ## Dependências
 
-- Sem dependência de código novo; usar a baseline documental e preservar alterações existentes.
+- Pode iniciar com a documentação e o ambiente de teste.
 
 ## Requisitos e leitura obrigatória
 
-Requisitos: R05, R18, R20. Ver [PRD](../01-prd.md).
+R05, R18, R20
 
 - [08-android.md](../08-android.md)
 - [03-arquitetura.md](../03-arquitetura.md)
 
 ## Onde trabalhar
 
-- `hivenode-app/app.json` (conferir existência; caminhos de módulos novos são alvos A CRIAR).
-- `hivenode-app/plugins/withNotifeeForegroundServiceType.js` (conferir existência; caminhos de módulos novos são alvos A CRIAR).
-- `hivenode-light/android-app/app/build.gradle` (conferir existência; caminhos de módulos novos são alvos A CRIAR).
+- `hivenode-app/app.json`
+- `hivenode-app/plugins/withNotifeeForegroundServiceType.js`
+- `hivenode-light/android-app/app/build.gradle`
 
 ## Passos de implementação
 
-1. Inspecionar SDK/target gerados no app principal e toolchain Light; registrar matriz API26/31/34/35/36.
-2. Avaliar opções legítimas FGS, reconciliação WorkManager e wake-up opcional; medir protótipo sem linha real.
-3. Verificar permissões SEND_SMS/READ_PHONE_STATE e elegibilidade de distribuição Play/empresarial.
-4. Registrar ADR com limites de segundo plano, force-stop, reboot e necessidade de abrir app; definir como exibir pausa.
+1. Testar APK principal assinado e instalado pelo canal pretendido em aparelho real.
+2. Verificar SEND_SMS no instalador e runtime, seleção de SIM e primeiro SMS controlado em linha elegível.
+3. Medir sessão visível, tela apagada, retomada após reboot/force-stop e coexistência com proxy.
+4. Documentar distribuição, verificação do desenvolvedor no Brasil e variante proxy sem SEND_SMS se necessária.
 
 ## Critérios de aceite
 
-- [ ] Não existe promessa 24/7 baseada só em dataSync/WakeLock.
-- [ ] Baseline SMS API>=26 é aplicado sem impedir proxy em aparelhos antigos.
-- [ ] ADR revisado por mobile experiente; físico ainda pendente.
-- [ ] Evidências e limitações anexadas ao PR; revisão das áreas críticas feita pelo responsável.
+- [ ] Há evidência de build, instalador, modelo, Android e linha.
+- [ ] Comportamento de segundo plano documentado sem prometer operação contínua.
+- [ ] Light possui homologação própria e não bloqueia principal.
+- [ ] Evidência, limitações e riscos registrados no PR.
 
 ## Testes e evidências
 
-Executar T49, T50 conforme [plano de testes](../11-testes.md). Para cada caso registrar ambiente, commit/build, entrada, esperado/observado e status. Caso físico ou comercial não disponível fica BLOQUEADO/NAO_EXECUTADO com responsável, nunca PASSOU.
+Executar T49, T50, T59 conforme o [plano de testes](../11-testes.md). Se o caso pertence à expansão ou a aparelho real, registrar a condição e a evidência disponível.
 
 ## Como revisar e entregar
 
-PR pequeno com problema/resultado, critérios de aceite e testes relevantes. Não copiar secrets, contatos reais ou corpo de SMS para logs. Para billing/migração/auth/modem, solicitar revisão experiente. Feature flag desligada e compatibilidade preservada quando gate posterior não estiver concluído. Atualizar o estado desta issue e a matriz de rastreabilidade após revisão.
-
+Referenciar esta issue, anexar os testes e registrar compatibilidade e rollback aplicáveis. Marcar a entrega concluída após revisão e atualizar a fase no backlog.

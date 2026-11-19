@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/auth";
 import { apiError, apiSuccess, handleApiError } from "@/lib/api-utils";
 import { brokerCommand } from "@/lib/broker";
 import { z } from "zod";
+import { isSmsBetaSameOrigin } from "@/lib/sms-beta-origin";
 
 export async function PATCH(
   request: Request,
@@ -12,7 +13,26 @@ export async function PATCH(
   try {
     const actor = await requireAdmin();
     const { id } = await params;
-    const { minerBetaAccess } = z.object({ minerBetaAccess: z.boolean() }).parse(await request.json());
+    const beta = z.union([
+      z.strictObject({ minerBetaAccess: z.boolean() }),
+      z.strictObject({ smsBetaAccess: z.boolean() }),
+    ]).parse(await request.json());
+
+    if ("smsBetaAccess" in beta) {
+      if (!isSmsBetaSameOrigin(request)) return apiError("Origem não autorizada", 403);
+      const { smsBetaAccess } = beta;
+      return await prisma.$transaction(async tx => {
+        const user = await tx.user.update({ where: { id }, data: { smsBetaAccess }, select: { role: true } });
+        await tx.auditLog.create({ data: { actorId: actor.userId, targetId: id,
+          action: smsBetaAccess ? "sms_beta.grant" : "sms_beta.revoke" } });
+        if (!smsBetaAccess && user.role !== "ADMIN") {
+          await tx.smsBetaMessage.updateMany({ where: { userId: id, state: "QUEUED" }, data: { state: "CANCELED" } });
+        }
+        return apiSuccess({ smsBetaAccess });
+      });
+    }
+
+    const { minerBetaAccess } = beta;
     await prisma.$transaction([
       prisma.user.update({ where: { id }, data: { minerBetaAccess } }),
       prisma.auditLog.create({

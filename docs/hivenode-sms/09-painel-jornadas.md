@@ -24,21 +24,21 @@ Menu por permissão ajuda uso, mas cada endpoint continua protegido. Usuário se
 
 ## Fluxo de ativação
 
-1. Mostrar requisitos e verificar compatibilidade. Contratação sem linha elegível não promete uso real.
-2. Aceite específico de versão; declaração de titularidade/uso autorizado e condições da operadora.
-3. Vincular aparelho à conta com login/pareamento autorizado; aparelho confirma conta e chips localmente.
-4. Criar política de linha elegível com evidência/contrato válido. Se pendente, mostrar bloqueio e ação concreta.
-5. Primeiro envio para número controlado, mostrar contador de segmentos e estados reais.
+1. Mostrar diagnóstico gratuito do aparelho e do canal de instalação. Explicar sinais de permissão e compatibilidade.
+2. Aceitar termo vigente em sessão humana e parear com QR curto. Mostrar a conta na confirmação do aparelho.
+3. Selecionar SIM, enviar evidência para revisão e acompanhar pendência. Confirmar localmente a revisão aprovada da política.
+4. Fazer envio guiado único a número controlado. Mostrar destino mascarado, SIM, segmentos e disponibilidade, com último contato e ação concreta.
+5. Após prontidão, oferecer teste e, quando o piloto pago estiver liberado, contratação. Mostrar validade paga, cancelamento e redução de vagas que possa afetar membros do proxy, mantendo as assinaturas independentes.
 
 Limite de aparelhos é por serviço: na lista geral, badges Proxy/SMS. SMS desabilitado não apaga nó nem para proxy. Dois chips não dobram mensalidade nem capacidade contratual.
 
 ## Envio e importação
 
-Normalizar destino E.164 com país explícito; não transformar número ambíguo em destino silenciosamente. CSV até 100 itens por lote no piloto, cabeçalhos documentados `clientItemId,to,text` ou template+variáveis; parse no servidor, negar fórmulas e não carregar anexos ilimitados. Preview devolve erros por linha; commit só quando lote inteiro válido.
+O piloto aceita um destino por mensagem, normalizado para E.164 e com país explícito. Na expansão, CSV pode ter até 100 itens por lote, com `clientItemId,to,text` ou template e variáveis. Validar no servidor, negar fórmulas e confirmar lote inteiro. Mostrar atraso estimado e risco de expiração conforme fila e política da linha.
 
 Para marketing, inserir link individual de descadastro antes do preview final. Calcular segmentos finais com aparelho/encoding; estimativa no servidor é indicativa. Se app recalcular quantidade diferente, pedir grant com valor real e atualizar UI/trial; não modificar texto depois de grant.
 
-Agendamento mostra timezone escolhido, hora local E instante UTC. Default de apresentação da conta nova: America/Sao_Paulo; usuário pode escolher outro fuso IANA. Testar transições DST em outro fuso e horários inexistentes/ambíguos com confirmação; não assumir que todo país segue São Paulo.
+Agendamento da expansão mostra “a partir de”, validade, timezone escolhido, hora local e instante UTC. O envio depende da sessão do aparelho. Default de apresentação `America/Sao_Paulo`, com opção de outro fuso IANA. Testar mudanças de horário e instantes ambíguos.
 
 ## Textos de interface recomendados
 

@@ -2,6 +2,10 @@
 
 ## Contexto obrigatório
 
+No beta fechado, a admissão em SMS é independente da do Miner. Sessão web de ADMIN ou conta com concessão explícita de um ADMIN pode iniciar o fluxo. Aplicar a admissão no servidor antes dos escopos e entitlements em cada canal. API keys, MCP e agente atuam somente em nome de conta admitida, com acesso vigente no momento de cada novo comando ou grant físico. Remover a admissão bloqueia imediatamente novas ações com sessões antigas e suspende pendências, preservando conciliação de efeitos físicos anteriores. [Beta privado](16-beta-privado.md).
+
+O piloto expõe apenas o OWNER. Convites, transferências e acesso delegado aos dois serviços entram na expansão. Aceite legal, política da linha, convites, faturamento e gestão de chaves usam sessão humana. Transferência de propriedade, cobrança mutável, aceite de termos e decisão de linha exigem reautenticação recente, com janela de cinco minutos. A decisão de linha exige também permissão de revisor segregada do cliente.
+
 Toda operação resolve `actor → workspace → membership ACTIVE → permissão → recurso → entitlement → política`. O workspaceId da URL é alvo a verificar, não prova de acesso. Consultar recursos por ID E workspaceId; nunca buscar pelo ID e confiar em frontend para filtrar.
 
 API key fixa uma conta, possui criador, recursos permitidos e escopos. Permissão efetiva é interseção entre escopo da chave, grants vigentes do criador, conta e assinatura. Remoção/suspensão do criador revoga execução das chaves criadas por ele; transferência deliberada para credencial de serviço exige ação do OWNER e auditoria. Não criar conta de serviço com login compartilhado para contornar vagas humanas.
@@ -34,7 +38,7 @@ OWNER tem capacidade de administrar grants da própria conta, mas não contorna 
 1. OWNER/admin autorizado informa email, papel e grants; servidor normaliza email sem modificar arbitrariamente regras do provedor.
 2. Transação trava conta, confere capacity incluindo convites, gera token aleatório e grava hash/expiração 72h.
 3. Enviar convite por fluxo de email existente, sem colocar credenciais. Falha de email permite reenvio sem consumir outra vaga.
-4. Aceite exige login com email verificado correspondente, token válido, conta elegível e vaga reservada; consumir uma vez atomicamente.
+4. Aceite exige sessão da pessoa no mesmo email e token enviado à caixa desse endereço. O token prova posse para o convite e não altera a verificação global do cadastro. Confirmar conta elegível e vaga reservada e consumir uma vez atomicamente.
 5. Trocar workspace na UI limpa caches/dados anteriores. Cada fetch/ticket/WS indica contexto verificado pelo servidor.
 
 Remover membro incrementa authorizationVersion da conta, invalida caches/grants e sessões de serviço daquele vínculo. Pessoa pode continuar logada em outras contas. Transferir OWNER exige destino ACTIVE, reautenticação e uma transação; manter audit trail e contato de cobrança definido.
@@ -45,7 +49,11 @@ Caches positivos de grants humanos: TTL máximo 30s com invalidação por versã
 
 Conta suspensa, membro revogado, credencial revogada, SIM trocado ou entitlement vencido invalidam novas execuções. Nó precisa continuar reportando eventos de tentativas anteriores por credencial de dispositivo dedicada, sem permissão de enviar.
 
+No corte do proxy para equipes, encerrar sessões de painel afetadas com evento de revogação e revalidar antes de cada broadcast ou a cada 30s como proteção adicional. Para credencial SOCKS entregue a membro, usar credencial individual revogável, ou exigir rotação da compartilhada ao remover acesso. A revogação deve bloquear novos túneis e encerrar os ativos associados à credencial revogada. Testar com WebSocket e túnel já abertos, preservando shares que continuam válidos.
+
 ## Dispositivo
+
+O app gera verificador forte e apresenta desafio S256 em base64url sem padding. O proprietário autenticado informa esse desafio para criar QR de uso único, válido por cinco minutos. O QR inclui origem esperada e identificação da conta apresentada antes da confirmação local. O resgate envia código, confirmação e verificador por HTTPS. Armazenar a credencial exclusiva no Keystore e vincular `workspaceId`, `nodeId`, `installationEpoch` e serviço SMS no consumo transacional. Rate limit do resgate e auditoria de conflito sem log de códigos/segredos. Perda da resposta de resgate requer novo vínculo e revogação da instalação anterior. Rotação usa novo pareamento e bloqueia novos grants para a instalação anterior. Eventos finais permanecem limitados às tentativas autorizadas conforme a política de revogação.
 
 Identidade por instalação: nodeId, workspaceId, installationEpoch e chave de instalação armazenada com proteção do SO; servidor cifra chave usando gestão própria e rota explicitamente autenticada. Registro requer permissão devices:manage e confirmação do aparelho. Nunca reutilizar token humano de 7 dias como licença perpétua do modem.
 

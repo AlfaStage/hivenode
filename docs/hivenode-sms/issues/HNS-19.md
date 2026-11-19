@@ -1,28 +1,28 @@
 # HNS-19 — Criar lotes, templates, agenda e preview
 
-Prioridade: P1 • Situação: TODO • Responsável sugerido: Backend/web
+Prioridade P1 · TODO · Fase EXPANSAO · Responsável sugerido Backend/web
 
 ## Contexto e objetivo
 
-Implementar esta parte do HiveNode SMS/equipes conforme as especificações vinculadas. Este arquivo é uma issue local pronta para importar; não foi publicado em tracker externo. Não confundir TODO com funcionalidade existente.
+Entregar esta parte conforme o [PRD](../01-prd.md) e a [sequência de execução](../12-entrega-operacao.md).
 
 ## Dependências
 
-- [HNS-15](HNS-15.md) concluída e contratos revisados.
-- [HNS-17](HNS-17.md) concluída e contratos revisados.
-- [HNS-18](HNS-18.md) concluída e contratos revisados.
+- [HNS-15](HNS-15.md)
+- [HNS-17](HNS-17.md)
+- [HNS-18](HNS-18.md)
 
 ## Requisitos e leitura obrigatória
 
-Requisitos: R08, R12. Ver [PRD](../01-prd.md).
+R08, R12
 
 - [06-api-mcp.md](../06-api-mcp.md)
 - [09-painel-jornadas.md](../09-painel-jornadas.md)
 
 ## Onde trabalhar
 
-- `web/src/lib/sms` (conferir existência; caminhos de módulos novos são alvos A CRIAR).
-- `web/src/app/api/v1` (conferir existência; caminhos de módulos novos são alvos A CRIAR).
+- `web/src/lib/sms`
+- `web/src/app/api/v1`
 
 ## Passos de implementação
 
@@ -36,13 +36,12 @@ Requisitos: R08, R12. Ver [PRD](../01-prd.md).
 - [ ] Erro em um item devolve422 e nenhum item persiste.
 - [ ] Troca de modelo não modifica mensagem autorizada.
 - [ ] Cada destino tem ID/estado próprio e paginação.
-- [ ] Evidências e limitações anexadas ao PR; revisão das áreas críticas feita pelo responsável.
+- [ ] Evidência, limitações e riscos registrados no PR.
 
 ## Testes e evidências
 
-Executar T17, T18, T27, T46, T53 conforme [plano de testes](../11-testes.md). Para cada caso registrar ambiente, commit/build, entrada, esperado/observado e status. Caso físico ou comercial não disponível fica BLOQUEADO/NAO_EXECUTADO com responsável, nunca PASSOU.
+Executar T17, T18, T27, T46, T53 conforme o [plano de testes](../11-testes.md). Se o caso pertence à expansão ou a aparelho real, registrar a condição e a evidência disponível.
 
 ## Como revisar e entregar
 
-PR pequeno com problema/resultado, critérios de aceite e testes relevantes. Não copiar secrets, contatos reais ou corpo de SMS para logs. Para billing/migração/auth/modem, solicitar revisão experiente. Feature flag desligada e compatibilidade preservada quando gate posterior não estiver concluído. Atualizar o estado desta issue e a matriz de rastreabilidade após revisão.
-
+Referenciar esta issue, anexar os testes e registrar compatibilidade e rollback aplicáveis. Marcar a entrega concluída após revisão e atualizar a fase no backlog.

@@ -21,21 +21,20 @@
 
 Usar HTTPS autenticado para inventário, preview, claim, grant e eventos SMS. O agente pode operar SMS sem um túnel SOCKS5 conectado e sem assinatura proxy. Evita acoplar a autorização SMS aos códigos DIAL e ao transporte TCP binário atual.
 
-Broker continua atendendo proxy e eventos de conectividade autorizados. É adaptado para contas/equipes, mas não passa a ter decisão de envio SMS. Uma futura otimização de notificação por WebSocket não altera as transações HTTP ou a autorização física.
+Broker continua atendendo proxy com as regras existentes durante o piloto. Na expansão, adaptar contas/equipes e a revogação de conexões, preservando protocolo de túnel. O agente SMS tem identidade e autorização próprias.
 
 ```mermaid
 flowchart LR
   UI[Painel] --> APP[Serviços de aplicação e autorização]
   API[REST versionado] --> APP
   MCP[MCP] --> APP
-  APP --> DB[(PostgreSQL e outbox)]
-  DB --> PUB[Publisher]
-  PUB --> Q[(Redis / BullMQ)]
-  Q --> WORK[Worker SMS]
+  APP --> DB[(PostgreSQL, estados e fila)]
+  APP --> CACHE[(Redis, limites e anti-replay)]
+  DB --> WORK[Worker de conciliação e retenção]
   WORK --> DB
   PHONE[Agente Android HTTPS] --> APP
   PHONE --> NATIVE[Executor nativo / modem / SIM]
-  APP --> HOOK[Worker de webhooks]
+  DB -. expansão .-> HOOK[Outbox e worker de webhooks]
   PROXY[Broker SOCKS5] --> AUTH[Autorização proxy por conta]
   AUTH --> DB
 ```
@@ -43,8 +42,8 @@ flowchart LR
 ## Fronteiras
 
 - Serviços de aplicação validam todos os canais; não duplicar regras em páginas, handlers ou MCP.
-- PostgreSQL guarda intenção, autorização, estado, política e eventos. Redis transporta trabalho/cache; indisponibilidade não elimina a intenção.
-- Worker seleciona mensagem/linha elegível, verifica identidade, estado e validade. Não executa modem.
+- PostgreSQL guarda a fila, intenção, autorização, estado, política e eventos. O agente retira trabalho de forma atômica. O worker concilia estado, expiração e retenção.
+- Redis atende limites e proteção contra replay. Indisponibilidade bloqueia operação que dependa dessas verificações, preservando a fila durável. BullMQ é opção posterior se o volume justificar.
 - Agente identifica instalação/linha, persiste inbox local, calcula segmentos e solicita grant antes do efeito físico.
 - Executor nativo persiste início, chama SmsManager uma vez por tentativa, registra callbacks por segmento e envia eventos mesmo sem JS ativo.
 - Webhook/exportação recebem apenas dados necessários e escopos permitidos; nenhuma credencial proxy entra em payload SMS.
@@ -75,7 +74,7 @@ Os caminhos são alvos sugeridos, não arquivos existentes. Manter contratos com
 
 O agente sincroniza quando está disponível e usa execução nativa persistente. Foreground service precisa tipo legítimo e avaliação para o target efetivo. `dataSync` não garante 24/7: Android moderno impõe limites de duração. WorkManager serve para reconciliação eventual, não para prometer latência instantânea. [Limites do Android](https://developer.android.com/develop/background-work/services/fgs/timeout).
 
-Gate de investigação compara operação visível iniciada pelo cliente, reconciliação WorkManager e wake-up FCM opcional sem conteúdo. Nenhum hack de Accessibility, root, broadcast abusivo ou troca artificial de tipo FGS é aceitável. Não mudar o ciclo de vida do proxy existente sem teste de regressão. Se o aparelho ficar indisponível, UX informa fila/pausa.
+O piloto usa sessão visível iniciada no aparelho. Heartbeat e validade da presença fazem parte do contrato Android. O teste físico mede sessão com tela apagada, proxy simultâneo e retomada. WorkManager pode apoiar conciliação posterior. FCM é opção de expansão sujeita às políticas e medições do canal.
 
 ## Feature flags projetadas
 

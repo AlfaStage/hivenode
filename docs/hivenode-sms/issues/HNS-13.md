@@ -1,49 +1,48 @@
-# HNS-13 — Criar termos versionados, inventário SIM e política elegível
+# HNS-13 — Implementar pareamento SMS-only, termos e aprovação de linha
 
-Prioridade: P0 • Situação: TODO • Responsável sugerido: Backend/mobile com compliance
+Prioridade P0 · TODO · Fase FLUXO_VERTICAL · Responsável sugerido Backend/mobile com compliance
 
 ## Contexto e objetivo
 
-Implementar esta parte do HiveNode SMS/equipes conforme as especificações vinculadas. Este arquivo é uma issue local pronta para importar; não foi publicado em tracker externo. Não confundir TODO com funcionalidade existente.
+Entregar esta parte conforme o [PRD](../01-prd.md) e a [sequência de execução](../12-entrega-operacao.md).
 
 ## Dependências
 
-- [HNS-02](HNS-02.md) concluída e contratos revisados.
-- [HNS-06](HNS-06.md) concluída e contratos revisados.
-- [HNS-11](HNS-11.md) concluída e contratos revisados.
+- [HNS-02](HNS-02.md)
+- [HNS-06](HNS-06.md)
+- [HNS-11](HNS-11.md)
 
 ## Requisitos e leitura obrigatória
 
-Requisitos: R05, R06, R17. Ver [PRD](../01-prd.md).
+R05, R06, R17
 
 - [08-android.md](../08-android.md)
 - [10-seguranca-conformidade.md](../10-seguranca-conformidade.md)
 
 ## Onde trabalhar
 
-- `web/src/lib/sms/policies` (conferir existência; caminhos de módulos novos são alvos A CRIAR).
-- `web/src/app/api/device/v1` (conferir existência; caminhos de módulos novos são alvos A CRIAR).
-- `web/src/app/api/v1` (conferir existência; caminhos de módulos novos são alvos A CRIAR).
+- `web/src/lib/sms/policies`
+- `web/src/app/api/device/v1`
+- `web/src/app/api/v1`
 
 ## Passos de implementação
 
-1. Gravar aceites por pessoa/conta/document hash sem exoneração total.
-2. Receber capabilities/inventory autenticados e validar node/epoch/subscription/binding.
-3. Versionar SimPolicy por finalidade/limites/roaming/evidência; checkbox não aprova contrato.
-4. Invalidar bindings removidos/incertos e bloquear execução, sem trocar SIM automaticamente.
+1. Criar QR de uso único por conta, serviço e desafio, com resgate HTTPS e credencial do aparelho independente do proxy.
+2. Criar aceite versionado por sessão humana e publicar inventário/diagnóstico.
+3. Separar evidência do cliente de decisão do revisor, com histórico e validade.
+4. Exigir confirmação nativa de SIM, instalação e revisão aprovada. Revogar vínculo anterior na troca.
 
 ## Critérios de aceite
 
-- [ ] Inventário só contém linhas ativas acessíveis; número ausente é permitido.
-- [ ] Troca no mesmo slot pausa pendentes.
-- [ ] Sem confirmação local/linha elegível não existe grant.
-- [ ] Evidências e limitações anexadas ao PR; revisão das áreas críticas feita pelo responsável.
+- [ ] Conta SMS-only pareia sem adquirir proxy.
+- [ ] Evidência ou clique do cliente não habilita a linha.
+- [ ] Reutilização de QR, outra conta ou revisão vencida impede grant.
+- [ ] Evidência, limitações e riscos registrados no PR.
 
 ## Testes e evidências
 
-Executar T19, T30, T45, T51 conforme [plano de testes](../11-testes.md). Para cada caso registrar ambiente, commit/build, entrada, esperado/observado e status. Caso físico ou comercial não disponível fica BLOQUEADO/NAO_EXECUTADO com responsável, nunca PASSOU.
+Executar T19, T30, T45, T51, T55, T56 conforme o [plano de testes](../11-testes.md). Se o caso pertence à expansão ou a aparelho real, registrar a condição e a evidência disponível.
 
 ## Como revisar e entregar
 
-PR pequeno com problema/resultado, critérios de aceite e testes relevantes. Não copiar secrets, contatos reais ou corpo de SMS para logs. Para billing/migração/auth/modem, solicitar revisão experiente. Feature flag desligada e compatibilidade preservada quando gate posterior não estiver concluído. Atualizar o estado desta issue e a matriz de rastreabilidade após revisão.
-
+Referenciar esta issue, anexar os testes e registrar compatibilidade e rollback aplicáveis. Marcar a entrega concluída após revisão e atualizar a fase no backlog.

@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "HiveNode SMS e equipes — contrato projetado",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "description": "Contrato projetado de rotas futuras, não implementadas nesta entrega. Complementar com autorização e regras de domínio em 06-api-mcp.md e protocolo em 07-fila-protocolo.md."
   },
   "servers": [
@@ -20,9 +20,6 @@
           "Workspace"
         ],
         "security": [
-          {
-            "apiKey": []
-          },
           {
             "sessionCookie": []
           }
@@ -149,7 +146,8 @@
               }
             }
           }
-        }
+        },
+        "x-hivenode-phase": "PILOTO_ASSISTIDO"
       }
     },
     "/api/v1/workspaces/{workspaceId}": {
@@ -160,9 +158,6 @@
           "Workspace"
         ],
         "security": [
-          {
-            "apiKey": []
-          },
           {
             "sessionCookie": []
           }
@@ -299,7 +294,8 @@
               }
             }
           }
-        }
+        },
+        "x-hivenode-phase": "PILOTO_ASSISTIDO"
       }
     },
     "/api/v1/workspaces/{workspaceId}/members": {
@@ -310,9 +306,6 @@
           "Workspace"
         ],
         "security": [
-          {
-            "apiKey": []
-          },
           {
             "sessionCookie": []
           }
@@ -466,7 +459,8 @@
               }
             }
           }
-        }
+        },
+        "x-hivenode-phase": "EXPANSAO"
       },
       "post": {
         "operationId": "inviteMember",
@@ -475,9 +469,6 @@
           "Workspace"
         ],
         "security": [
-          {
-            "apiKey": []
-          },
           {
             "sessionCookie": []
           }
@@ -624,7 +615,8 @@
               }
             }
           }
-        }
+        },
+        "x-hivenode-phase": "EXPANSAO"
       }
     },
     "/api/v1/workspaces/{workspaceId}/members/{membershipId}": {
@@ -635,9 +627,6 @@
           "Workspace"
         ],
         "security": [
-          {
-            "apiKey": []
-          },
           {
             "sessionCookie": []
           }
@@ -793,7 +782,8 @@
               }
             }
           }
-        }
+        },
+        "x-hivenode-phase": "EXPANSAO"
       },
       "delete": {
         "operationId": "removeMember",
@@ -802,9 +792,6 @@
           "Workspace"
         ],
         "security": [
-          {
-            "apiKey": []
-          },
           {
             "sessionCookie": []
           }
@@ -950,7 +937,8 @@
               }
             }
           }
-        }
+        },
+        "x-hivenode-phase": "EXPANSAO"
       }
     },
     "/api/v1/workspaces/{workspaceId}/invitations/{invitationId}/revoke": {
@@ -961,9 +949,6 @@
           "Workspace"
         ],
         "security": [
-          {
-            "apiKey": []
-          },
           {
             "sessionCookie": []
           }
@@ -1109,7 +1094,8 @@
               }
             }
           }
-        }
+        },
+        "x-hivenode-phase": "EXPANSAO"
       }
     },
     "/api/v1/invitations/accept": {
@@ -1120,9 +1106,6 @@
           "Workspace"
         ],
         "security": [
-          {
-            "apiKey": []
-          },
           {
             "sessionCookie": []
           }
@@ -1259,7 +1242,8 @@
               }
             }
           }
-        }
+        },
+        "x-hivenode-phase": "EXPANSAO"
       }
     },
     "/api/v1/workspaces/{workspaceId}/ownership/transfer": {
@@ -1270,9 +1254,6 @@
           "Workspace"
         ],
         "security": [
-          {
-            "apiKey": []
-          },
           {
             "sessionCookie": []
           }
@@ -1419,7 +1400,9 @@
               }
             }
           }
-        }
+        },
+        "x-hivenode-recent-auth-seconds": 300,
+        "x-hivenode-phase": "EXPANSAO"
       }
     },
     "/api/v1/workspaces/{workspaceId}/entitlements": {
@@ -1430,9 +1413,6 @@
           "Workspace"
         ],
         "security": [
-          {
-            "apiKey": []
-          },
           {
             "sessionCookie": []
           }
@@ -1569,7 +1549,8 @@
               }
             }
           }
-        }
+        },
+        "x-hivenode-phase": "PILOTO_ASSISTIDO"
       }
     },
     "/api/v1/workspaces/{workspaceId}/sms/devices": {
@@ -1736,7 +1717,8 @@
               }
             }
           }
-        }
+        },
+        "x-hivenode-phase": "PILOTO_ASSISTIDO"
       }
     },
     "/api/v1/workspaces/{workspaceId}/sms/devices/{nodeId}": {
@@ -1747,9 +1729,6 @@
           "SMS"
         ],
         "security": [
-          {
-            "apiKey": []
-          },
           {
             "sessionCookie": []
           }
@@ -1905,7 +1884,8 @@
               }
             }
           }
-        }
+        },
+        "x-hivenode-phase": "PILOTO_ASSISTIDO"
       }
     },
     "/api/v1/workspaces/{workspaceId}/sms/devices/{nodeId}/sims": {
@@ -2081,20 +2061,18 @@
               }
             }
           }
-        }
+        },
+        "x-hivenode-phase": "PILOTO_ASSISTIDO"
       }
     },
     "/api/v1/workspaces/{workspaceId}/sms/sims/{simBindingId}/policy": {
       "put": {
         "operationId": "setSimPolicy",
-        "summary": "sms:policy:manage; elegibilidade não autodeclarada",
+        "summary": "Submeter nova revisão PENDING com sessão humana",
         "tags": [
           "SMS"
         ],
         "security": [
-          {
-            "apiKey": []
-          },
           {
             "sessionCookie": []
           }
@@ -2250,7 +2228,9 @@
               }
             }
           }
-        }
+        },
+        "x-hivenode-recent-auth-seconds": 300,
+        "x-hivenode-phase": "PILOTO_ASSISTIDO"
       }
     },
     "/api/v1/workspaces/{workspaceId}/sms/terms/accept": {
@@ -2261,9 +2241,6 @@
           "SMS"
         ],
         "security": [
-          {
-            "apiKey": []
-          },
           {
             "sessionCookie": []
           }
@@ -2410,7 +2387,9 @@
               }
             }
           }
-        }
+        },
+        "x-hivenode-recent-auth-seconds": 300,
+        "x-hivenode-phase": "PILOTO_ASSISTIDO"
       }
     },
     "/api/v1/workspaces/{workspaceId}/sms/messages": {
@@ -2458,6 +2437,13 @@
                   "type": "string",
                   "format": "uuid"
                 }
+              },
+              "Idempotency-Replayed": {
+                "description": "Pedido anterior com a mesma intenção.",
+                "schema": {
+                  "type": "boolean",
+                  "const": true
+                }
               }
             },
             "content": {
@@ -2467,7 +2453,7 @@
                   "additionalProperties": false,
                   "properties": {
                     "data": {
-                      "$ref": "#/components/schemas/Message"
+                      "$ref": "#/components/schemas/MutationReceipt"
                     },
                     "requestId": {
                       "type": "string",
@@ -2499,7 +2485,7 @@
                   "additionalProperties": false,
                   "properties": {
                     "data": {
-                      "$ref": "#/components/schemas/Message"
+                      "$ref": "#/components/schemas/MutationReceipt"
                     },
                     "requestId": {
                       "type": "string",
@@ -2612,7 +2598,9 @@
               }
             }
           }
-        }
+        },
+        "x-hivenode-phase": "PILOTO_ASSISTIDO",
+        "description": "No piloto, aceita TRANSACTIONAL individual, sem agenda futura, e aplica a allowlist da coorte."
       },
       "get": {
         "operationId": "listSms",
@@ -2653,6 +2641,52 @@
               "minimum": 1,
               "maximum": 100,
               "default": 25
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "QUEUED",
+                "LEASED",
+                "AUTHORIZED",
+                "SENDING",
+                "SENT",
+                "DELIVERED",
+                "PARTIAL",
+                "FAILED",
+                "UNKNOWN",
+                "SUSPENDED",
+                "CANCELED",
+                "EXPIRED",
+                "SUPPRESSED"
+              ]
+            }
+          },
+          {
+            "name": "nodeId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "createdFrom",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "createdTo",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
             }
           }
         ],
@@ -2777,7 +2811,8 @@
               }
             }
           }
-        }
+        },
+        "x-hivenode-phase": "PILOTO_ASSISTIDO"
       }
     },
     "/api/v1/workspaces/{workspaceId}/sms/messages/{messageId}": {
@@ -2936,7 +2971,8 @@
               }
             }
           }
-        }
+        },
+        "x-hivenode-phase": "PILOTO_ASSISTIDO"
       }
     },
     "/api/v1/workspaces/{workspaceId}/sms/messages/{messageId}/cancel": {
@@ -3095,7 +3131,8 @@
               }
             }
           }
-        }
+        },
+        "x-hivenode-phase": "PILOTO_ASSISTIDO"
       }
     },
     "/api/v1/workspaces/{workspaceId}/sms/messages/{messageId}/resend": {
@@ -3152,6 +3189,13 @@
                   "type": "string",
                   "format": "uuid"
                 }
+              },
+              "Idempotency-Replayed": {
+                "description": "Pedido anterior com a mesma intenção.",
+                "schema": {
+                  "type": "boolean",
+                  "const": true
+                }
               }
             },
             "content": {
@@ -3161,7 +3205,7 @@
                   "additionalProperties": false,
                   "properties": {
                     "data": {
-                      "$ref": "#/components/schemas/Message"
+                      "$ref": "#/components/schemas/MutationReceipt"
                     },
                     "requestId": {
                       "type": "string",
@@ -3193,7 +3237,7 @@
                   "additionalProperties": false,
                   "properties": {
                     "data": {
-                      "$ref": "#/components/schemas/Message"
+                      "$ref": "#/components/schemas/MutationReceipt"
                     },
                     "requestId": {
                       "type": "string",
@@ -3306,7 +3350,8 @@
               }
             }
           }
-        }
+        },
+        "x-hivenode-phase": "PILOTO_ASSISTIDO"
       }
     },
     "/api/v1/workspaces/{workspaceId}/sms/batches": {
@@ -3353,6 +3398,13 @@
                 "schema": {
                   "type": "string",
                   "format": "uuid"
+                }
+              },
+              "Idempotency-Replayed": {
+                "description": "Pedido anterior com a mesma intenção.",
+                "schema": {
+                  "type": "boolean",
+                  "const": true
                 }
               }
             },
@@ -3508,7 +3560,8 @@
               }
             }
           }
-        }
+        },
+        "x-hivenode-phase": "EXPANSAO"
       },
       "get": {
         "operationId": "listSmsBatches",
@@ -3673,7 +3726,8 @@
               }
             }
           }
-        }
+        },
+        "x-hivenode-phase": "EXPANSAO"
       }
     },
     "/api/v1/workspaces/{workspaceId}/sms/batches/{batchId}": {
@@ -3849,7 +3903,8 @@
               }
             }
           }
-        }
+        },
+        "x-hivenode-phase": "EXPANSAO"
       }
     },
     "/api/v1/workspaces/{workspaceId}/sms/pause": {
@@ -4009,7 +4064,8 @@
               }
             }
           }
-        }
+        },
+        "x-hivenode-phase": "PILOTO_ASSISTIDO"
       }
     },
     "/api/v1/workspaces/{workspaceId}/sms/resume": {
@@ -4169,7 +4225,8 @@
               }
             }
           }
-        }
+        },
+        "x-hivenode-phase": "PILOTO_ASSISTIDO"
       }
     },
     "/api/v1/workspaces/{workspaceId}/sms/templates": {
@@ -4336,7 +4393,8 @@
               }
             }
           }
-        }
+        },
+        "x-hivenode-phase": "EXPANSAO"
       },
       "post": {
         "operationId": "createTemplate",
@@ -4494,7 +4552,8 @@
               }
             }
           }
-        }
+        },
+        "x-hivenode-phase": "EXPANSAO"
       }
     },
     "/api/v1/workspaces/{workspaceId}/sms/templates/{templateId}": {
@@ -4663,7 +4722,8 @@
               }
             }
           }
-        }
+        },
+        "x-hivenode-phase": "EXPANSAO"
       },
       "delete": {
         "operationId": "deleteTemplate",
@@ -4820,7 +4880,8 @@
               }
             }
           }
-        }
+        },
+        "x-hivenode-phase": "EXPANSAO"
       }
     },
     "/api/v1/workspaces/{workspaceId}/sms/suppressions": {
@@ -4987,7 +5048,8 @@
               }
             }
           }
-        }
+        },
+        "x-hivenode-phase": "EXPANSAO"
       },
       "post": {
         "operationId": "addSuppression",
@@ -5145,7 +5207,8 @@
               }
             }
           }
-        }
+        },
+        "x-hivenode-phase": "EXPANSAO"
       }
     },
     "/api/v1/workspaces/{workspaceId}/sms/webhooks": {
@@ -5312,7 +5375,8 @@
               }
             }
           }
-        }
+        },
+        "x-hivenode-phase": "EXPANSAO"
       },
       "post": {
         "operationId": "createWebhook",
@@ -5470,7 +5534,8 @@
               }
             }
           }
-        }
+        },
+        "x-hivenode-phase": "EXPANSAO"
       }
     },
     "/api/v1/workspaces/{workspaceId}/sms/webhooks/{endpointId}": {
@@ -5639,7 +5704,8 @@
               }
             }
           }
-        }
+        },
+        "x-hivenode-phase": "EXPANSAO"
       },
       "delete": {
         "operationId": "deleteWebhook",
@@ -5796,7 +5862,8 @@
               }
             }
           }
-        }
+        },
+        "x-hivenode-phase": "EXPANSAO"
       }
     },
     "/api/v1/workspaces/{workspaceId}/sms/webhooks/{endpointId}/replay": {
@@ -5965,7 +6032,8 @@
               }
             }
           }
-        }
+        },
+        "x-hivenode-phase": "EXPANSAO"
       }
     },
     "/api/v1/workspaces/{workspaceId}/sms/exports": {
@@ -6125,7 +6193,8 @@
               }
             }
           }
-        }
+        },
+        "x-hivenode-phase": "EXPANSAO"
       }
     },
     "/api/v1/workspaces/{workspaceId}/sms/exports/{exportId}": {
@@ -6284,7 +6353,8 @@
               }
             }
           }
-        }
+        },
+        "x-hivenode-phase": "EXPANSAO"
       }
     },
     "/api/v1/workspaces/{workspaceId}/api-keys": {
@@ -6295,9 +6365,6 @@
           "Workspace"
         ],
         "security": [
-          {
-            "apiKey": []
-          },
           {
             "sessionCookie": []
           }
@@ -6451,7 +6518,8 @@
               }
             }
           }
-        }
+        },
+        "x-hivenode-phase": "PILOTO_ASSISTIDO"
       },
       "post": {
         "operationId": "createApiKey",
@@ -6460,9 +6528,6 @@
           "Workspace"
         ],
         "security": [
-          {
-            "apiKey": []
-          },
           {
             "sessionCookie": []
           }
@@ -6609,7 +6674,8 @@
               }
             }
           }
-        }
+        },
+        "x-hivenode-phase": "PILOTO_ASSISTIDO"
       }
     },
     "/api/v1/workspaces/{workspaceId}/api-keys/{credentialId}": {
@@ -6620,9 +6686,6 @@
           "Workspace"
         ],
         "security": [
-          {
-            "apiKey": []
-          },
           {
             "sessionCookie": []
           }
@@ -6768,7 +6831,8 @@
               }
             }
           }
-        }
+        },
+        "x-hivenode-phase": "PILOTO_ASSISTIDO"
       }
     },
     "/api/v1/workspaces/{workspaceId}/billing/quote": {
@@ -6779,9 +6843,6 @@
           "Billing"
         ],
         "security": [
-          {
-            "apiKey": []
-          },
           {
             "sessionCookie": []
           }
@@ -6928,7 +6989,9 @@
               }
             }
           }
-        }
+        },
+        "x-hivenode-recent-auth-seconds": 300,
+        "x-hivenode-phase": "PILOTO_PAGO"
       }
     },
     "/api/v1/workspaces/{workspaceId}/billing/change": {
@@ -6939,9 +7002,6 @@
           "Billing"
         ],
         "security": [
-          {
-            "apiKey": []
-          },
           {
             "sessionCookie": []
           }
@@ -6975,6 +7035,13 @@
                 "schema": {
                   "type": "string",
                   "format": "uuid"
+                }
+              },
+              "Idempotency-Replayed": {
+                "description": "Pedido anterior com a mesma intenção.",
+                "schema": {
+                  "type": "boolean",
+                  "const": true
                 }
               }
             },
@@ -7130,7 +7197,10 @@
               }
             }
           }
-        }
+        },
+        "x-hivenode-recent-auth-seconds": 300,
+        "x-hivenode-phase": "PILOTO_PAGO",
+        "description": "Aplicação na próxima renovação confirmada. O meio pode exigir novo mandato."
       }
     },
     "/api/v1/workspaces/{workspaceId}/billing/cancel": {
@@ -7141,9 +7211,6 @@
           "Billing"
         ],
         "security": [
-          {
-            "apiKey": []
-          },
           {
             "sessionCookie": []
           }
@@ -7290,7 +7357,10 @@
               }
             }
           }
-        }
+        },
+        "x-hivenode-recent-auth-seconds": 300,
+        "x-hivenode-phase": "PILOTO_PAGO",
+        "description": "Encerra renovação e preserva paidThrough, salvo regra própria de estorno ou disputa."
       }
     },
     "/api/v1/sms/optout": {
@@ -7433,7 +7503,8 @@
               }
             }
           }
-        }
+        },
+        "x-hivenode-phase": "EXPANSAO"
       }
     },
     "/sms/optout/{token}": {
@@ -7554,7 +7625,8 @@
               }
             }
           }
-        }
+        },
+        "x-hivenode-phase": "EXPANSAO"
       }
     },
     "/api/device/v1/capabilities": {
@@ -7739,7 +7811,8 @@
               }
             }
           }
-        }
+        },
+        "x-hivenode-phase": "PILOTO_ASSISTIDO"
       }
     },
     "/api/device/v1/sms/inventory": {
@@ -7924,7 +7997,8 @@
               }
             }
           }
-        }
+        },
+        "x-hivenode-phase": "PILOTO_ASSISTIDO"
       }
     },
     "/api/device/v1/sms/claim": {
@@ -8116,7 +8190,8 @@
               }
             }
           }
-        }
+        },
+        "x-hivenode-phase": "PILOTO_ASSISTIDO"
       }
     },
     "/api/device/v1/sms/attempts/{attemptId}/grant": {
@@ -8310,7 +8385,8 @@
               }
             }
           }
-        }
+        },
+        "x-hivenode-phase": "PILOTO_ASSISTIDO"
       }
     },
     "/api/device/v1/sms/attempts/{attemptId}": {
@@ -8494,7 +8570,8 @@
               }
             }
           }
-        }
+        },
+        "x-hivenode-phase": "PILOTO_ASSISTIDO"
       }
     },
     "/api/device/v1/sms/events": {
@@ -8676,6 +8753,1530 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/DeviceEvents"
+              }
+            }
+          }
+        },
+        "x-hivenode-phase": "PILOTO_ASSISTIDO",
+        "description": "503 deixa os eventos no dispositivo sem ACK. Confirma somente depois de persistir."
+      }
+    },
+    "/api/v1/workspaces/{workspaceId}/sms/enrollments": {
+      "post": {
+        "operationId": "createSmsEnrollment",
+        "summary": "OWNER cria QR vinculado ao desafio da instalação",
+        "tags": [
+          "SMS"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Requisição inválida",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Não autenticado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Não autorizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Ausente ou outra conta",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Estado/chave/capacidade conflitante",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validação de domínio",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Limite público",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependência indisponível",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Sucesso",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Enrollment"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "x-hivenode-phase": "PILOTO_ASSISTIDO",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnrollmentRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workspaces/{workspaceId}/sms/enrollments/{enrollmentId}/revoke": {
+      "post": {
+        "operationId": "revokeSmsEnrollment",
+        "summary": "OWNER encerra convite aberto",
+        "tags": [
+          "SMS"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "enrollmentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Requisição inválida",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Não autenticado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Não autorizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Ausente ou outra conta",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Estado/chave/capacidade conflitante",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validação de domínio",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Limite público",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependência indisponível",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Sucesso",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/RevokeEnrollment"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "x-hivenode-phase": "PILOTO_ASSISTIDO"
+      }
+    },
+    "/api/device/v1/sms/enrollments/redeem": {
+      "post": {
+        "operationId": "redeemSmsEnrollment",
+        "summary": "TLS, código de uso único, desafio S256 e confirmação local",
+        "tags": [
+          "Device"
+        ],
+        "security": [],
+        "parameters": [],
+        "responses": {
+          "400": {
+            "description": "Requisição inválida",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Não autenticado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Não autorizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Ausente ou outra conta",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Estado/chave/capacidade conflitante",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validação de domínio",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Limite público",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependência indisponível",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Sucesso",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/SmsIdentity"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "x-hivenode-phase": "PILOTO_ASSISTIDO",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RedeemEnrollment"
+              }
+            }
+          }
+        },
+        "description": "Resgate autenticado por código e desafio S256 em TLS. Limitar tentativas e enviar o segredo apenas uma vez. Resposta perdida exige revogar a instalação e parear novamente."
+      }
+    },
+    "/api/v1/workspaces/{workspaceId}/sms/sims/{simBindingId}/policy/{version}/decision": {
+      "post": {
+        "operationId": "decideSmsPolicy",
+        "summary": "Revisor independente registra decisão auditada",
+        "tags": [
+          "SMS"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "simBindingId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Requisição inválida",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Não autenticado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Não autorizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Ausente ou outra conta",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Estado/chave/capacidade conflitante",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validação de domínio",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Limite público",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependência indisponível",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Sucesso",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/SimPolicy"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "x-hivenode-phase": "PILOTO_ASSISTIDO",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyDecision"
+              }
+            }
+          }
+        },
+        "x-hivenode-recent-auth-seconds": 300
+      }
+    },
+    "/api/device/v1/sms/sims/{simBindingId}/consent": {
+      "post": {
+        "operationId": "setSimConsent",
+        "summary": "Confirma ou revoga consentimento local da versão",
+        "tags": [
+          "Device"
+        ],
+        "security": [
+          {
+            "deviceSignature": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "simBindingId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Hive-Node",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Hive-Epoch",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Hive-Timestamp",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "X-Hive-Nonce",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 32,
+              "maxLength": 128
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Requisição inválida",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Não autenticado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Não autorizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Ausente ou outra conta",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Estado/chave/capacidade conflitante",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validação de domínio",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Limite público",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependência indisponível",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Sucesso",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/ActionResult"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "x-hivenode-phase": "PILOTO_ASSISTIDO",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SimConsent"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workspaces/{workspaceId}/sms/readiness": {
+      "get": {
+        "operationId": "getSmsReadiness",
+        "summary": "OWNER consulta diagnóstico e prontidão",
+        "tags": [
+          "SMS"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Requisição inválida",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Não autenticado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Não autorizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Ausente ou outra conta",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Estado/chave/capacidade conflitante",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validação de domínio",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Limite público",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependência indisponível",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Sucesso",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/SmsReadiness"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "x-hivenode-phase": "PILOTO_ASSISTIDO"
+      }
+    },
+    "/api/v1/workspaces/{workspaceId}/sms/readiness/test": {
+      "post": {
+        "operationId": "sendSmsReadinessTest",
+        "summary": "Teste de prontidão único para destino controlado configurado no servidor",
+        "tags": [
+          "SMS"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 16,
+              "maxLength": 128
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Requisição inválida",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Não autenticado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Não autorizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Ausente ou outra conta",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Estado/chave/capacidade conflitante",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validação de domínio",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Limite público",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependência indisponível",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Sucesso",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/MutationReceipt"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Solicitação idempotente já registrada; mesmo recurso",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              },
+              "Idempotency-Replayed": {
+                "description": "Pedido anterior com a mesma intenção.",
+                "schema": {
+                  "type": "boolean",
+                  "const": true
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/MutationReceipt"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "x-hivenode-phase": "PILOTO_ASSISTIDO",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReadinessTestRequest"
+              }
+            }
+          }
+        },
+        "description": "A reserva única de prontidão é por conta e instalação. O destino controlado é configurado no servidor e utiliza a mesma fila e política."
+      }
+    },
+    "/api/v1/workspaces/{workspaceId}/sms/trial": {
+      "post": {
+        "operationId": "activateSmsTrial",
+        "summary": "OWNER inicia teste após prontidão",
+        "tags": [
+          "SMS"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Requisição inválida",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Não autenticado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Não autorizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Ausente ou outra conta",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Estado/chave/capacidade conflitante",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validação de domínio",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Limite público",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependência indisponível",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Sucesso",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/TrialInfo"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "x-hivenode-phase": "PILOTO_ASSISTIDO"
+      }
+    },
+    "/api/device/v1/sms/presence": {
+      "post": {
+        "operationId": "setSmsPresence",
+        "summary": "Sessão visível do agente",
+        "tags": [
+          "Device"
+        ],
+        "security": [
+          {
+            "deviceSignature": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Hive-Node",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Hive-Epoch",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Hive-Timestamp",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "X-Hive-Nonce",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 32,
+              "maxLength": 128
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Requisição inválida",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Não autenticado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Não autorizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Ausente ou outra conta",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Estado/chave/capacidade conflitante",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validação de domínio",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Limite público",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependência indisponível",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Sucesso",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/AgentPresenceResult"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "x-hivenode-phase": "PILOTO_ASSISTIDO",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentPresence"
               }
             }
           }
@@ -9038,13 +10639,33 @@
           "lastSeenAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "availableUntil": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "nextAction": {
+            "type": "string"
+          },
+          "availabilityReason": {
+            "type": "string",
+            "enum": [
+              "READY",
+              "OFFLINE",
+              "INSTALLER_RESTRICTED",
+              "PERMISSION_REQUIRED",
+              "SIM_REVIEW_PENDING",
+              "SESSION_STOPPED",
+              "UNSUPPORTED"
+            ]
           }
         },
         "required": [
           "id",
           "smsSupported",
           "smsEnabled",
-          "available"
+          "available",
+          "availabilityReason"
         ]
       },
       "DeviceUpdate": {
@@ -9196,13 +10817,24 @@
           "expiresAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "APPROVED",
+              "REJECTED",
+              "REVOKED"
+            ]
           }
         },
         "required": [
           "allowedPurposes",
           "segmentRate",
           "evidenceReference",
-          "roamingAllowed"
+          "roamingAllowed",
+          "status",
+          "version"
         ]
       },
       "TermsRequest": {
@@ -9883,6 +11515,10 @@
           "expiresAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "effectiveAt": {
+            "type": "string",
+            "format": "date-time"
           }
         },
         "required": [
@@ -9890,7 +11526,8 @@
           "service",
           "amountCents",
           "renewalPriceCents",
-          "expiresAt"
+          "expiresAt",
+          "effectiveAt"
         ]
       },
       "ChangeRequest": {
@@ -10042,10 +11679,15 @@
           "inventoryVersion": {
             "type": "integer",
             "minimum": 1
+          },
+          "activeSessionId": {
+            "type": "string",
+            "format": "uuid"
           }
         },
         "required": [
-          "inventoryVersion"
+          "inventoryVersion",
+          "activeSessionId"
         ]
       },
       "Claim": {
@@ -10133,13 +11775,23 @@
           "previewFingerprint": {
             "type": "string",
             "pattern": "^[a-f0-9]{64}$"
+          },
+          "policyVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "activeSessionId": {
+            "type": "string",
+            "format": "uuid"
           }
         },
         "required": [
           "leaseToken",
           "inventoryVersion",
           "segments",
-          "previewFingerprint"
+          "previewFingerprint",
+          "policyVersion",
+          "activeSessionId"
         ]
       },
       "DispatchGrant": {
@@ -10220,7 +11872,8 @@
               "SEGMENT_DELIVERED",
               "SEGMENT_DELIVERY_FAILED",
               "EXECUTION_UNKNOWN",
-              "PRECHECK_FAILED"
+              "PRECHECK_FAILED",
+              "SEGMENT_DELIVERY_UNAVAILABLE"
             ]
           },
           "attemptId": {
@@ -10242,6 +11895,27 @@
           "occurredAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "precheckReason": {
+            "type": "string",
+            "enum": [
+              "NETWORK_UNAVAILABLE_BEFORE_INVOKE",
+              "SESSION_STOPPED",
+              "SIM_CHANGED",
+              "PERMISSION_REVOKED",
+              "GRANT_EXPIRED"
+            ]
+          },
+          "deliveryReport": {
+            "type": "string",
+            "enum": [
+              "CONFIRMED_DELIVERED",
+              "NEGATIVE",
+              "UNAVAILABLE"
+            ]
+          },
+          "networkStatusCode": {
+            "type": "integer"
           }
         },
         "required": [
@@ -10250,6 +11924,99 @@
           "attemptId",
           "deviceSequence",
           "occurredAt"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "eventType": {
+                  "const": "PRECHECK_FAILED"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "precheckReason"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "eventType": {
+                  "enum": [
+                    "SEGMENT_SENT",
+                    "SEGMENT_SEND_FAILED",
+                    "SEGMENT_DELIVERED",
+                    "SEGMENT_DELIVERY_FAILED",
+                    "SEGMENT_DELIVERY_UNAVAILABLE"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "segmentIndex"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "eventType": {
+                  "const": "SEGMENT_DELIVERED"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "deliveryReport"
+              ],
+              "properties": {
+                "deliveryReport": {
+                  "const": "CONFIRMED_DELIVERED"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "eventType": {
+                  "const": "SEGMENT_DELIVERY_FAILED"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "deliveryReport"
+              ],
+              "properties": {
+                "deliveryReport": {
+                  "const": "NEGATIVE"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "eventType": {
+                  "const": "SEGMENT_DELIVERY_UNAVAILABLE"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "deliveryReport"
+              ],
+              "properties": {
+                "deliveryReport": {
+                  "const": "UNAVAILABLE"
+                }
+              }
+            }
+          }
         ]
       },
       "DeviceEvents": {
@@ -10273,26 +12040,39 @@
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "ackedEventIds": {
+          "results": {
             "type": "array",
+            "maxItems": 100,
             "items": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "maxItems": 100
-          },
-          "rejectedEventIds": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "maxItems": 100
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "eventId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "ACCEPTED",
+                    "DUPLICATE",
+                    "PERMANENT_REJECT",
+                    "RETRY"
+                  ]
+                },
+                "code": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "eventId",
+                "status"
+              ]
+            }
           }
         },
         "required": [
-          "ackedEventIds",
-          "rejectedEventIds"
+          "results"
         ]
       },
       "Template": {
@@ -10779,6 +12559,300 @@
           "segmentRate",
           "evidenceReference",
           "roamingAllowed"
+        ]
+      },
+      "MutationReceipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "LEASED",
+              "AUTHORIZED",
+              "SENDING",
+              "SENT",
+              "DELIVERED",
+              "PARTIAL",
+              "FAILED",
+              "UNKNOWN",
+              "SUSPENDED",
+              "CANCELED",
+              "EXPIRED",
+              "SUPPRESSED"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "state"
+        ]
+      },
+      "EnrollmentRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "installationChallenge": {
+            "type": "string",
+            "minLength": 43,
+            "maxLength": 43,
+            "pattern": "^[A-Za-z0-9_-]{43}$"
+          }
+        },
+        "required": [
+          "installationChallenge"
+        ]
+      },
+      "Enrollment": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "minLength": 32
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "workspaceLabel": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "expiresAt",
+          "workspaceLabel"
+        ]
+      },
+      "RevokeEnrollment": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "REVOKED"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "state"
+        ]
+      },
+      "RedeemEnrollment": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 32
+          },
+          "installationVerifier": {
+            "type": "string",
+            "minLength": 43,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9._~-]+$"
+          },
+          "localConfirmation": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "code",
+          "installationVerifier",
+          "localConfirmation"
+        ]
+      },
+      "SmsIdentity": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "workspaceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "nodeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "installationEpoch": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "deviceSecret": {
+            "type": "string",
+            "minLength": 32
+          }
+        },
+        "required": [
+          "workspaceId",
+          "nodeId",
+          "installationEpoch",
+          "deviceSecret"
+        ]
+      },
+      "PolicyDecision": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "decision": {
+            "type": "string",
+            "enum": [
+              "APPROVED",
+              "REJECTED",
+              "REVOKED"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "decision",
+          "reason"
+        ]
+      },
+      "SimConsent": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "policyVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "accepted": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "policyVersion",
+          "accepted"
+        ]
+      },
+      "SmsReadiness": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "ready": {
+            "type": "boolean"
+          },
+          "testEligible": {
+            "type": "boolean"
+          },
+          "trialEligible": {
+            "type": "boolean"
+          },
+          "nextAction": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ready",
+          "testEligible",
+          "trialEligible",
+          "nextAction"
+        ]
+      },
+      "ReadinessTestRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "nodeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "simBindingId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "nodeId",
+          "simBindingId"
+        ]
+      },
+      "TrialInfo": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "startsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "segmentLimit": {
+            "type": "integer",
+            "const": 100
+          }
+        },
+        "required": [
+          "startsAt",
+          "expiresAt",
+          "segmentLimit"
+        ]
+      },
+      "AgentPresence": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "activeSessionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "active": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "activeSessionId",
+          "active"
+        ]
+      },
+      "AgentPresenceResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "availableUntil": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "serverTime": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "availableUntil",
+          "serverTime"
         ]
       }
     }

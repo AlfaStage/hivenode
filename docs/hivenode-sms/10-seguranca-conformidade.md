@@ -10,6 +10,8 @@ Cliente tende a ser controlador da campanha e HiveNode operador nessa execução
 
 ## Conteúdo e descadastro
 
+O piloto aceita finalidade transacional aprovada e destinatários de teste ou da operação autorizada. Campanhas são habilitadas em etapa própria. O cliente submete a evidência. Um revisor autorizado aprova ou rejeita a versão com motivo, finalidade, limites e validade. O Android confirma a versão aprovada antes de emitir grants. Troca, revogação ou expiração bloqueiam novos grants. O proprietário pode pausar sem depender de suporte.
+
 - Marketing v1 exige evidência de adesão e identidade do remetente como política do produto, além da análise jurídica aplicável.
 - Incluir link de descadastro tokenizado por destinatário/conta, URL HTTPS sob domínio configurado. Não usar `SAIR` como única saída sem recepção nativa implementada.
 - GET apenas exibe confirmação, porque scanners de links podem visitar URLs. POST efetiva supressão idempotente sem exigir login.
@@ -36,7 +38,7 @@ O job de retenção remove corpo do DB, filas, eventos indevidos, exports e arma
 1. TLS externo; endpoints internos com autenticação dedicada; segmentation de rede e credenciais mínimas.
 2. API key aleatória forte, hash no servidor, prefixo público, scopes/resources, expiração e rotação. Segredo completo exibido uma vez.
 3. Corpo cifrado com encryption key versionada; lookup de número por HMAC com key própria. Não reutilizar chave JWT para tudo.
-4. Sem texto/telefone completo em logs, traces, URLs, fila BullMQ, alertas, analytics, dumps de teste ou captura de tela compartilhada.
+4. Sem texto/telefone completo em logs, traces, URLs, payload operacional de fila, alertas, analytics, dumps de teste ou captura de tela compartilhada.
 5. Revalidar acesso ao ler, exportar, assinar download e emitir evento realtime; remover membro invalida permissões.
 6. Limitar tamanho/batch, sanitizar CSV contra formula injection, CSRF em cookie, CORS explícito.
 7. Webhooks com defesa SSRF inclusive resolução/rebinding/IPv6; impedir endpoint da própria rede interna.

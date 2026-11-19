@@ -1,6 +1,6 @@
 {
-  "version": "1.0.0",
-  "documentDate": "2026-10-13",
+  "version": "1.1.0",
+  "documentDate": "2026-11-18",
   "timezone": "America/Sao_Paulo",
   "productImplemented": false,
   "gates": [
@@ -36,15 +36,33 @@
     },
     {
       "id": "P",
-      "name": "Aparelhos e linhas reais",
+      "name": "Homologação do Android principal",
       "status": "NAO_EXECUTADO",
-      "reason": "Proprietário testará daqui a alguns dias; data não definida"
+      "reason": "HNS-32 requer build, linha, aparelho e responsável definidos"
     },
     {
       "id": "L",
       "name": "Jurídico, custos, gateway e distribuição",
       "status": "NAO_EXECUTADO",
       "reason": "Validação pelos responsáveis antes de lançamento"
+    },
+    {
+      "id": "V",
+      "name": "Provas de viabilidade",
+      "status": "NAO_EXECUTADO",
+      "reason": "HNS-02 e HNS-35"
+    },
+    {
+      "id": "LP",
+      "name": "Homologação do Light",
+      "status": "NAO_EXECUTADO",
+      "reason": "HNS-36, independente do piloto"
+    },
+    {
+      "id": "PG",
+      "name": "Pagamento real do piloto Inicial",
+      "status": "NAO_EXECUTADO",
+      "reason": "HNS-38, após HNS-34"
     }
   ],
   "productionRealSendAllowed": false

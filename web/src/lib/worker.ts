@@ -5,6 +5,7 @@ async function tick() {
   const now = new Date();
   await prisma.subscription.updateMany({ where: { status: "ACTIVE", currentPeriodEnd: { lt: now } }, data: { status: "PAST_DUE" } });
   await prisma.oneTimeToken.deleteMany({ where: { expiresAt: { lt: now } } });
+  await prisma.smsBetaMessage.deleteMany({ where: { createdAt: { lt: new Date(now.getTime() - 30 * 86_400_000) } } });
   await prisma.systemConfig.upsert({ where: { key: "worker_heartbeat" }, create: { key: "worker_heartbeat", value: now.toISOString() }, update: { value: now.toISOString() } });
 }
 async function main() {

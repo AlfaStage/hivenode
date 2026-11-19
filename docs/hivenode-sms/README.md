@@ -1,6 +1,8 @@
 # HiveNode SMS e equipes — pacote de execução
 
-Versão: 1.0 • Data: 13/10/2026 • Situação: especificado, não implementado.
+Versão 1.1 · 18/11/2026 · Planejamento revisado e pronto para as provas de viabilidade.
+
+Comece pelas quatro issues de viabilidade [HNS-01](issues/HNS-01.md), [HNS-02](issues/HNS-02.md), [HNS-03](issues/HNS-03.md) e [HNS-35](issues/HNS-35.md). O [plano de entrega](12-entrega-operacao.md) define o piloto assistido, o piloto pago e os aceites de expansão.
 
 Este pacote transforma as decisões da conversa em trabalho executável. Não é evidência de que o produto existe, de aprovação jurídica, de aprovação da loja ou de testes de SMS reais. Nenhum serviço, banco, assinatura ou issue remota foi alterado nesta entrega.
 
@@ -25,6 +27,8 @@ Este pacote transforma as decisões da conversa em trabalho executável. Não é
 17. [Situação da validação](validation-status.json): separa documentação conferida de produto/testes ainda pendentes.
 18. [Guia do dev júnior](14-guia-dev-junior.md): exemplo de implementação de uma issue, revisão e resolução de bloqueios.
 19. [Relatório de validação documental](validation-report.md): verificações executadas e limites da evidência.
+20. [Revisão pré-codificação](15-revisao-pre-codificacao.md): diagnóstico histórico que fundamenta a versão 1.1.
+21. [Beta privado](16-beta-privado.md): acesso administrativo, simulação disponível no código e requisitos do beta com modem.
 
 ## Como um dev júnior começa
 

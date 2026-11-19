@@ -1,30 +1,30 @@
 # HNS-31 — Ensaiar migração, backup e rollback com dados representativos
 
-Prioridade: P0 • Situação: TODO • Responsável sugerido: Backend/DBA com revisão
+Prioridade P0 · TODO · Fase EXPANSAO · Responsável sugerido Backend/DBA com revisão
 
 ## Contexto e objetivo
 
-Implementar esta parte do HiveNode SMS/equipes conforme as especificações vinculadas. Este arquivo é uma issue local pronta para importar; não foi publicado em tracker externo. Não confundir TODO com funcionalidade existente.
+Entregar esta parte conforme o [PRD](../01-prd.md) e a [sequência de execução](../12-entrega-operacao.md).
 
 ## Dependências
 
-- [HNS-05](HNS-05.md) concluída e contratos revisados.
-- [HNS-09](HNS-09.md) concluída e contratos revisados.
-- [HNS-12](HNS-12.md) concluída e contratos revisados.
-- [HNS-30](HNS-30.md) concluída e contratos revisados.
+- [HNS-05](HNS-05.md)
+- [HNS-09](HNS-09.md)
+- [HNS-12](HNS-12.md)
+- [HNS-30](HNS-30.md)
 
 ## Requisitos e leitura obrigatória
 
-Requisitos: R01, R20, R22. Ver [PRD](../01-prd.md).
+R01, R20, R22
 
 - [04-dados-migracao.md](../04-dados-migracao.md)
 - [12-entrega-operacao.md](../12-entrega-operacao.md)
 
 ## Onde trabalhar
 
-- `web/prisma/migrations` (conferir existência; caminhos de módulos novos são alvos A CRIAR).
-- `web/scripts` (conferir existência; caminhos de módulos novos são alvos A CRIAR).
-- `docs/hivenode-sms` (conferir existência; caminhos de módulos novos são alvos A CRIAR).
+- `web/prisma/migrations`
+- `web/scripts`
+- `docs/hivenode-sms`
 
 ## Passos de implementação
 
@@ -38,13 +38,12 @@ Requisitos: R01, R20, R22. Ver [PRD](../01-prd.md).
 - [ ] Contagens/saldos idênticos ou divergências justificadas e aprovadas.
 - [ ] Sem reset de produção ou restauração que descarte trabalho novo.
 - [ ] Runbook assinado com comandos do ambiente e limites.
-- [ ] Evidências e limitações anexadas ao PR; revisão das áreas críticas feita pelo responsável.
+- [ ] Evidência, limitações e riscos registrados no PR.
 
 ## Testes e evidências
 
-Executar T01, T44, T48 conforme [plano de testes](../11-testes.md). Para cada caso registrar ambiente, commit/build, entrada, esperado/observado e status. Caso físico ou comercial não disponível fica BLOQUEADO/NAO_EXECUTADO com responsável, nunca PASSOU.
+Executar T01, T44, T48 conforme o [plano de testes](../11-testes.md). Se o caso pertence à expansão ou a aparelho real, registrar a condição e a evidência disponível.
 
 ## Como revisar e entregar
 
-PR pequeno com problema/resultado, critérios de aceite e testes relevantes. Não copiar secrets, contatos reais ou corpo de SMS para logs. Para billing/migração/auth/modem, solicitar revisão experiente. Feature flag desligada e compatibilidade preservada quando gate posterior não estiver concluído. Atualizar o estado desta issue e a matriz de rastreabilidade após revisão.
-
+Referenciar esta issue, anexar os testes e registrar compatibilidade e rollback aplicáveis. Marcar a entrega concluída após revisão e atualizar a fase no backlog.

@@ -11,7 +11,7 @@ Este documento descreve testes A EXECUTAR durante implementação. Nesta entrega
 | B — integração DB/Redis/API/worker/simulador | Sim | PENDENTE_IMPLEMENTACAO |
 | C — navegador/MCP/proxy/migração/carga | Sim | PENDENTE_IMPLEMENTACAO |
 | N — build e testes nativos/emulador | Com JDK/SDK, sem linha real | PENDENTE_IMPLEMENTACAO |
-| P — homologação de aparelhos e operadoras | Não | PENDENTE_APARELHO; proprietário testa daqui a alguns dias |
+| P — homologação do Android principal | Não | PENDENTE_APARELHO, registrar responsável e build ao executar |
 | L — jurídico/comercial/gateway/distribuição | Responsáveis e contratos | PENDENTE_VALIDACAO |
 
 Aprovar A/B/C/N não libera envio real. Publicação exige P/L e gates anteriores. Marcações possíveis: PASSOU, FALHOU, BLOQUEADO, NAO_EXECUTADO; sempre acompanhar ambiente e evidência. Não marcar NAO_EXECUTADO como aprovado.
@@ -73,7 +73,7 @@ Os `;` acima são apenas separadores de leitura; executar cada comando separadam
 | `test:teams:integration` | Conta/equipe/convites, concorrência e migração |
 | `test:sms:browser` | Playwright jornadas cliente, sem admin de atalho |
 | `test:sms:contracts` | Validação OpenAPI/JSON schemas e contract tests de server/client |
-| `test:sms:load` | Perfil staging 10 requests/s/conta, 10min, sem modem |
+| `test:sms:load` | Staging, 10 escritas/s agregadas em 10 contas durante 10 min. Seis chaves espaçadas por conta. Teste 429 à parte |
 | `test:sms:chaos` | Quedas nos pontos críticos e convergência |
 | `sms:simulator` | Agente fake standalone com cenários, sem Telephony |
 
@@ -100,13 +100,13 @@ Simulador jamais chama modem nem serviço SMS externo. Deve rejeitar uso em prod
 | T09 | Habilitar último aparelho em corrida: uma única vaga | R04,R06 |
 | T10 | Trial reserva segmentos em corrida, multipart e UNKNOWN | R04,R07 |
 | T11 | Cancelar SMS só no fim pago; proxy continua | R04,R22 |
-| T12 | Upgrade por cotação, delta/meses curtos/ano bissexto | R04 |
+| T12 | Troca só no próximo ciclo confirmado, meses curtos/ano bissexto e mandato Pix quando necessário | R04 |
 | T13 | Reativação não dispara fila velha/vencida | R04,R08,R19 |
 | T14 | Webhook pagamento duplicado/fora de ordem/refund isolado | R04,R22 |
-| T15 | Mesmo key e payload concorrentes: um ID/outbox | R07 |
+| T15 | Mesma chave e intenção concorrentes criam um ID e uma pendência PostgreSQL | R07 |
 | T16 | Mesmo key e corpo/destino/conta distintos: escopo/409 corretos | R07,R13 |
 | T17 | Agenda UTC/fuso/DST e lote inválido: nenhum commit parcial | R08 |
-| T18 | Marketing descadastrado antes do grant: SUPPRESSED | R06,R16 |
+| T18 | Marketing descadastrado em QUEUED ou LEASED antes do grant: SUPPRESSED | R06,R16 |
 | T19 | Ausência de política/aceite/permissão: sem grant/modem | R06,R17 |
 | T20 | Dois claims/grants no mesmo aparelho: um executor | R07,R10 |
 | T21 | Nonce/grant/fence/epoch repetido ou adulterado: rejeitado | R10,R13,R18 |
@@ -114,7 +114,7 @@ Simulador jamais chama modem nem serviço SMS externo. Deve rejeitar uso em prod
 | T23 | Grant emitido, resposta perdida: recuperar grant existente | R09,R10 |
 | T24 | Crash após INVOKING antes/durante modem: UNKNOWN sem retry | R09,R10 |
 | T25 | Modem enviou, evento perdeu ACK: replay não reenvia | R09,R10,R15 |
-| T26 | Zero segmentos aceitos e falha segura: até 3 tentativas | R10,R11 |
+| T26 | Falha transitória comprovada antes da invocação: até 3 tentativas com uma chamada física no máximo | R10,R11 |
 | T27 | Multipart parcial/eventos invertidos/repetidos: PARTIAL, contadores exatos | R09,R10 |
 | T28 | SENT sem receipt: SENT com entrega não confirmada | R09,R11 |
 | T29 | Recibo tardio e duplicado: converge sem regredir estado | R09,R15 |
@@ -129,8 +129,8 @@ Simulador jamais chama modem nem serviço SMS externo. Deve rejeitar uso em prod
 | T38 | Webhook SSRF/DNS rebinding/IPv6/redirect: bloqueado | R15,R16 |
 | T39 | Exportação sem content grant, revogação antes de download, CSV formula | R03,R12,R16 |
 | T40 | Retenção remove corpo de DB/cache/export/app; logs sem PII | R16,R17 |
-| T41 | Kill switch/DB indisponível impedem grant novo e mantêm ingestão final | R19 |
-| T42 | Redis/fila indisponível após commit: outbox recupera | R07,R19 |
+| T41 | Kill switch recebe eventos finais com DB disponível. Sem DB, 503 sem ACK, persistência no aparelho e replay após volta | R19 |
+| T42 | Redis indisponível após commit preserva pendência PostgreSQL. Grant só volta após as verificações | R07,R19 |
 | T43 | Broker tickets/realtime não vazam para outro membro/conta | R03,R22 |
 | T44 | Bytes, créditos, proxy público e compartilhamento têm totais anteriores | R22 |
 | T45 | Tornar node público com SMS habilitado é rejeitado | R03,R06,R22 |
@@ -143,6 +143,15 @@ Simulador jamais chama modem nem serviço SMS externo. Deve rejeitar uso em prod
 | T52 | Canal de distribuição/pagamento real/linha elegível documentados | R04,R06,R20 |
 | T53 | Ordem retention x agenda: corpo necessário existe até validade | R08,R16 |
 | T54 | Pausa/revogação após grant mostra limite real de cancelamento | R09,R19 |
+| T55 | QR SMS-only, desafio, expiração, replay, sessão errada e confirmação local | R03,R05,R06,R22 |
+| T56 | Cliente não aprova a própria política. API key falha em aceite, gestão e cobrança. SIM requer revisão local vigente | R03,R06,R13,R17 |
+| T57 | Checkout e assinatura têm IDs distintos. Webhook antecipado, timeout e cobrança duplicada/falsa | R04,R21 |
+| T58 | ACK por evento, conflito de payload, recibos tardios e liberação da vaga sem duplicação | R09,R10,R19 |
+| T59 | Canal do APK concede SMS, aparelho/linha elegíveis e troca de instalação não recupera fila de backup | R05,R06,R18,R20 |
+| T60 | Revogar membro encerra WebSocket e túneis afetados e mantém shares válidos | R03,R22 |
+| T61 | Diagnóstico precede cobrança, relógio começa só após ativação e a interface mostra resultado, vagas e retenção | R04,R06,R12,R21 |
+
+Piloto usa os casos cobertos por suas issues e os testes de regressão do proxy. Casos de expansão são exigidos pela entrega correspondente. Light tem homologação própria em HNS-36. A prova física registra instalação pelo canal pretendido, permissão, modelo, build, versão Android, linha, SIM, sent/receipt, força de parada, segundo plano e tráfego proxy simultâneo.
 
 ## Simulador e injeção de falha
 

@@ -1,48 +1,47 @@
-# HNS-16 — Criar outbox, workers, agenda e recuperação Redis
+# HNS-16 — Criar fila durável no PostgreSQL e worker de conciliação
 
-Prioridade: P0 • Situação: TODO • Responsável sugerido: Backend/infra
+Prioridade P0 · TODO · Fase FLUXO_VERTICAL · Responsável sugerido Backend/infra
 
 ## Contexto e objetivo
 
-Implementar esta parte do HiveNode SMS/equipes conforme as especificações vinculadas. Este arquivo é uma issue local pronta para importar; não foi publicado em tracker externo. Não confundir TODO com funcionalidade existente.
+Entregar esta parte conforme o [PRD](../01-prd.md) e a [sequência de execução](../12-entrega-operacao.md).
 
 ## Dependências
 
-- [HNS-03](HNS-03.md) concluída e contratos revisados.
-- [HNS-15](HNS-15.md) concluída e contratos revisados.
+- [HNS-03](HNS-03.md)
+- [HNS-15](HNS-15.md)
 
 ## Requisitos e leitura obrigatória
 
-Requisitos: R07, R08, R19. Ver [PRD](../01-prd.md).
+R07, R08, R19
 
 - [07-fila-protocolo.md](../07-fila-protocolo.md)
 - [03-arquitetura.md](../03-arquitetura.md)
 
 ## Onde trabalhar
 
-- `web/src/lib/sms/jobs` (conferir existência; caminhos de módulos novos são alvos A CRIAR).
-- `web/src/workers` (conferir existência; caminhos de módulos novos são alvos A CRIAR).
-- `web/package.json` (conferir existência; caminhos de módulos novos são alvos A CRIAR).
+- `web/src/lib/sms/jobs`
+- `web/src/workers`
+- `web/package.json`
 
 ## Passos de implementação
 
-1. Criar publisher/worker separados do tick atual, jobs sem corpo e IDs sem dois-pontos.
-2. Reconciliar intents persistidas após queda; atualizar disponibilidade no banco.
-3. Implementar schedule/expiry e transações concorrentes com CAS/locks.
-4. Adicionar DLQ e replay administrativo que não equivale a resend físico; graceful shutdown.
+1. Indexar pendências por conta, nó e disponibilidade.
+2. Retirar com transação curta, SKIP LOCKED e exclusão de execução por aparelho.
+3. Conciliar leases e grants vencidos periodicamente.
+4. Preservar intenção em indisponibilidade do Redis. Reservar outbox para efeitos externos na expansão.
 
 ## Critérios de aceite
 
-- [ ] Redis offline após commit não perde a mensagem.
-- [ ] Repetir job não cria grant/modem novo por si só.
+- [ ] Restart preserva pendências e dedup.
+- [ ] Redis indisponível não elimina pedido nem concede autorização sem verificações.
 - [ ] Expiração antes de grant vira EXPIRED.
-- [ ] Evidências e limitações anexadas ao PR; revisão das áreas críticas feita pelo responsável.
+- [ ] Evidência, limitações e riscos registrados no PR.
 
 ## Testes e evidências
 
-Executar T17, T22, T42, T53 conforme [plano de testes](../11-testes.md). Para cada caso registrar ambiente, commit/build, entrada, esperado/observado e status. Caso físico ou comercial não disponível fica BLOQUEADO/NAO_EXECUTADO com responsável, nunca PASSOU.
+Executar T17, T20, T22, T42, T53 conforme o [plano de testes](../11-testes.md). Se o caso pertence à expansão ou a aparelho real, registrar a condição e a evidência disponível.
 
 ## Como revisar e entregar
 
-PR pequeno com problema/resultado, critérios de aceite e testes relevantes. Não copiar secrets, contatos reais ou corpo de SMS para logs. Para billing/migração/auth/modem, solicitar revisão experiente. Feature flag desligada e compatibilidade preservada quando gate posterior não estiver concluído. Atualizar o estado desta issue e a matriz de rastreabilidade após revisão.
-
+Referenciar esta issue, anexar os testes e registrar compatibilidade e rollback aplicáveis. Marcar a entrega concluída após revisão e atualizar a fase no backlog.

@@ -5,7 +5,7 @@
 | Estado | Significado | Próximos estados permitidos |
 |---|---|---|
 | QUEUED | Persistida, aguardando agenda/linha | LEASED, CANCELED, EXPIRED, SUPPRESSED, SUSPENDED |
-| LEASED | Uma instalação retirou o comando; nenhum efeito comprovado | AUTHORIZED, QUEUED, SUSPENDED, CANCELED, EXPIRED, FAILED |
+| LEASED | Uma instalação retirou o comando e ainda aguarda autorização | AUTHORIZED, QUEUED, SUSPENDED, CANCELED, EXPIRED, FAILED, SUPPRESSED |
 | AUTHORIZED | Grant físico emitido para tentativa específica | SENDING, UNKNOWN, FAILED |
 | SENDING | App persistiu INVOKING e invocou o modem | SENT, PARTIAL, FAILED, UNKNOWN |
 | SENT | Todos os segmentos aceitos no resultado de envio | DELIVERED; permanece SENT se recibo não chega |
@@ -24,14 +24,14 @@ Delivery é outra dimensão por segmento: PENDING, DELIVERED, FAILED, UNAVAILABL
 
 ## Fluxo físico em oito passos
 
-1. Cliente solicita envio: validar conta, ator, entitlement, SIM, conteúdo e supressão; transação grava mensagem/idempotência/outbox. Responder 202 com ID, não com promessa de entrega.
-2. Publisher publica `sms-<messageId>` (sem `:` no jobId). Worker prepara disponibilidade; reconciliação também pode encontrar mensagem mesmo se Redis cair.
-3. Agente `POST /api/device/v1/sms/claim` recebe no máximo uma tentativa em lease de 120s, pinned ao node/epoch/SIM/inventoryVersion, schedule/expiry e body cifrado no trânsito TLS.
+1. Validar conta, ator, direito, finalidade, SIM, conteúdo e supressão. Persistir mensagem e idempotência na mesma transação. O 202 confirma a intenção persistida.
+2. PostgreSQL é a fila do piloto. Indexar pendências elegíveis por conta, aparelho, `availableAt`, `scheduledAt` e ID. Retirar com transação curta e `FOR UPDATE SKIP LOCKED`, sob exclusão por aparelho. Um worker concilia expiração e retenção. Redis atende limites e anti-replay, sem ser fonte da intenção.
+3. `POST /api/device/v1/sms/claim` concede lease de 120s para instalação e SIM específicos. Persistir hash e cópia cifrada do lease durante sua validade para devolver a mesma capacidade em retry. Depois de expirar, apagar a cópia. TLS protege o texto em trânsito.
 4. App persiste RECEIVED em banco local; calcula divisão via SmsManager, verifica permissão e vínculo; grava número de segmentos/hash da divisão. Solicita grant com preview e lease.
-5. Servidor revalida todas as regras e reserva segmentos do trial. Emite grant assinado, único para tentativa, com validade máxima 30s limitada por expiresAt. Armazena autorização e fencingToken crescente.
+5. Servidor revalida termos, ator, instalação, política aprovada, consentimento local da revisão, disponibilidade, supressão e orçamento. Uma supressão vence enquanto ainda `LEASED`, inclusive se o comando já chegou ao aparelho. Reservar segmentos atomicamente. Emitir grant único com validade máxima de 30s, limitada por `expiresAt`, e contador crescente por aparelho.
 6. App valida assinatura/claims e relógio usando horário obtido do servidor, não apenas relógio local; transação local grava INVOKING **antes** de chamar modem. Verifica linha/permissão novamente. Reiniciar nesse estado nunca reinvoca automaticamente.
 7. SmsManager executa uma vez; cada callback grava evento/segmento no banco nativo. JS não é necessário para guardar o resultado. Callback correlaciona attemptId e segmentIndex com PendingIntent não ambíguo.
-8. App envia eventos deduplicáveis; servidor aplica CAS, atualiza contadores e outbox de webhook. Agente exclui eventos locais apenas após ACK persistido.
+8. O app envia eventos deduplicáveis. O servidor valida e persiste antes de confirmar, atualiza estado/contadores e grava a outbox de webhook quando esse recurso estiver habilitado. O agente remove eventos confirmados e guarda erros permanentes em registro local redigido.
 
 Um gap entre INVOKING e chamada física também pode produzir UNKNOWN sem envio real. Preferir incerteza explicada a duplicação silenciosa. Não existe transação distribuída com modem que garanta exatamente uma execução em todas as quedas.
 
@@ -47,16 +47,17 @@ O agente é uma fronteira de confiança: um aparelho adulterado pode mentir sobr
 
 Assinatura não substitui validação de node/SIM/epoch. Dispositivo persiste maior fencingToken e rejeita comando repetido/outra instalação. Perder lease depois de AUTHORIZED produz UNKNOWN; não liberar novo grant só porque TTL expirou. Grant não pode ser reutilizado para outra mensagem nem reemitido com ID novo para a mesma tentativa depois de INVOKING.
 
-Sem confirmação de grant emitido, app pergunta estado pelo attemptId. Não tenta outra linha. Sem rede, só executa um grant ainda válido e já persistido; nunca cria fila offline nova para execução futura sem verificação.
+O grant inclui `policyVersion` e `previewFingerprint`, além do vínculo e da quantidade de segmentos. Usar sessão de envio ativa e troca HTTPS recente na mesma inicialização, com relógio monotônico para calcular o tempo restante. Reboot invalida a referência temporal e impede reaproveitar o grant após reinício. Em perda de resposta, consultar a mesma tentativa. O piloto exige conexão no momento de iniciar a chamada ao Android. Confirmar rede, permissão, SIM e sessão imediatamente antes de chamar. Nenhum fallback de linha.
+
+Liberar a vaga do aparelho quando todos os resultados de envio forem conhecidos ou dois minutos após expirar o grant, o que ocorrer primeiro. Se houver lacuna no prazo, marcar `UNKNOWN` ou `PARTIAL` conforme evidência e manter a mensagem bloqueada para retry. A liberação permite outras mensagens. Recibos tardios atualizam a tentativa original e nunca bloqueiam a vaga nem geram execução. Uma tentativa vencida só pode ser liberada pela transação de conciliação.
 
 ## Retentativas
 
 - Antes de grant, queda/reentrega é segura com mesmo attemptId enquanto app comprova não ter INVOKING.
-- Após grant, retry físico só quando o resultado comprova **zero segmentos aceitos**, permite retry e está conciliado. Generic failure, timeout, erro de modem e rede ambígua não são automaticamente seguros.
-- Defaults de piloto: até 3 tentativas físicas no total, esperas mínimas 30s e 120s com jitter determinístico nos testes; sempre respeitar expiração e rate da linha.
+- Após grant, aceitar retry automático somente por prova nativa tipada de que a chamada não ocorreu, sem `INVOKING`, para condição transitória `NETWORK_UNAVAILABLE_BEFORE_INVOKE`. Até três tentativas totais e uma chamada física no piloto, com esperas mínimas de 30s e 120s. Resultado de telephony, timeout e qualquer histórico `UNKNOWN` ou `PARTIAL` tornam a mensagem inelegível para retry automático, mesmo se uma evidência posterior corrigir o estado.
 - Erro de permissão, destinatário inválido, SIM removido, contrato, supressão e block do cliente não fazem retry automático.
 - Mensagem PARTIAL/UNKNOWN exige investigação. Reenvio deliberado cria nova mensagem com `resendOf` e confirmação de possível duplicação, não muta a antiga para QUEUED.
-- BullMQ retry é retry de trabalho do servidor, não autorização para invocar SmsManager de novo.
+- Retry de trabalho do servidor nunca concede uma nova chamada ao `SmsManager` por si só.
 
 ## Diagnóstico normalizado
 
@@ -72,9 +73,11 @@ Lote até 100 destinos únicos por requisição. Preservar clientItemId; validar
 
 ## Eventos, outbox e reconciliação
 
-Evento mínimo: eventId UUID, eventType, nodeId, epoch, attemptId, deviceSequence inteiro, segmentIndex quando aplicável, platformCode, occurredAt, receivedAt servidor. Sequência monotônica por instalação; dedup por evento/seq. Receber fora de ordem deve convergir por segmento, sem regredir DELIVERED para SENT.
+Identificar evento por ID e por sequência da instalação. Persistir hash do payload para comparar retransmissões. Responder por evento com `ACCEPTED`, `DUPLICATE`, `PERMANENT_REJECT` ou `RETRY`. Mesmo ID/seq com payload diferente é conflito permanente auditado. Banco indisponível responde 503 sem confirmação, e o aparelho conserva a fila. Um canal de reporte anteriormente vinculado pode registrar resultados de sua própria tentativa durante retenção após desativação normal, sem receber novas autorizações. Comprometimento da credencial bloqueia também o reporte e exige operação assistida.
 
-Publisher pode repetir publicação; estado DB decide. Reconciliação a cada 30s encontra claims vencidos e grants/INVOCANDO sem eventos. Se servidor reiniciar, attempts e reservas persistidas mantêm exclusão. DLQ tem erro, tentativas e reprocessamento auditado; replay de webhook não reenvia SMS. Não usar corpo de mensagem em job data ou DLQ.
+O contrato separa código de envio, prova de pré-checagem e resultado interpretado do relatório de entrega. Recibo positivo reconhecido implica evidência de envio do segmento, mesmo se chegar antes do callback de envio. Recibo negativo preserva o resultado de envio. Resultado desconhecido ou relatório sem suporte fica sem confirmação. Nunca rebaixar `DELIVERED` por evento tardio. Conflito de evidência é auditado e não gera retry. [Android, relatório de status](https://developer.android.com/reference/android/telephony/SmsMessage#getStatus()).
+
+Reconciliação a cada 30s encontra leases vencidos e grants sem evidência. O estado persistido mantém a exclusão após restart. Na expansão, outbox e DLQ registram efeitos externos como webhooks usando ID por ocorrência, payload redigido e reprocessamento auditado. Introduzir BullMQ somente se medidas de carga ou operação justificarem. Replay de webhook nunca reenvia SMS.
 
 Ordenação de dispatch: por `scheduledAt,createdAt,id` dentro da linha, com rodízio entre linhas disponíveis e contas para evitar que um lote monopolize o worker. A exclusão por aparelho continua superior ao rodízio. Política segmentRate reserva tokens antes do grant; `periodCap`, quando presente, especifica contagem de segmentos e intervalo UTC startAt/endAt explícito, sem reset mensal presumido. Resultado UNKNOWN mantém reserva conservadora; zero segmentos aceitos comprovados permite liberação idempotente. Se replay cache/autorização estiver indisponível, novo grant retorna503 e não opera em modo permissivo.
 

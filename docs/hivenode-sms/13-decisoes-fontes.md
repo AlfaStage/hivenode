@@ -12,13 +12,23 @@
 | D06 | Equipe única para plataforma; maior benefício ativo, nunca soma |
 | D07 | SMS/proxy separados em cobrança/permissões; mesmos login, painel e apps |
 | D08 | Estados e recuperação transparentes; nenhuma promessa de resolver toda falha |
-| D09 | App será homologado fisicamente pelo proprietário daqui a alguns dias |
+| D09 | Homologação física do Android principal com responsável, build e evidência. Light tem marco próprio. |
 
 D05 é baseline para especificação após aceite de seguir recomendações; lançamento continua dependendo de custos. Benefícios de membros dos planos proxy atuais não foram definidos: baseline conservador 1 preserva operação atual até revisão do catálogo.
 
 ## Decisões técnicas propostas para execução
 
-T-D01: controle SMS HTTPS independente de túnel proxy. T-D02: grant curto antes do modem e inbox nativo persistente. T-D03: broker mantém binário TCP e migra contexto para conta. T-D04: SDK54 fixo, SMS API>=26, Light modernizado e antigo proxy-only. T-D05: MCP stdio inicial e remoto OAuth condicionado. T-D06: descadastro por link v1; recebimento nativo fora do lançamento. T-D07: dois chips serializados por aparelho, sem failover automático. T-D08: body retention 7d pós-terminal, limites e configuração descritos nos specs.
+| ID | Decisão operacional da versão 1.1 |
+|---|---|
+| T-D01 | Controle SMS HTTPS separado de proxy. Contas do piloto são aditivas. Migração proxy entra na expansão. |
+| T-D02 | PostgreSQL como fila do piloto. Grant curto antes do modem, inbox nativo e retry exclusivo de pré-checagem comprovada. |
+| T-D03 | QR SMS-only com credencial do aparelho própria. Aprovação de linha e confirmação local são etapas separadas. |
+| T-D04 | APK principal assinado, sessão visível e Android API26+ em aparelhos homologados. Light separado. |
+| T-D05 | REST individual no piloto. MCP stdio após estabilização, com remoto sujeito a homologação própria. |
+| T-D06 | Piloto transacional. Marketing com descadastro, evidência e suporte entra na expansão. |
+| T-D07 | Seleção explícita de chip, serialização por aparelho e bloqueio de troca silenciosa. |
+| T-D08 | Retenção de texto de sete dias pós-terminal por padrão, independente do histórico operacional. |
+| T-D09 | Verificar prontidão antes do teste e do pagamento. Primeiro plano pago Inicial, um meio mensal validado e trocas no próximo ciclo quando suportadas. |
 
 Essas decisões tornam o trabalho concreto; revisão técnica pode alterá-las por ADR, atualizando contratos, issues, teste e PRD juntos. Não alterar só o código e deixar um junior seguindo documento contraditório.
 
@@ -31,7 +41,7 @@ Essas decisões tornam o trabalho concreto; revisão técnica pode alterá-las p
 | Termos/LGPD/enquadramento | Jurídico habilitado | Documentos e instruções revisados |
 | Canal de distribuição SMS | Produto/mobile | Play elegível ou distribuição empresarial definida |
 | Estratégia FGS/target/latência | Mobile sênior | ADR por versão Android, teste físico e limites publicados |
-| Billing upgrade/cancelamento/recorrência | Backend/financeiro | Spike de API real/sandbox e adaptação |
+| Billing, cancelamento e recorrência | Backend/financeiro | Sandbox em HNS-35, implementação em HNS-12 e validação real em HNS-38 |
 | Carga/capacidade | Infra/backend | Benchmark do ambiente e limites públicos |
 | Homologação aparelho | Proprietário + mobile | Gate P com build/modelo/linha e resultados |
 | MCP remoto | Integrações/security | OAuth e teste com clientes reais antes de oferta remota |

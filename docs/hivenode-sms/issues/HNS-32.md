@@ -1,50 +1,47 @@
-# HNS-32 — Homologar APKs e chips reais com o proprietário
+# HNS-32 — Homologar Android principal em aparelho e linha reais
 
-Prioridade: P0 • Situação: TODO • Responsável sugerido: Proprietário + mobile/QA
+Prioridade P0 · TODO · Fase PILOTO_ASSISTIDO · Responsável sugerido Proprietário + mobile/QA
 
 ## Contexto e objetivo
 
-Implementar esta parte do HiveNode SMS/equipes conforme as especificações vinculadas. Este arquivo é uma issue local pronta para importar; não foi publicado em tracker externo. Não confundir TODO com funcionalidade existente.
+Entregar esta parte conforme o [PRD](../01-prd.md) e a [sequência de execução](../12-entrega-operacao.md).
 
 ## Dependências
 
-- [HNS-24](HNS-24.md) concluída e contratos revisados.
-- [HNS-25](HNS-25.md) concluída e contratos revisados.
-- [HNS-30](HNS-30.md) concluída e contratos revisados.
+- [HNS-24](HNS-24.md)
+- [HNS-30](HNS-30.md)
 
 ## Requisitos e leitura obrigatória
 
-Requisitos: R05, R09, R18, R20. Ver [PRD](../01-prd.md).
+R05, R09, R18, R20
 
 - [11-testes.md](../11-testes.md)
 - [08-android.md](../08-android.md)
 
 ## Onde trabalhar
 
-- `hivenode-app` (conferir existência; caminhos de módulos novos são alvos A CRIAR).
-- `hivenode-light` (conferir existência; caminhos de módulos novos são alvos A CRIAR).
-- `docs/hivenode-sms/validation-status.json` (conferir existência; caminhos de módulos novos são alvos A CRIAR).
+- `hivenode-app`
+- `hivenode-light`
+- `docs/hivenode-sms/validation-status.json`
 
 ## Passos de implementação
 
-1. Entregar APKs identificados/hash e roteiro; agendar somente quando proprietário informar disponibilidade.
-2. Testar poucos destinos controlados com linha elegível, SIM1/SIM2/eSIM conforme hardware.
-3. Executar background/reboot/force-stop/permissão/removedSIM/multipart e proxy simultâneo.
-4. Registrar PASSOU/FALHOU/BLOQUEADO/NAO_EXECUTADO por modelo; compatibilidade limitada quando necessário.
-5. Aguardar teste físico do proprietário daqui a alguns dias; não substituir pelo simulador nem inventar data.
+1. Instalar APK assinado pelo canal previsto e registrar build, instalador, aparelho e Android.
+2. Validar SEND_SMS, linha elegível, seleção de SIM, destino controlado e evidência de resultado.
+3. Testar tela apagada, proxy simultâneo, reboot, force-stop, troca de SIM e restauração.
+4. Registrar responsável, resultados por caso e limites de compatibilidade.
 
 ## Critérios de aceite
 
-- [ ] Gate físico não é aprovado antes dos testes do proprietário.
-- [ ] Build/modelo/Android/linha documentados sem secrets.
-- [ ] Light não aprovado não é anunciado como SMS funcional; sua flag permanece off.
-- [ ] Evidências e limitações anexadas ao PR; revisão das áreas críticas feita pelo responsável.
+- [ ] Envio controlado no Android principal comprovado.
+- [ ] Compatibilidade e funcionamento em segundo plano têm evidência.
+- [ ] Light possui aceite independente e flags próprias.
+- [ ] Evidência, limitações e riscos registrados no PR.
 
 ## Testes e evidências
 
-Executar T30, T49, T50, T54 conforme [plano de testes](../11-testes.md). Para cada caso registrar ambiente, commit/build, entrada, esperado/observado e status. Caso físico ou comercial não disponível fica BLOQUEADO/NAO_EXECUTADO com responsável, nunca PASSOU.
+Executar T30, T49, T50, T54, T59 conforme o [plano de testes](../11-testes.md). Se o caso pertence à expansão ou a aparelho real, registrar a condição e a evidência disponível.
 
 ## Como revisar e entregar
 
-PR pequeno com problema/resultado, critérios de aceite e testes relevantes. Não copiar secrets, contatos reais ou corpo de SMS para logs. Para billing/migração/auth/modem, solicitar revisão experiente. Feature flag desligada e compatibilidade preservada quando gate posterior não estiver concluído. Atualizar o estado desta issue e a matriz de rastreabilidade após revisão.
-
+Referenciar esta issue, anexar os testes e registrar compatibilidade e rollback aplicáveis. Marcar a entrega concluída após revisão e atualizar a fase no backlog.

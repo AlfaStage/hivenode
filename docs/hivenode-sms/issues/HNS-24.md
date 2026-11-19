@@ -1,49 +1,48 @@
 # HNS-24 — Integrar agente e telas SMS no app principal
 
-Prioridade: P0 • Situação: TODO • Responsável sugerido: Mobile
+Prioridade P0 · TODO · Fase FLUXO_VERTICAL · Responsável sugerido Mobile
 
 ## Contexto e objetivo
 
-Implementar esta parte do HiveNode SMS/equipes conforme as especificações vinculadas. Este arquivo é uma issue local pronta para importar; não foi publicado em tracker externo. Não confundir TODO com funcionalidade existente.
+Entregar esta parte conforme o [PRD](../01-prd.md) e a [sequência de execução](../12-entrega-operacao.md).
 
 ## Dependências
 
-- [HNS-23](HNS-23.md) concluída e contratos revisados.
-- [HNS-06](HNS-06.md) concluída e contratos revisados.
-- [HNS-13](HNS-13.md) concluída e contratos revisados.
+- [HNS-23](HNS-23.md)
+- [HNS-06](HNS-06.md)
+- [HNS-13](HNS-13.md)
 
 ## Requisitos e leitura obrigatória
 
-Requisitos: R05, R06, R12, R18. Ver [PRD](../01-prd.md).
+R05, R06, R12, R18
 
 - [08-android.md](../08-android.md)
 - [09-painel-jornadas.md](../09-painel-jornadas.md)
 
 ## Onde trabalhar
 
-- `hivenode-app/src/app/index.tsx` (conferir existência; caminhos de módulos novos são alvos A CRIAR).
-- `hivenode-app/src/app/_layout.tsx` (conferir existência; caminhos de módulos novos são alvos A CRIAR).
-- `hivenode-app/plugins` (conferir existência; caminhos de módulos novos são alvos A CRIAR).
+- `hivenode-app/src/app/index.tsx`
+- `hivenode-app/src/app/_layout.tsx`
+- `hivenode-app/plugins`
 
 ## Passos de implementação
 
-1. Extrair integração SMS em módulos sem ampliar monólito de index.tsx.
-2. Mostrar conta/chips/custos/autorizações; ativar permissões apenas ao habilitar serviço.
-3. Agente HTTPS claim/grant/events com persistência nativa e reconciliação.
-4. Tratar timeout FGS/background/reboot/logout/force-stop e badges distintos de proxy/SMS.
+1. Adicionar pareamento e confirmação local de revisão da linha.
+2. Mostrar aparelho, SIM, sessão, disponibilidade, último contato e ação necessária.
+3. Usar sessão visível no piloto com presença expirada, conciliação e retomada explícitas.
+4. Registrar segurança de backup e validar troca de aparelho sem recuperar credencial ou fila.
 
 ## Critérios de aceite
 
 - [ ] SMS funciona sem assinatura proxy e sem sessão de túnel.
 - [ ] Revogação local pausa envio e mantém diagnóstico.
 - [ ] App build/bridge validado; rede real aguarda proprietário.
-- [ ] Evidências e limitações anexadas ao PR; revisão das áreas críticas feita pelo responsável.
+- [ ] Evidência, limitações e riscos registrados no PR.
 
 ## Testes e evidências
 
-Executar T19, T30, T32, T49, T50 conforme [plano de testes](../11-testes.md). Para cada caso registrar ambiente, commit/build, entrada, esperado/observado e status. Caso físico ou comercial não disponível fica BLOQUEADO/NAO_EXECUTADO com responsável, nunca PASSOU.
+Executar T19, T30, T32, T49, T50, T55, T59 conforme o [plano de testes](../11-testes.md). Se o caso pertence à expansão ou a aparelho real, registrar a condição e a evidência disponível.
 
 ## Como revisar e entregar
 
-PR pequeno com problema/resultado, critérios de aceite e testes relevantes. Não copiar secrets, contatos reais ou corpo de SMS para logs. Para billing/migração/auth/modem, solicitar revisão experiente. Feature flag desligada e compatibilidade preservada quando gate posterior não estiver concluído. Atualizar o estado desta issue e a matriz de rastreabilidade após revisão.
-
+Referenciar esta issue, anexar os testes e registrar compatibilidade e rollback aplicáveis. Marcar a entrega concluída após revisão e atualizar a fase no backlog.

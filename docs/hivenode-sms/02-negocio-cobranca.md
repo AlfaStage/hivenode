@@ -12,7 +12,7 @@ Valores em reais, mensalidade antecipada; armazenar preços em centavos inteiros
 
 Acima de 15 aparelhos: orçamento privado, com valores e limites explícitos. Nenhum adicional avulso, plano anual, setup obrigatório ou cobrança por mensagem no lançamento. Suporte assíncrono em português em horário comercial, sem compromisso de resposta 24/7. Sessão assistida opcional: baseline de R$ 99,90 por até uma hora, cobrada separadamente somente após contratação expressa.
 
-Todos os planos incluem painel/API/MCP local, chips ativos, modelos, agenda, lote, estados, exportação, webhooks e controles básicos. Recursos não ficam bloqueados artificialmente para desenvolvedores do plano Inicial. MCP remoto OAuth é liberação condicionada à sua issue.
+O piloto pago oferta apenas o Inicial com painel, REST individual, diagnóstico e histórico disponível. Catálogo de expansão inclui as faixas Equipe e Operação. Recursos entram conforme as etapas do [PRD](01-prd.md), sem cobrança por mensagem. MCP local entra após REST estável e MCP remoto tem validação própria. A oferta mostra os recursos já disponíveis.
 
 ## Regras de capacidade
 
@@ -30,7 +30,7 @@ Um mesmo aparelho pode consumir uma vaga SMS e uma vaga proxy. Compra SMS não c
 
 ## Teste
 
-7 dias corridos a partir da ativação explícita, um aparelho, um membro, 100 segmentos físicos autorizados, uma vez por conta e proprietário inicial. Não enviar sem requisitos da linha. O teste não renova automaticamente para pago sem contratação. Conta verificada e controle de abuso reduzem múltiplos testes; não coletar documentos extras sem justificativa.
+Diagnóstico gratuito precede teste e pagamento. Após prontidão, política aprovada e autorização local, admitir um único teste de prontidão por conta e instalação para destino controlado. Registrar uso para impedir repetição e explicitar custo da operadora antes de confirmar. Ao ativar o teste por ação do proprietário, iniciar sete dias corridos, um aparelho, um membro e até 100 segmentos físicos autorizados, uma vez por conta e proprietário inicial. Encerrar sem conversão automática. O piloto assistido também pode usar um direito temporário auditado com destino controlado.
 
 Reserva de segmentos: preview do aparelho calcula quantidade; antes de autorizar modem, reservar atomicamente o total. Reservas têm ID único da tentativa. Se nenhum segmento foi aceito e a falha é comprovada, liberar; se resultado incerto, manter reservado. Conversão reserva→consumido é idempotente; reenvio deliberado é outra reserva. Não usar número de caracteres JavaScript como faturamento. Planos pagos mantêm contador informativo, sem débito por SMS.
 
@@ -42,27 +42,32 @@ Campos necessários: serviço, preço/limites snapshot, início/fim UTC, ciclo m
 
 Pagamento recebido duas vezes estende o período uma vez. Eventos fora de ordem são reconciliados com estado/identidade de cobrança do gateway. Reembolso/chargeback têm fluxo próprio e não subtraem GB de SMS. Metadados não autorizam cliente a escolher outra conta. Registrar recibo e trilha de reconciliação.
 
-Cartão recorrente e Pix dependem da API/contrato efetivo do gateway. A issue de investigação entrega matriz de suporte a recorrência, cancelamento, atualização, proporcionalidade e sandbox. Se proporcionalidade não existir, implementar cobrança complementar confirmada antes do upgrade; nunca fingir sucesso. Pix manual mostra vencimento e requer confirmação de pagamento.
+Persistir intenção única por conta e serviço antes da chamada externa. Guardar `externalId`, `bill_` (checkout), `subs_` (assinatura após pagamento) e `payment.id` (parcela) separadamente. Validar assinatura do evento, origem, ambiente, valor, moeda e snapshot do plano. Conceder período uma vez por parcela confirmada. O mesmo checkout pode aparecer em renovações e eventos diferentes podem descrever a mesma parcela. Se a resposta do gateway se perder, reconciliar pela referência persistida antes de permitir nova tentativa. Associar webhook antecipado a uma inbox durável. [Checkout](https://docs.abacatepay.com/pages/subscriptions/create) e [eventos](https://docs.abacatepay.com/pages/webhooks/events/subscriptions).
+
+O piloto usa um único meio mensal confirmado em sandbox e disponível na conta. Preferir cartão recorrente se a conta e o público permitirem. Pix Automático depende da loja e troca de valor pode exigir novo mandato. Encerrar a renovação antiga antes que duas autorizações possam cobrar o mesmo período. Oferecer Pix manual apenas como período avulso validado, com vencimento explícito. [Troca de plano](https://docs.abacatepay.com/pages/subscriptions/change-plan).
 
 ## Transições comerciais
 
 | Evento | Regra |
 |---|---|
 | Compra | PENDING até confirmação válida; ACTIVE com período pago |
-| Upgrade | Mostrar cotação; cobrar delta proporcional uma vez; novo limite após pagamento confirmado |
+| Upgrade | Mostrar novo preço e data. Programar para a próxima renovação se o meio suportar. Benefícios mudam após pagamento confirmado |
 | Downgrade | Próxima renovação; cliente escolhe membros/aparelhos que permanecem |
-| Cancelar renovação | Registrar intenção; direitos continuam até `currentPeriodEnd` |
+| Cancelar renovação | Parar cobranças futuras no gateway e preservar `paidThrough`. Informar eventual redução das vagas globais, sem encerrar proxy |
+| Reembolso ou disputa | Fluxo próprio com decisão e efeito explícito sobre o período. Arrependimento recebe confirmação quando aplicável |
 | Período termina sem pagamento | Novas execuções SMS param; saldo/assinatura proxy elegível permanece |
 | Reactivar | Não retomar mensagens vencidas ou suspensas sem revisão explícita |
 | Suspensão por abuso | Parar novas autorizações; manter acesso permitido a cobrança, denúncia e exportação |
 
-Proporcionalidade proposta: `ceil(max(0, novoPreco-antigoPreco) * segundosRestantes / segundosDoPeriodo)`, em centavos, cotação vinculada ao intervalo real UTC, válida por 15 minutos. Exibir preço da renovação. Não usar mês fixo de 30 dias. Se gateway usar cálculo diferente, uma única regra documentada deve prevalecer após a investigação e teste.
+Cotação mostra data, preço e vagas no novo ciclo. Mudança imediata com cálculo proporcional fica para extensão independente. No fim do período, o proprietário conserva cobrança, histórico mascarado disponível e exportação autorizada dentro da janela do último plano pago. Conteúdo segue a própria retenção. Mostrar prazo e impacto antes de confirmar cancelamento ou redução. [Decreto 7.962/2013](https://www.planalto.gov.br/ccivil_03/_ato2011-2014/2013/decreto/d7962.htm).
 
 Ao reduzir capacidade sem seleção prévia: nunca remover dados nem proprietário. Suspender primeiro membros não proprietários mais recentes e aparelhos SMS habilitados mais recentemente até caber; emitir aviso e permitir seleção posterior. Remover acesso suspende também suas chaves, sem perder rastreabilidade. Convites excedentes são cancelados. Reativação de membros/aparelhos depende de seleção, não ocorre em massa automaticamente.
 
 ## Limites públicos de engenharia
 
-Defaults de piloto, configuráveis por ambiente/conta e revisáveis antes de comercializar: 10 solicitações de escrita/minuto por chave, 60/minuto por conta, 100 destinatários/lote, 10.000 mensagens pendentes/conta, 8 segmentos/mensagem e 1 MiB de corpo por requisição. Retornar 429/erro específico e informar limite/ação. Leitura: 120/minuto por chave e 600/minuto por conta. Não cobrar excedente. Contas personalizadas têm limites contratados; nunca alterar silenciosamente.
+Defaults preliminares configuráveis do piloto. Escrita até 10/min por chave e 60/min por conta. Leitura até 120/min por chave e 600/min por conta. Um destinatário por chamada, teto inicial de 100 pendentes por conta, máximo oito segmentos por mensagem e 1 MiB por requisição. Ajustar o teto de pendentes conforme validade e capacidade da linha. Lotes de até 100 destinos entram na expansão com prévia de atraso/expiração. Retornar erro específico e `Retry-After` para 429. Excedente operacional gera limite, sem tarifa adicional.
+
+Para cada coorte, Produto e Financeiro registram antes do piloto amostra, duração, meta de ativação e renovação, orçamento de suporte e margem alvo. Usar R$ 5,17 de variáveis restantes no Inicial como hipótese com Pix de R$ 0,80 e teto variável de 30%. Separar custos de cadastro/revisão, manutenção, taxas, tributos e perdas. [Referência de taxas](https://www.abacatepay.com/duvidas/quanto-custa-a-abacatepay).
 
 Esses números protegem o software, não autorizam a linha a enviar nessa velocidade. Política de envio por linha exige condições contratuais explícitas e usa o menor limite aplicável. Sem política autorizada, bloquear execução real. API pode aceitar uma agenda dentro dos limites de fila sem prometer envio imediato.
 

@@ -4,12 +4,11 @@
 
 | Fase | Entrega | Saída exigida |
 |---|---|---|
-| 0 — Fundamentos | HNS-01–HNS-03, investigação FGS/gateway, fixtures | Contratos/decisões verificáveis, baseline e simulator-ready |
-| 1 — Equipes | HNS-04–HNS-10 | Migração aditiva, autorização, convites, proxy/realtime sem regressão |
-| 2 — Comércio e políticas | HNS-11–HNS-14 | Catálogo, trial, lifecycle de billing e linha elegível |
-| 3 — Backend SMS | HNS-15–HNS-22 | REST, outbox, claim/grant, estados, webhooks/exports |
-| 4 — Apps/canais | HNS-23–HNS-28 | Módulo principal, Light, UX, MCP, builds |
-| 5 — Release | HNS-29–HNS-34 | Observabilidade, CI, homologação, operação e gates comerciais |
+| 0 — Viabilidade | HNS-01, 02, 03, 35 | Prova do canal Android, sandbox financeiro e testes isolados em paralelo |
+| 1 — Fluxo vertical | HNS-04, 06, 08, 10, 11, 13, 15–18, 23, 24, 26, 37 | OWNER, pareamento SMS-only, fila Postgres, simulação E2E e Android principal |
+| 2 — Piloto assistido | HNS-29, 30, 32–34 | Medição, Android principal homologado, controles de linha, privacidade e pausa |
+| 3 — Piloto pago | HNS-12, 38 | Inicial, um meio mensal confirmado, cancelamento e receita conciliados |
+| 4 — Expansão | HNS-05, 07, 09, 14, 19–22, 25, 27, 28, 31, 36 | Aceites próprios por capacidade, migração progressiva e dispositivos homologados |
 
 Issues contêm dependências mais precisas que estes intervalos. Não comprometer datas sem disponibilidade do time. Junior implementa partes pequenas com revisão; responsabilidade jurídica, arquitetura de execução e produção têm responsável experiente.
 
@@ -26,21 +25,21 @@ Variáveis A CRIAR/documentar no `.env.example` sem segredo real: flags da arqui
 
 Métricas por ambiente/serviço e IDs técnicos controlados: mensagens por estado, grants, diferença claim→grant→sent, UNKNOWN/PARTIAL, retries seguros, reconciliação atrasada, outbox lag, DLQ, webhook falhas, tempo fila, dispositivos disponíveis, suspensões e receita/custos efetivos. Não anexar conteúdo/telefone completo como labels; evitar cardinalidade infinita por destinatário.
 
-Defaults de piloto para investigação, não SLA: outbox lag >60s por 5min; reconciliação sem heartbeat >2min; eventos UNKNOWN/PARTIAL >1% em 15min com pelo menos 100 tentativas; estado degradado de DB/Redis imediato para novos grants. Volumes pequenos mostram contagem, não percentuais enganosos. Dashboards devem separar resultado sintético e real.
+Defaults de investigação do piloto: atraso de conciliação acima de dois minutos, fila fora da validade e crescimento de UNKNOWN/PARTIAL por modelo. Volumes pequenos mostram contagem. Medir consultas ociosas, atraso fila→modem, bateria, dados, tempo até primeiro envio, conversão, renovação e minutos de suporte. Produto e Financeiro definem coorte e metas antes de convidar clientes. Duplicação física ou falha de isolamento interrompe a expansão. Separar resultados reais e simulados. Outbox lag passa a ser acompanhado quando webhooks estiverem ativos.
 
 Runbooks: aparelho offline; permissão/SIM; erro de rede ambíguo; atraso de outbox; fila indisponível; webhook; pagamento fora de ordem; perda de chave; vazamento de dados; migração inconsistente; rollback compatível. Nenhum runbook recomenda trocar chip para burlar bloqueio ou repetir UNKNOWN automaticamente.
 
 ## Kill switch
 
 1. Desabilitar `SMS_REAL_SEND_ENABLED` global ou suspender conta/linha em transação auditada.
-2. Publisher/worker continuam guardando intent/estado; emitir novos grants fica proibido.
+2. PostgreSQL preserva intenção e estado. O worker continua a conciliação e novos grants são bloqueados.
 3. App pode finalizar grant previamente emitido até exp, por no máximo 30s; expor essa janela, sem alegar recall de modem.
 4. Eventos/receipts/ACK continuam aceitos para conciliação; webhooks e leitura autorizada continuam operando.
 5. Retomada exige revisar política, validade e mensagens suspensas; nunca flush indiscriminado de fila acumulada.
 
 ## Rollout
 
-Não promover todos os clientes de uma vez. Primeiro migração em shadow e equipe de piloto; depois simulador backend; depois APK principal com teste físico; Light somente após gate próprio; por fim público com linhas elegíveis. Catálogo público pode ficar desativado até L/P. Cliente já pagante não ganha SMS por acaso ao alterar um enum.
+Criar contas do piloto de forma aditiva e preservar as rotas de proxy. Executar simulador e homologar o APK principal. Após HNS-34, conceder SMS Beta só a contas selecionadas em Administração → Usuários. Exigir admissão no painel, REST, MCP, pareamento e novas autorizações de modem. A linha e o destino mantêm autorizações independentes. Liberar compra no plano Inicial após HNS-38 e somente para o beta admitido. Aplicar migração em shadow e ensaio de restauração antes de habilitar equipe sobre o proxy. Light e abertura pública têm aceites próprios. [Beta privado](16-beta-privado.md).
 
 ## Rollback
 
@@ -52,13 +51,13 @@ Não promover todos os clientes de uma vez. Primeiro migração em shadow e equi
 
 ## Checklist para release
 
-- [ ] R01–R22 rastreados; T01–T54 com evidência e gates pendentes visíveis.
-- [ ] Backup restaurado, migração idempotente e rollback compatível ensaiados.
+- [ ] R01–R22 rastreados. T01–T61 executados conforme a fase, com pendências e evidências visíveis.
+- [ ] Rollback e recuperação SMS ensaiados para o piloto. Antes da expansão do proxy, executar HNS-31 com backfill idempotente e backup restaurado.
 - [ ] Testes regressivos de proxy/apps antigos e cobrança passaram.
 - [ ] Nenhuma chance conhecida de acesso entre contas ou retry cego sem correção.
 - [ ] Gate físico principal aprovado; Light aprovado ou flag Light SMS desligada e status público explícito.
 - [ ] Linhas do piloto elegíveis; termos/privacidade/contratos revistos.
-- [ ] Gateway/distribuição real validados; limites/preços publicados e custos aceitos.
+- [ ] Distribuição e requisitos de linha validados no piloto assistido. Para cobrar, validar gateway real, limites, custos e preço conforme HNS-38.
 - [ ] Suporte, alertas, kill switch e responsáveis de plantão definidos.
 - [ ] Artefatos/commits dos repositórios próprios referenciados e APK hash registrado.
 
