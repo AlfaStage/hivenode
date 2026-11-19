@@ -1,5 +1,7 @@
 # Contratos REST, credenciais, MCP e webhooks
 
+Para integrar o beta em produção, use a [documentação da API do piloto real](17-piloto-real.md). O restante deste documento descreve o contrato planejado da API por workspace.
+
 ## Regras comuns
 
 REST novo em `/api/v1/workspaces/{workspaceId}`; APIs atuais continuam durante migração. JSON UTF-8, UUID, E.164, datas RFC3339 UTC, timezone IANA. Valores monetários em centavos. Paginação por cursor opaco vinculado a conta/filtro, default 25, máximo 100. Ordenar createdAt+id para paginação estável.

@@ -129,6 +129,33 @@ export async function checkBrowser(base: string, email: string, otherEmail: stri
       const { data: { message } } = await sentResponse.json();
       await expect(sendResult).toContainText("Mensagem na fila.");
       await expect(page.getByText(message.id, { exact: true })).toBeVisible();
+
+      const secondNumber = "+5562988888888";
+      await page.getByRole("button", { name: "Adicionar número", exact: true }).click();
+      await page.getByLabel("Número a aprovar com DDI").fill(secondNumber);
+      await page.getByRole("checkbox", { name: /Confirmo que tenho autorização/ }).check();
+      const [secondReview] = await Promise.all([
+        page.waitForResponse(response => response.url() === pilotApi && response.request().method() === "POST"),
+        page.getByRole("button", { name: "Solicitar aprovação" }).click(),
+      ]);
+      assert.equal(secondReview.status(), 201);
+      await expect(page.getByText(/8888 está em revisão/)).toBeVisible();
+      await expect(page.getByRole("button", { name: "Revogar destino +55 •••• 9999" })).toBeVisible();
+      await page.getByLabel("Número de teste com DDI").fill(secondNumber);
+      await page.getByLabel("Mensagem", { exact: true }).fill("Segundo destino isolado");
+      const [pendingResponse] = await Promise.all([nextSend(), sendButton.click()]);
+      assert.equal(pendingResponse.status(), 403);
+
+      const adminSmsPage = await admin.newPage();
+      await adminSmsPage.goto(smsPath, { waitUntil: "domcontentloaded" });
+      const reviewCard = adminSmsPage.getByText(email, { exact: true }).locator("..").locator("..");
+      await reviewCard.getByRole("checkbox").check();
+      await reviewCard.getByRole("button", { name: "Aprovar número", exact: true }).click();
+      await expect(page.getByRole("button", { name: "Revogar destino +55 •••• 8888" })).toBeVisible({ timeout: 15000 });
+      await adminSmsPage.close();
+      const [secondResponse] = await Promise.all([nextSend(), sendButton.click()]);
+      assert.equal(secondResponse.status(), 202);
+      const { data: { message: secondMessage } } = await secondResponse.json();
       await expect(page.getByRole("button", { name: "Gerar chave" })).toHaveCount(0);
       await page.getByRole("button", { name: "Gerenciar", exact: true }).click();
       await expect(page.getByRole("button", { name: "Gerar chave" })).toBeVisible();
@@ -141,13 +168,50 @@ export async function checkBrowser(base: string, email: string, otherEmail: stri
       const dispatch = await page.request.post(agentApi, { data: poll, headers: agentAuth });
       const { data: { grant } } = await dispatch.json();
       assert.equal(JSON.parse(Buffer.from(grant.payload, "base64url").toString()).id, message.id);
+      const event = { action: "event", messageId: message.id, version: 1, total: 1, sent: 1, delivered: 0, failed: 0, code: null };
+      assert.equal((await page.request.post(agentApi, { data: event, headers: agentAuth })).status(), 200);
+      const secondDispatch = await page.request.post(agentApi, { data: poll, headers: agentAuth });
+      const { data: { grant: secondGrant } } = await secondDispatch.json();
+      const secondPayload = JSON.parse(Buffer.from(secondGrant.payload, "base64url").toString());
+      assert.equal(secondPayload.id, secondMessage.id);
+      assert.equal(secondPayload.to, secondNumber);
+      await page.getByLabel("Mensagem", { exact: true }).fill("Aguardando na fila");
+      const [secondQueuedResponse] = await Promise.all([nextSend(), sendButton.click()]);
+      assert.equal(secondQueuedResponse.status(), 202);
+      const { data: { message: secondQueued } } = await secondQueuedResponse.json();
+      page.once("dialog", dialog => dialog.accept());
+      await page.getByRole("button", { name: "Revogar destino +55 •••• 8888" }).click();
+      const canceledRow = page.getByText(secondQueued.id, { exact: true }).locator("..");
+      await expect(canceledRow.getByText("Cancelado", { exact: true })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Revogar destino +55 •••• 9999" })).toBeVisible();
+
+      const key = await page.evaluate(async () => {
+        const response = await fetch("/api/sms/pilot", {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ action: "issue-key" }),
+        });
+        return (await response.json()).data.token as string;
+      });
+      const sendWithKey = (destination: string, idempotencyKey: string) => page.request.post(pilotApi + "/messages", {
+        data: { deviceId, destination, text: "Solicitação pela chave da API" },
+        headers: { ...deviceAuth(key), "Idempotency-Key": idempotencyKey },
+      });
+      const retryKey = randomUUID();
+      const firstViaApi = await sendWithKey("+5562999999999", retryKey);
+      assert.equal(firstViaApi.status(), 202);
+      const replay = await sendWithKey("+5562999999999", retryKey);
+      assert.equal(replay.status(), 200);
+      assert.equal((await replay.json()).data.message.id, (await firstViaApi.json()).data.message.id);
+      assert.equal((await sendWithKey(secondNumber, randomUUID())).status(), 403);
+      assert.equal((await sendWithKey("+5562999999999", randomUUID())).status(), 202);
+      assert.equal((await sendWithKey("+5562999999999", randomUUID())).status(), 429);
 
       assert.equal((await other.goto(smsPath, { waitUntil: "domcontentloaded" }))?.status(), 404);
       await adminPage.getByRole("button", { name: "Revogar SMS", exact: true }).click();
       await expect(adminPage.getByRole("button", { name: "Liberar SMS", exact: true })).toBeVisible({ timeout: 15000 });
       if (deviceTokens) assert.deepEqual((await (await readMobileAccess(deviceTokens.admittedDevice)).json()).data, { allowed: false });
       assert.equal((await page.reload({ waitUntil: "domcontentloaded" }))?.status(), 404);
-      console.log("Browser: SMS admission, pairing, click-to-queue, SIM activation and revocation checked");
+      console.log("Browser: pairing, SIM activation, two approved destinations, queued grants and individual revocation checked");
     }
 
     if (process.argv.includes("--sms-beta-only")) {

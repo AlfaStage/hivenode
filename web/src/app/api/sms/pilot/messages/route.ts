@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { apiError, apiSuccess } from "@/lib/api-utils";
 import { encrypt } from "@/lib/crypto";
-import { consentVersion, destination, expireMessages, maskPhone, messageFields, privateHash, realSendEnabled, withPilotAccess } from "@/lib/sms-pilot";
+import { consentVersion, destination, destinationFingerprint, expireMessages, maskPhone, messageFields, privateHash,
+  realSendEnabled, reviewedDestinations, withPilotAccess } from "@/lib/sms-pilot";
 
 const create = z.strictObject({ deviceId: z.uuid(), destination, text: z.string().trim().min(1).max(420) });
 const idempotency = z.string().regex(/^[a-zA-Z0-9_-]{16,128}$/);
@@ -37,9 +38,9 @@ export async function POST(request: Request) {
     }
     const device = await tx.smsPilotDevice.findFirst({ where: { id: data.deviceId, userId, revokedAt: null } });
     if (!device) return apiError("Aparelho não encontrado", 404);
-    if (!device.approvedBinding || !device.approvedAt ||
-        device.destinationHash !== privateHash(["destination-v1", userId, data.destination])) {
-      return apiError("A linha e este destino precisam estar aprovados para o piloto", 403);
+    const hash = destinationFingerprint(userId, data.destination);
+    if (!device.approvedBinding || !reviewedDestinations(device).some(item => item.hash === hash)) {
+      return apiError("Este número precisa estar na lista de destinos aprovados do chip", 403);
     }
     if (device.consentVersion !== consentVersion) {
       return apiError("Abra a tela SMS Beta no Android e selecione o SIM aprovado para retomar o envio.", 409);
@@ -52,7 +53,8 @@ export async function POST(request: Request) {
     if (count >= 5) return apiError("Limite de 5 solicitações em 24 horas no piloto", 429);
     const message = await tx.smsPilotMessage.create({ data: {
       userId, deviceId: data.deviceId, bindingId: device.approvedBinding, idempotencyKey, fingerprint,
-      maskedDestination: maskPhone(data.destination), encryptedPayload: encrypt(JSON.stringify({ to: data.destination, text: data.text })),
+      maskedDestination: maskPhone(data.destination), destinationHash: hash,
+      encryptedPayload: encrypt(JSON.stringify({ to: data.destination, text: data.text })),
       expiresAt: new Date(now.getTime() + 600_000),
     }, select: messageFields });
     await tx.auditLog.create({ data: { actorId: userId, action: "sms_pilot.enqueue", targetId: message.id,

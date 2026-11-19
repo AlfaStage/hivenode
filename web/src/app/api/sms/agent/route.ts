@@ -4,8 +4,8 @@ import { getAuthenticatedUser } from "@/lib/auth";
 import { decrypt } from "@/lib/crypto";
 import { prisma } from "@/lib/prisma";
 import {
-  bindingId, bindingList, cancelPending, consentVersion, expireMessages, hashToken,
-  isAdmitted, lockOwner, opaqueToken, realSendEnabled, signGrant,
+  bindingId, bindingList, cancelPending, consentVersion, destinationFingerprint, expireMessages, hashToken,
+  isAdmitted, lockOwner, opaqueToken, realSendEnabled, reviewedDestinations, signGrant,
 } from "@/lib/sms-pilot";
 
 const eventCode = z.enum([
@@ -99,13 +99,14 @@ export async function POST(request: Request) {
       await tx.smsPilotDevice.update({ where: { id: device.id }, data: {
         lastSeenAt: now, bindings: data.bindings, consentVersion: data.consentVersion, selectedBinding: data.activeBinding,
         ...(inventoryChanged ? { approvedBinding: null, approvedAt: null, pendingBinding: null,
-          destinationHash: null, destinationMask: null } : {}),
+          destinationHash: null, destinationMask: null, approvedDestinations: [] } : {}),
       } });
       if (inventoryChanged) await cancelPending(tx, device.userId, device.id);
 
+      const approved = inventoryChanged ? [] : reviewedDestinations(device);
       let status = "READY";
       if (!realSendEnabled()) status = "SERVICE_PAUSED";
-      else if (inventoryChanged || !device.approvedBinding || !device.approvedAt) status = "APPROVAL_REQUIRED";
+      else if (!approved.length) status = "APPROVAL_REQUIRED";
       else if (data.consentVersion !== consentVersion || device.approvedBinding !== data.activeBinding || missing(data.activeBinding)) status = "SIM_NOT_SELECTED";
       if (status !== "READY") return apiSuccess({ status, grant: null });
 
@@ -118,6 +119,11 @@ export async function POST(request: Request) {
       });
       if (!message?.encryptedPayload) return apiSuccess({ status, grant: null });
       const { to, text } = z.object({ to: z.string(), text: z.string() }).parse(JSON.parse(decrypt(message.encryptedPayload)));
+      const hash = destinationFingerprint(device.userId, to);
+      if (!approved.some(item => item.hash === hash)) {
+        await tx.smsPilotMessage.update({ where: { id: message.id }, data: { state: "CANCELED", encryptedPayload: null } });
+        return apiSuccess({ status, grant: null });
+      }
       const grantExpiresAt = new Date(now.getTime() + 30_000);
       const payload = Buffer.from(JSON.stringify({ id: message.id, deviceId: device.id, bindingId: message.bindingId, to, text,
         issuedAt: now.getTime(), expiresAt: grantExpiresAt.getTime() })).toString("base64url");

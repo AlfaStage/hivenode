@@ -7,8 +7,12 @@ import { prisma } from "@/lib/prisma";
 import { isSmsBetaSameOrigin } from "@/lib/sms-beta-origin";
 
 export const consentVersion = "pilot-br-1";
+export const maxApprovedDestinations = 5;
 export const bindingId = z.uuid();
 export const destination = z.string().trim().regex(/^\+55[1-9]\d{9,10}$/);
+const destinationList = z.array(z.strictObject({
+  id: z.uuid(), hash: z.string().regex(/^[a-f0-9]{64}$/), mask: z.string(),
+})).max(maxApprovedDestinations);
 export const bindingList = z.array(z.strictObject({
   id: bindingId,
   slot: z.number().int().min(0).max(8),
@@ -44,6 +48,22 @@ export function signGrant(agentToken: string, payload: string) {
 
 export function maskPhone(number: string) {
   return "+55 •••• " + number.slice(-4);
+}
+
+export function destinationFingerprint(userId: string, number: string) {
+  return privateHash(["destination-v1", userId, number]);
+}
+
+export function reviewedDestinations(device: {
+  id: string; approvedDestinations: Prisma.JsonValue; approvedBinding: string | null; approvedAt: Date | null;
+  pendingBinding: string | null; destinationHash: string | null; destinationMask: string | null;
+}) {
+  if (!device.approvedBinding || !device.approvedAt) return [];
+  const approved = destinationList.parse(device.approvedDestinations);
+  if (!approved.length && !device.pendingBinding && device.destinationHash && device.destinationMask) {
+    return [{ id: device.id, hash: device.destinationHash, mask: device.destinationMask }];
+  }
+  return approved;
 }
 
 type Owner = { role: string; disabled: boolean; sessionVersion: number; smsBetaAccess: boolean };

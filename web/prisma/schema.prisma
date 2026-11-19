@@ -101,6 +101,7 @@ model SmsPilotDevice {
   pendingBinding  String?
   destinationHash String?
   destinationMask String?
+  approvedDestinations Json @default("[]")
   approvedAt      DateTime?
   createdAt       DateTime @default(now())
   messages        SmsPilotMessage[]
@@ -130,6 +131,7 @@ model SmsPilotMessage {
   idempotencyKey   String
   fingerprint      String
   maskedDestination String
+  destinationHash  String?
   encryptedPayload String?
   state            SmsPilotState @default(QUEUED)
   expiresAt        DateTime

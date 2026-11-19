@@ -1,9 +1,11 @@
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { apiError, apiSuccess, handleApiError } from "@/lib/api-utils";
 import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { isSmsBetaSameOrigin } from "@/lib/sms-beta-origin";
-import { bindingId, bindingList, cancelPending, consentVersion, isAdmitted, lockOwner, privateHash } from "@/lib/sms-pilot";
+import { bindingId, bindingList, cancelPending, consentVersion, isAdmitted, lockOwner, maxApprovedDestinations,
+  privateHash, reviewedDestinations } from "@/lib/sms-pilot";
 
 function reviewToken(id: string, binding: string | null, destinationHash: string | null) {
   return privateHash(["line-review-v1", id, binding, destinationHash]);
@@ -13,7 +15,7 @@ export async function GET() {
   try {
     await requireAdmin();
     const pending = await prisma.smsPilotDevice.findMany({ where: { pendingBinding: { not: null }, revokedAt: null },
-      select: { id: true, label: true, pendingBinding: true, destinationMask: true, destinationHash: true, bindings: true,
+      select: { id: true, label: true, pendingBinding: true, approvedBinding: true, destinationMask: true, destinationHash: true, bindings: true,
         user: { select: { email: true } } }, take: 50, orderBy: { createdAt: "desc" } });
     return apiSuccess({ pending: pending.map(({ destinationHash, ...item }) => ({
       ...item, approvalToken: reviewToken(item.id, item.pendingBinding, destinationHash),
@@ -41,17 +43,26 @@ export async function POST(request: Request) {
         return apiError("A solicitação foi alterada. Revise a linha e o destino novamente.", 409);
       }
       const approving = data.action === "approve";
-      if (approving && (device.consentVersion !== consentVersion || device.selectedBinding !== data.bindingId || !device.destinationHash ||
-          !device.lastSeenAt || Date.now() - device.lastSeenAt.getTime() > 90_000 ||
-          !bindingList.parse(device.bindings).some(line => line.id === data.bindingId))) {
-        return apiError("O chip precisa estar disponível e confirmado no app", 409);
+      const sameLine = device.approvedBinding === data.bindingId && !!device.approvedAt;
+      const approved = sameLine ? reviewedDestinations(device) : [];
+      if (approving) {
+        if (device.consentVersion !== consentVersion || device.selectedBinding !== data.bindingId ||
+            !device.destinationHash || !device.destinationMask || !device.lastSeenAt ||
+            Date.now() - device.lastSeenAt.getTime() > 90_000 ||
+            !bindingList.parse(device.bindings).some(line => line.id === data.bindingId)) {
+          return apiError("O chip precisa estar disponível e confirmado no app", 409);
+        }
+        if (approved.length >= maxApprovedDestinations) return apiError("Limite de destinos aprovados neste chip", 409);
+        if (approved.some(item => item.hash === device.destinationHash)) return apiError("Este destino já está aprovado", 409);
+        approved.push({ id: randomUUID(), hash: device.destinationHash, mask: device.destinationMask });
       }
+      const keepLine = approving || (data.action === "decline" && sameLine);
       await tx.smsPilotDevice.update({ where: { id: device.id }, data: {
-        approvedBinding: approving ? data.bindingId : null, approvedAt: approving ? new Date() : null,
-        pendingBinding: null, destinationHash: approving ? device.destinationHash : null,
-        destinationMask: approving ? device.destinationMask : null,
+        approvedBinding: keepLine ? data.bindingId : null, approvedAt: keepLine ? device.approvedAt ?? new Date() : null,
+        approvedDestinations: keepLine ? approved : [],
+        pendingBinding: null, destinationHash: null, destinationMask: null,
       } });
-      if (!approving) await cancelPending(tx, device.userId, device.id);
+      if (!keepLine) await cancelPending(tx, device.userId, device.id);
       await tx.auditLog.create({ data: { actorId: admin.userId, action: "sms_pilot.line_" + data.action,
         targetId: device.id, metadata: { bindingId: data.bindingId, consentVersion } } });
       return apiSuccess({ approved: approving });
